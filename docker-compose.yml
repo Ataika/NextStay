@@ -1,0 +1,43 @@
+
+services:
+  # 1. DATABASE: PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: nextstay_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-nextstay_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# 2. BACKEND: FastAPI
+  backend:
+    build: ./backend
+    container_name: nextstay_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-nextstay_db}
+    depends_on:
+      - db
+
+# 3. ANALYTICS: Apache Superset
+  superset:
+    image: apache/superset:latest
+    container_name: nextstay_superset
+    restart: always
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-your_secret_key_here}
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+
