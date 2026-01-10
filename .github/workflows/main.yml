@@ -7,13 +7,52 @@ on:
     branches: [ main ]
 
 jobs:
-  check-infrastructure:
+  quality-control:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Python Linter
+        run: pip install flake8
+
+      - name: Lint Backend (Dair)
+        run: flake8 backend --count --max-line-length=127 --statistics
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Frontend Deps & Lint (Turat)
+        run: |
+          if [ -f frontend/package.json ]; then
+            cd frontend
+            npm install
+            npm run lint || echo "Linting failed or script not found"
+          else
+            echo "Frontend project not initialized yet, skipping..."
+          fi
+
       - name: Validate Docker Compose
         run: docker compose config
 
-      - name: Test Backend Build
+      - name: Test Docker Build
         run: docker build ./backend
+
+
+
+
+
+
+
+
+
+
+
+
+
+
