@@ -1,0 +1,51 @@
+{
+  "rooms": [
+    {
+      "room_number": "101",
+      "room_type": "standard",
+      "status": "available",
+      "price_per_night": 50.00
+    },
+    {
+      "room_number": "102",
+      "room_type": "standard",
+      "status": "occupied",
+      "price_per_night": 50.00
+    },
+    {
+      "room_number": "201",
+      "room_type": "deluxe",
+      "status": "dirty",
+      "price_per_night": 120.00
+    },
+    {
+      "room_number": "202",
+      "room_type": "deluxe",
+      "status": "maintenance",
+      "price_per_night": 120.00
+    },
+    {
+      "room_number": "301",
+      "room_type": "dorm",
+      "status": "available",
+      "price_per_night": 25.00
+    }
+  ],
+  "users": [
+    {
+      "username": "atay_admin",
+      "role": "admin",
+      "password_hash": "hashed_pass_placeholder"
+    },
+    {
+      "username": "dair_backend",
+      "role": "manager",
+      "password_hash": "hashed_pass_placeholder"
+    },
+    {
+      "username": "turat_cleaner",
+      "role": "cleaner",
+      "password_hash": "hashed_pass_placeholder"
+    }
+  ]
+}
