@@ -1,0 +1,12 @@
+nexstay_dwh:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: db
+      user: postgres
+      password: postgres
+      port: 5432
+      dbname: nexstay
+      schema: stg
+      threads: 4
