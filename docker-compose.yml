@@ -1,32 +1,33 @@
-
-services:
+services: 
   # 1. DATABASE: PostgreSQL
   db:
     image: postgres:15-alpine
-    container_name: nextstay_db
+    container_name: nextstay_db  
     restart: always
-    environment:
+    environment:   
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-nextstay_db}
+      POSTGRES_DB: ${DB_NAME:-nextstay} 
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-# 2. BACKEND: FastAPI
+  # 2. BACKEND: FastAPI
   backend:
     build: ./backend
     container_name: nextstay_backend
     restart: always
     ports:
       - "8000:8000"
+    volumes:
+      - ./backend:/app 
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-nextstay_db}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-nextstay}
     depends_on:
       - db
-
-# 3. ANALYTICS: Apache Superset
+  
+  # 3. ANALYTICS: Apache Superset
   superset:
     image: apache/superset:latest
     container_name: nextstay_superset
@@ -38,6 +39,18 @@ services:
     depends_on:
       - db
 
+  # 4. Analytics ETL/ELT pipeline: DBT
+  dbt:
+    build:
+      context: ./analytics
+    container_name: nextstay_dbt
+    volumes:
+      - ./analytics:/usr/app
+      - ~/.dbt:/root/.dbt
+    environment:
+      - DBT_PROFILES_DIR=/usr/app
+    depends_on:
+      - db
+
 volumes:
   postgres_data:
-
