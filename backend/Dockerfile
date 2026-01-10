@@ -7,9 +7,12 @@ ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies for PostgreSQL
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+    gcc \
+    python3-dev \
     libpq-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    make \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
