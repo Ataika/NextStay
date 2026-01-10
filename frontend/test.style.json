@@ -1,5 +1,0 @@
-mkdir -p frontend
-cd frontend
-# Создаем минимальный package.json, чтобы Гитхаб начал проверку
-echo '{"name": "frontend", "scripts": {"lint": "exit 1"}}' > package.json 
-cd ..
