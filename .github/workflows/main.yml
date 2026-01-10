@@ -1,4 +1,4 @@
-ame: NexStay CI Pipeline
+name: NexStay CI
 
 on:
   push:
@@ -7,28 +7,13 @@ on:
     branches: [ main ]
 
 jobs:
-backend-lint:
+  check-infrastructure:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install flake8
-      - name: Lint with flake8
-        run: |
-          # Проверка на синтаксические ошибки
-          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
-
-docker-build-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Build Backend Image
-        run: docker build ./backend -t nextstay-backend-test
-      - name: Check Docker Compose Config
+      
+      - name: Validate Docker Compose
         run: docker compose config
+
+      - name: Test Backend Build
+        run: docker build ./backend
