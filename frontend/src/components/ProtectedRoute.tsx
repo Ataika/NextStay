@@ -12,12 +12,12 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   const token = useAuthStore((s) => s.token);
   const role = useAuthStore((s) => s.role);
 
-  // если нет полной auth-сессии
+  // if there is no full auth session
   if (!token || !role) {
     return <Navigate to="/login" replace />;
   }
 
-  // если нужна конкретная роль, а роль не совпала
+  // if a specific role is needed and the role doesn't match
   if (requiredRole && role !== requiredRole) {
     return <Navigate to={role === "OWNER" ? "/admin" : "/staff"} replace />;
   }

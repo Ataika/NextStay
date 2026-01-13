@@ -5,11 +5,11 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Reports</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Аналитика и отчеты</p>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Analytics and reports</p>
         </div>
       </div>
 
-      {/* Placeholder Dashboard - Superset style - полноэкранный */}
+      {/* Placeholder Dashboard - Superset style - fullscreen */}
       <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-6 sm:p-8 lg:p-12 min-h-[600px] w-full">
         <div className="text-center py-12 sm:py-20">
           <div className="inline-block mb-6">
@@ -31,10 +31,10 @@ export default function ReportsPage() {
             Reports Dashboard
           </h2>
           <p className="text-gray-500 dark:text-gray-500">
-            Модуль аналитики и отчетов
+            Analytics and reports module
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-600 mt-2">
-            В разработке
+            In development
           </p>
         </div>
       </div>

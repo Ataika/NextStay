@@ -11,7 +11,7 @@ export default function Header() {
     try {
       await authApi.logout();
     } catch (error) {
-      // Игнорируем ошибки при выходе
+      // Ignore errors when logging out
     } finally {
       clearAuth();
       navigate("/login");
@@ -30,14 +30,14 @@ export default function Header() {
         </h1>
         <div className="flex items-center gap-2 sm:gap-4">
           <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-300">
-            {role === "OWNER" ? "Администратор" : "Персонал"}
+            {role === "OWNER" ? "Administrator" : "Staff"}
           </span>
           <button
             onClick={handleLogout}
             className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
           >
-            <span className="hidden sm:inline">Выйти</span>
-            <span className="sm:hidden">Выход</span>
+            <span className="hidden sm:inline">Logout</span>
+            <span className="sm:hidden">Logout</span>
           </button>
           <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs sm:text-sm">
             {role === "OWNER" ? "A" : "S"}

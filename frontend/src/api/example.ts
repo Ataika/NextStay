@@ -1,7 +1,7 @@
-// Пример использования API клиента
+// Example API client usage
 import http from "./http";
 
-// Пример API функций
+// Example API functions
 export const authApi = {
   login: async (email: string, password: string) => {
     const response = await http.post("/auth/login", { email, password });

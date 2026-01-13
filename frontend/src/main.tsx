@@ -4,10 +4,10 @@ import { Toaster } from 'react-hot-toast'
 import './index.css'
 import App from './App.tsx'
 
-// Компонент для управления темой
+// Component to manage the theme
 function ThemeManager() {
   useEffect(() => {
-    // Автоматическое определение системной темы
+    // Automatic detection of the system theme
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
     const updateTheme = (e: MediaQueryList | MediaQueryListEvent) => {
@@ -18,18 +18,18 @@ function ThemeManager() {
       }
     };
 
-    // Устанавливаем начальную тему
+      // Set the initial theme
     updateTheme(mediaQuery);
 
-    // Слушаем изменения системной темы
-    // Используем addEventListener если доступен, иначе fallback на addListener для старых браузеров
+    // Listen for changes in the system theme
+    // Use addEventListener if available, otherwise fallback to addListener for older browsers
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener('change', updateTheme);
       return () => {
         mediaQuery.removeEventListener('change', updateTheme);
       };
     } else {
-      // Fallback для старых браузеров
+      // Fallback for older browsers
       const listener = (e: MediaQueryListEvent) => updateTheme(e);
       mediaQuery.addListener(listener);
       return () => {

@@ -35,15 +35,15 @@ export default function GuestPage() {
       setLoading(true);
       const data = await guestApi.getByToken(guestToken);
       if (!data) {
-        toast.error("Неверный токен");
+        toast.error("Invalid token");
         return;
       }
       if (!data.isValid) {
-        toast.error("Токен истек");
+        toast.error("Token expired");
       }
       setGuest(data);
     } catch (error) {
-      toast.error("Ошибка загрузки данных");
+      toast.error("Error loading data");
       console.error(error);
     } finally {
       setLoading(false);
@@ -53,18 +53,18 @@ export default function GuestPage() {
   const handleCheckout = async () => {
     if (!token || !guest) return;
 
-    if (!confirm("Вы уверены, что хотите выехать?")) {
+    if (!confirm("Are you sure you want to check out?")) {
       return;
     }
 
     try {
       setCheckingOut(true);
       await guestApi.checkOut(token);
-      toast.success("Выезд успешно оформлен. Спасибо за визит!");
-      // Перезагружаем данные, чтобы токен стал невалидным в UI
+      toast.success("Check out successfully. Thank you for your visit!");
+      // Reload data to make the token invalid in UI
       await loadGuestData(token);
     } catch (error) {
-      toast.error("Ошибка при оформлении выезда");
+      toast.error("Error checking out");
       console.error(error);
     } finally {
       setCheckingOut(false);
@@ -74,7 +74,7 @@ export default function GuestPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-600 dark:text-gray-400">Загрузка...</div>
+        <div className="text-gray-600 dark:text-gray-400">Loading...</div>
       </div>
     );
   }
@@ -83,8 +83,8 @@ export default function GuestPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Ошибка</h1>
-          <p className="text-gray-600 dark:text-gray-400">Неверный или истекший токен</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Error</h1>
+          <p className="text-gray-600 dark:text-gray-400">Invalid or expired token</p>
         </div>
       </div>
     );
@@ -100,10 +100,10 @@ export default function GuestPage() {
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">NextStay</h1>
-          <p className="text-gray-600 dark:text-gray-300">Добро пожаловать, {guest.guestName}!</p>
+          <p className="text-gray-600 dark:text-gray-300">Welcome, {guest.guestName}!</p>
         </div>
 
-        {/* Main Card - адаптивный layout */}
+        {/* Main Card - responsive layout */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 sm:p-6 mb-4 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
           {/* Left Column - QR Code and Room Info */}
           <div className="lg:flex lg:flex-col lg:items-center">
@@ -115,11 +115,11 @@ export default function GuestPage() {
                 </span>
               </div>
               <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-1">
-                Комната {guest.roomNumber}
+                Room {guest.roomNumber}
               </h2>
               {!guest.isValid && (
                 <p className="text-sm text-red-600 dark:text-red-400 font-medium">
-                  Токен истек
+                  Token expired
                 </p>
               )}
             </div>
@@ -141,7 +141,7 @@ export default function GuestPage() {
             {/* Booking Info */}
             <div className="space-y-3 mb-4 sm:mb-6 lg:mb-6">
               <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Заезд</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Check-in</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {checkInDate.toLocaleDateString("ru-RU", {
                     day: "numeric",
@@ -151,7 +151,7 @@ export default function GuestPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-gray-700">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Выезд</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Check-out</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {checkOutDate.toLocaleDateString("ru-RU", {
                     day: "numeric",
@@ -161,7 +161,7 @@ export default function GuestPage() {
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Гость</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">Guest</span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {guest.guestName}
                 </span>
@@ -174,7 +174,7 @@ export default function GuestPage() {
               disabled={checkingOut || !guest.isValid}
               className="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 active:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md"
             >
-              {checkingOut ? "Оформление..." : "Оформить выезд"}
+              {checkingOut ? "Checking out..." : "Check out"}
             </button>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function GuestPage() {
         {/* Info */}
         <div className="text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Покажите QR-код персоналу для быстрого доступа
+            Show the QR code to the staff for quick access
           </p>
         </div>
       </div>

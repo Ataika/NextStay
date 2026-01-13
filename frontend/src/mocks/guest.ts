@@ -9,14 +9,14 @@ export interface GuestToken {
   isValid: boolean;
 }
 
-// Моки токенов для гостей
+// Mock tokens for guests
 export const mockGuestTokens: GuestToken[] = [
   {
     token: "guest-token-abc123",
     bookingId: 1,
     roomId: 2,
     roomNumber: "102",
-    guestName: "Иван Иванов",
+    guestName: "John Doe",
     checkIn: "2024-01-14T14:00:00Z",
     checkOut: "2024-01-16T12:00:00Z",
     isValid: true,
@@ -26,7 +26,7 @@ export const mockGuestTokens: GuestToken[] = [
     bookingId: 2,
     roomId: 8,
     roomNumber: "203",
-    guestName: "Петр Петров",
+    guestName: "Jane Doe",
     checkIn: "2024-01-15T14:00:00Z",
     checkOut: "2024-01-17T12:00:00Z",
     isValid: true,
@@ -36,14 +36,14 @@ export const mockGuestTokens: GuestToken[] = [
     bookingId: 3,
     roomId: 1,
     roomNumber: "101",
-    guestName: "Мария Сидорова",
+    guestName: "Mary Smith",
     checkIn: "2024-01-10T14:00:00Z",
     checkOut: "2024-01-12T12:00:00Z",
-    isValid: false, // Истекший токен
+    isValid: false, // Expired token
   },
 ];
 
-// Функция для получения данных гостя по токену
+// Function to get guest data by token
 export function getGuestByToken(token: string): GuestToken | null {
   return mockGuestTokens.find((gt) => gt.token === token) || null;
 }

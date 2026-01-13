@@ -1,4 +1,4 @@
-// Унифицированный API клиент - автоматически переключается между моками и реальным API
+// Unified API client - automatically switches between mock and real API
 import http from "./http";
 import { mockApi, USE_MOCK_API } from "./mockApi";
 import type { Room } from "../mocks/rooms";
@@ -112,7 +112,7 @@ export const guestApi = {
 export const authApi = {
   login: async (email: string, password: string) => {
     if (USE_MOCK_API) {
-      // Mock логин - возвращает токен и роль
+      // Mock login - returns token and role
       await new Promise((resolve) => setTimeout(resolve, 500));
       if (email === "admin@nextstay.com" && password === "admin") {
         return {
