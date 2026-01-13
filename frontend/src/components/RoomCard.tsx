@@ -56,7 +56,7 @@ export default function RoomCard({
         <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-4">
           <div className="flex items-center gap-1">
             <span>👥</span>
-            <span>{room.capacity} чел.</span>
+            <span>{room.capacity} people</span>
           </div>
           <div className="font-semibold text-gray-800 dark:text-white">
             {room.price.toLocaleString("ru-RU")} ₽
@@ -94,10 +94,10 @@ export default function RoomCard({
               }
               className="flex-1 text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
-              <option value="Available">Доступна</option>
-              <option value="Occupied">Занята</option>
-              <option value="Dirty">Требует уборки</option>
-              <option value="Maintenance">На ремонте</option>
+              <option value="Available">Available</option>
+              <option value="Occupied">Occupied</option>
+              <option value="Dirty">Dirty</option>
+              <option value="Maintenance">Maintenance</option>
             </select>
           )}
           {onViewDetails && (
@@ -105,7 +105,7 @@ export default function RoomCard({
               onClick={() => onViewDetails(room.id)}
               className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white text-xs font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
             >
-              Детали
+              Details
             </button>
           )}
         </div>

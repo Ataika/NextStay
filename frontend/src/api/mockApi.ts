@@ -1,12 +1,12 @@
-// Mock API для работы без backend
+// Mock API for working without backend
 import { mockRooms, type Room } from "../mocks/rooms";
 import { mockTasks, type CleaningTask } from "../mocks/tasks";
 import { getGuestByToken, type GuestToken } from "../mocks/guest";
 
-// Флаг для переключения между моками и реальным API
-export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true" || true; // По умолчанию true
+// Flag for switching between mock and real API
+export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true" || true; // Default true
 
-// Имитация задержки сети
+// Network delay simulation
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const mockApi = {
@@ -102,7 +102,7 @@ export const mockApi = {
       await delay(500);
       const guest = getGuestByToken(token);
       if (!guest) throw new Error("Invalid token");
-      // В реальном API здесь будет обновление статуса комнаты и создание задачи
+      // In real API, here would be updating room status and creating a task
     },
   },
 };

@@ -2,19 +2,19 @@ import axios, { AxiosError } from "axios";
 import { useAuthStore } from "../store/authStore";
 import toast from "react-hot-toast";
 
-// Базовый URL API (можно вынести в .env)
+// Base API URL (can be moved to .env)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
-// Создаем axios instance
+// Create axios instance
 const http = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 10000, // 10 секунд
+  timeout: 10000, // 10 seconds
 });
 
-// Request interceptor - добавляет Bearer token
+// Request interceptor - adds Bearer token
 http.interceptors.request.use(
   (config) => {
     const { token } = useAuthStore.getState();
@@ -30,27 +30,27 @@ http.interceptors.request.use(
   }
 );
 
-// Response interceptor - обрабатывает ошибки
+// Response interceptor - handles errors
 http.interceptors.response.use(
   (response) => {
     return response;
   },
   (error: AxiosError) => {
-    // Обработка 401 - неавторизован
+    // Handle 401 - unauthorized
     if (error.response?.status === 401) {
       const { clearAuth } = useAuthStore.getState();
       clearAuth();
       
-      // Редирект на страницу логина
+      // Redirect to login page
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
       
-      toast.error("Сессия истекла. Пожалуйста, войдите снова.");
+      toast.error("Session expired. Please login again.");
       return Promise.reject(error);
     }
 
-    // Обработка других ошибок
+    // Handle other errors
     const errorMessage = getErrorMessage(error);
     toast.error(errorMessage);
     
@@ -58,9 +58,9 @@ http.interceptors.response.use(
   }
 );
 
-// Функция для получения сообщения об ошибке
+// Function to get error message
 function getErrorMessage(error: AxiosError): string {
-  // Если есть сообщение от сервера
+  // If there is a message from the server
   if (error.response?.data) {
     const data = error.response.data as { message?: string; detail?: string; error?: string };
     
@@ -69,27 +69,27 @@ function getErrorMessage(error: AxiosError): string {
     if (data.error) return data.error;
   }
 
-  // Если есть статус код
+  // If there is a status code
   if (error.response?.status) {
     const statusMessages: Record<number, string> = {
-      400: "Неверный запрос",
-      403: "Доступ запрещен",
-      404: "Ресурс не найден",
-      500: "Внутренняя ошибка сервера",
-      502: "Сервис временно недоступен",
-      503: "Сервис перегружен",
+      400: "Invalid request",
+      403: "Access denied",
+      404: "Resource not found",
+      500: "Internal server error",
+      502: "Service temporarily unavailable",
+      503: "Service overloaded",
     };
 
-    return statusMessages[error.response.status] || `Ошибка ${error.response.status}`;
+    return statusMessages[error.response.status] || `Error code: ${error.response.status}`;
   }
 
-  // Если нет ответа от сервера
+  // If there is no response from the server
   if (error.request) {
-    return "Сервер не отвечает. Проверьте подключение к интернету.";
+    return "Server is not responding. Check your internet connection.";
   }
 
-  // Общая ошибка
-  return error.message || "Произошла неизвестная ошибка";
+  // General error
+  return error.message || "An unknown error occurred";
 }
 
 export default http;

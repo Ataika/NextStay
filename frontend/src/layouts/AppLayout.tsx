@@ -16,7 +16,7 @@ export default function AppLayout() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex min-h-screen">
-        {/* Sidebar только на md+ */}
+        {/* Sidebar only on md+ */}
         <div className="hidden md:block">
           <Sidebar />
         </div>
