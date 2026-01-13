@@ -21,8 +21,8 @@ export default function Sidebar() {
   const visibleItems = role ? items.filter((i) => i.roles.includes(role)) : [];
 
   return (
-    <aside className="w-64 bg-gray-800 dark:bg-gray-900 text-white min-h-screen">
-      <div className="p-6">
+    <aside className="w-64 bg-gray-800 dark:bg-gray-900 text-white min-h-screen fixed md:static inset-y-0 left-0 z-40">
+      <div className="p-4 sm:p-6 h-full overflow-y-auto">
         <h2 className="text-xl font-bold mb-6">NextStay</h2>
 
         <nav>
@@ -47,7 +47,6 @@ export default function Sidebar() {
           </ul>
         </nav>
 
-        {/* если хочешь, можно добавить внизу маленькую подпись роли */}
         {role && (
           <div className="mt-8 text-xs text-gray-400">
             Role: {role === "OWNER" ? "Owner/Admin" : "Staff"}

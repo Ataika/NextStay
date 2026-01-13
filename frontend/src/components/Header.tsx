@@ -23,22 +23,23 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-      <div className="px-6 py-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-800 dark:text-white">
+    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 dark:text-white truncate">
           {role === "OWNER" ? "Admin Dashboard" : "Staff Dashboard"}
         </h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600 dark:text-gray-300">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-300">
             {role === "OWNER" ? "Администратор" : "Персонал"}
           </span>
           <button
             onClick={handleLogout}
-            className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+            className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
           >
-            Выйти
+            <span className="hidden sm:inline">Выйти</span>
+            <span className="sm:hidden">Выход</span>
           </button>
-          <div className="w-8 h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs sm:text-sm">
             {role === "OWNER" ? "A" : "S"}
           </div>
         </div>
