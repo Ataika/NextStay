@@ -5,7 +5,7 @@ import { getGuestByToken, type GuestToken } from "../mocks/guest";
 import { mockBookings, type Booking } from "../mocks/bookings";
 
 // Flag for switching between mock and real API
-export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true" || true; // Default true
+export const USE_MOCK_API = import.meta.env.VITE_USE_MOCK_API === "true" || import.meta.env.VITE_USE_MOCK_API !== "false"; // Default true if not explicitly set to false
 
 // Network delay simulation
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

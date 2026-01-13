@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo } from "react";
-import { mockRooms } from "../../mocks/rooms";
 import type { Room } from "../../mocks/rooms";
 import { tasksApi, roomsApi, bookingsApi } from "../../api/api";
 import type { CleaningTask } from "../../mocks/tasks";
@@ -11,6 +10,7 @@ import Card from "../../ui/Card";
 import Button from "../../ui/Button";
 import Modal from "../../ui/Modal";
 import Drawer from "../../ui/Drawer";
+import LoadingSpinner from "../../ui/LoadingSpinner";
 import { layout, colors } from "../../constants/designTokens";
 import toast from "react-hot-toast";
 
@@ -25,7 +25,7 @@ const statusColors = {
 };
 
 export default function AdminPage() {
-  const [rooms, setRooms] = useState<Room[]>(mockRooms);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -41,6 +41,7 @@ export default function AdminPage() {
   const [showMaintenanceConfirmModal, setShowMaintenanceConfirmModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ roomId: number; newStatus: Room["status"] } | null>(null);
   const [isEditingRoom, setIsEditingRoom] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [roomForm, setRoomForm] = useState<Omit<Room, "id">>({
     number: "",
     category: "",
@@ -59,11 +60,14 @@ export default function AdminPage() {
 
   const loadRooms = async () => {
     try {
+      setLoading(true);
       const data = await roomsApi.getAll();
       setRooms(data);
     } catch (error) {
       toast.error("Error loading rooms");
       console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -379,6 +383,10 @@ export default function AdminPage() {
     setSelectedTask(task);
     setShowTaskDetailsModal(true);
   };
+
+  if (loading) {
+    return <LoadingSpinner message="Loading rooms..." />;
+  }
 
   return (
     <div className="space-y-6">
