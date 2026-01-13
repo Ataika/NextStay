@@ -1,4 +1,4 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError } from "axios";
 import { useAuthStore } from "../store/authStore";
 import toast from "react-hot-toast";
 
@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
 // Создаем axios instance
-const http: AxiosInstance = axios.create({
+const http = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
@@ -16,7 +16,7 @@ const http: AxiosInstance = axios.create({
 
 // Request interceptor - добавляет Bearer token
 http.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  (config) => {
     const { token } = useAuthStore.getState();
     
     if (token && config.headers) {
