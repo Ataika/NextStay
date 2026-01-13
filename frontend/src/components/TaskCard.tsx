@@ -8,15 +8,15 @@ interface TaskCardProps {
 }
 
 const priorityColors = {
-  Low: "bg-gray-100 text-gray-700 border-gray-300",
-  Medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
-  High: "bg-red-100 text-red-700 border-red-300",
+  Low: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600",
+  Medium: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
+  High: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700",
 };
 
 const statusColors = {
-  Pending: "bg-gray-50 border-gray-200",
-  "In Progress": "bg-blue-50 border-blue-200",
-  Completed: "bg-green-50 border-green-200",
+  Pending: "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
+  "In Progress": "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800",
+  Completed: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
 };
 
 const statusIcons = {
@@ -48,12 +48,12 @@ export default function TaskCard({
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">{statusIcon}</span>
-            <h3 className="font-bold text-lg text-gray-900">
+            <h3 className="font-bold text-lg text-gray-900 dark:text-white">
               Комната #{task.roomNumber}
             </h3>
           </div>
           {task.assignedToName && (
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               Исполнитель: {task.assignedToName}
             </p>
           )}
@@ -72,7 +72,7 @@ export default function TaskCard({
       {/* Notes */}
       {task.notes && (
         <div className="mb-3">
-          <p className="text-sm text-gray-700">{task.notes}</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">{task.notes}</p>
         </div>
       )}
 
@@ -83,9 +83,9 @@ export default function TaskCard({
             type="checkbox"
             checked={task.status === "Completed"}
             disabled
-            className="w-4 h-4 rounded border-gray-300"
+            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
-          <span className={task.status === "Completed" ? "line-through text-gray-500" : ""}>
+          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
             Уборка комнаты
           </span>
         </div>
@@ -94,9 +94,9 @@ export default function TaskCard({
             type="checkbox"
             checked={task.status === "Completed"}
             disabled
-            className="w-4 h-4 rounded border-gray-300"
+            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
-          <span className={task.status === "Completed" ? "line-through text-gray-500" : ""}>
+          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
             Замена постельного белья
           </span>
         </div>
@@ -105,9 +105,9 @@ export default function TaskCard({
             type="checkbox"
             checked={task.status === "Completed"}
             disabled
-            className="w-4 h-4 rounded border-gray-300"
+            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
-          <span className={task.status === "Completed" ? "line-through text-gray-500" : ""}>
+          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
             Пополнение мини-бара
           </span>
         </div>
@@ -132,19 +132,19 @@ export default function TaskCard({
           </button>
         )}
         {task.status === "Completed" && (
-          <div className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 font-medium rounded-lg text-center">
+          <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
             Завершено
           </div>
         )}
         {task.status === "Pending" && task.assignedTo && !isAssignedToMe && (
-          <div className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 font-medium rounded-lg text-center">
+          <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
             Назначено другому
           </div>
         )}
       </div>
 
       {/* Timestamp */}
-      <div className="mt-3 text-xs text-gray-500">
+      <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
         Создано: {new Date(task.createdAt).toLocaleString("ru-RU")}
         {task.completedAt &&
           ` • Завершено: ${new Date(task.completedAt).toLocaleString("ru-RU")}`}
