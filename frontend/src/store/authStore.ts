@@ -8,26 +8,16 @@ interface AuthState {
   role: UserRole | null;
   setAuth: (token: string, role: UserRole) => void;
   clearAuth: () => void;
-  isAuthenticated: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       token: null,
       role: null,
-      setAuth: (token: string, role: UserRole) => {
-        set({ token, role });
-      },
-      clearAuth: () => {
-        set({ token: null, role: null });
-      },
-      isAuthenticated: () => {
-        return get().token !== null;
-      },
+      setAuth: (token, role) => set({ token, role }),
+      clearAuth: () => set({ token: null, role: null }),
     }),
-    {
-      name: "auth-storage",
-    }
+    { name: "auth-storage" }
   )
 );

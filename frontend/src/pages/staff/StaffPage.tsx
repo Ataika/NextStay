@@ -12,6 +12,7 @@ export default function StaffPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
+  const [onlyMyTasks, setOnlyMyTasks] = useState(false);
 
   // Моковые данные для текущего сотрудника
   const currentStaffId = 1;
@@ -60,9 +61,10 @@ export default function StaffPage() {
     return tasks.filter((task) => {
       const matchesStatus = statusFilter === "All" || task.status === statusFilter;
       const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
-      return matchesStatus && matchesPriority;
+      const matchesMyTasks = !onlyMyTasks || task.assignedTo === currentStaffId;
+      return matchesStatus && matchesPriority && matchesMyTasks;
     });
-  }, [tasks, statusFilter, priorityFilter]);
+  }, [tasks, statusFilter, priorityFilter, onlyMyTasks, currentStaffId]);
 
   const stats = useMemo(() => {
     return {
@@ -76,7 +78,7 @@ export default function StaffPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600">Загрузка задач...</div>
+        <div className="text-gray-600 dark:text-gray-400">Загрузка задач...</div>
       </div>
     );
   }
@@ -85,19 +87,19 @@ export default function StaffPage() {
     <div className="max-w-md mx-auto px-4 py-6 pb-20">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Мои задачи</h1>
-        <p className="text-sm text-gray-600">Управление задачами уборки</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Мои задачи</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400">Управление задачами уборки</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <div className="text-xs text-gray-600 mb-1">Ожидают</div>
-          <div className="text-xl font-bold text-gray-900">{stats.pending}</div>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Ожидают</div>
+          <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.pending}</div>
         </div>
-        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-          <div className="text-xs text-blue-700 mb-1">В работе</div>
-          <div className="text-xl font-bold text-blue-800">{stats.inProgress}</div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+          <div className="text-xs text-blue-700 dark:text-blue-400 mb-1">В работе</div>
+          <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.inProgress}</div>
         </div>
       </div>
 
@@ -106,7 +108,7 @@ export default function StaffPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
           <option value="All">Все статусы</option>
           <option value="Pending">Ожидают</option>
@@ -116,27 +118,36 @@ export default function StaffPage() {
         <select
           value={priorityFilter}
           onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
         >
           <option value="All">Все приоритеты</option>
           <option value="High">Высокий</option>
           <option value="Medium">Средний</option>
           <option value="Low">Низкий</option>
         </select>
+        <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+          <input
+            type="checkbox"
+            checked={onlyMyTasks}
+            onChange={(e) => setOnlyMyTasks(e.target.checked)}
+            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-400 dark:ring-offset-gray-800 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <span className="text-sm text-gray-900 dark:text-white">Только мои задачи</span>
+        </label>
       </div>
 
       {/* Tasks List */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             Задачи ({filteredTasks.length})
           </h2>
         </div>
 
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-gray-500">Нет задач</p>
-            <p className="text-sm text-gray-400 mt-1">
+          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <p className="text-gray-500 dark:text-gray-400">Нет задач</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
               Попробуйте изменить фильтры
             </p>
           </div>

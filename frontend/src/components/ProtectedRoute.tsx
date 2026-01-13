@@ -1,3 +1,4 @@
+import React from "react";
 import { Navigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import type { UserRole } from "../store/authStore";
@@ -7,27 +8,18 @@ interface ProtectedRouteProps {
   requiredRole?: UserRole;
 }
 
-export default function ProtectedRoute({
-  children,
-  requiredRole,
-}: ProtectedRouteProps) {
-  const { token, role, isAuthenticated } = useAuthStore();
+export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
 
-  // Если нет токена, редирект на /login
-  if (!isAuthenticated() || !token) {
+  // если нет полной auth-сессии
+  if (!token || !role) {
     return <Navigate to="/login" replace />;
   }
 
-  // Если требуется определенная роль и роль не совпадает
+  // если нужна конкретная роль, а роль не совпала
   if (requiredRole && role !== requiredRole) {
-    // Редирект в зависимости от роли пользователя
-    if (role === "OWNER") {
-      return <Navigate to="/admin" replace />;
-    } else if (role === "STAFF") {
-      return <Navigate to="/staff" replace />;
-    }
-    // Если роль неизвестна, редирект на login
-    return <Navigate to="/login" replace />;
+    return <Navigate to={role === "OWNER" ? "/admin" : "/staff"} replace />;
   }
 
   return <>{children}</>;

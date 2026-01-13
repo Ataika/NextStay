@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import { guestApi } from "../../api/api";
 import type { GuestToken } from "../../mocks/guest";
@@ -7,7 +7,6 @@ import toast from "react-hot-toast";
 
 export default function GuestPage() {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
   const [guest, setGuest] = useState<GuestToken | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -52,9 +51,8 @@ export default function GuestPage() {
       setCheckingOut(true);
       await guestApi.checkOut(token);
       toast.success("Выезд успешно оформлен. Спасибо за визит!");
-      setTimeout(() => {
-        navigate("/");
-      }, 2000);
+      // Перезагружаем данные, чтобы токен стал невалидным в UI
+      await loadGuestData(token);
     } catch (error) {
       toast.error("Ошибка при оформлении выезда");
       console.error(error);

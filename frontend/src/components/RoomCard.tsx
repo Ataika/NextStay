@@ -7,10 +7,10 @@ interface RoomCardProps {
 }
 
 const statusColors = {
-  Available: "bg-green-100 text-green-800 border-green-300",
-  Occupied: "bg-blue-100 text-blue-800 border-blue-300",
-  Dirty: "bg-yellow-100 text-yellow-800 border-yellow-300",
-  Maintenance: "bg-red-100 text-red-800 border-red-300",
+  Available: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
+  Occupied: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700",
+  Dirty: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
+  Maintenance: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
 };
 
 const statusIcons = {
@@ -29,7 +29,7 @@ export default function RoomCard({
   const statusIcon = statusIcons[room.status];
 
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Status Badge */}
       <div className={`px-4 py-2 border-b ${statusColor}`}>
         <div className="flex items-center justify-between">
@@ -37,28 +37,28 @@ export default function RoomCard({
             <span>{statusIcon}</span>
             {room.status}
           </span>
-          <span className="text-xs font-medium">#{room.number}</span>
+          <span className="text-xs font-medium dark:text-gray-300">#{room.number}</span>
         </div>
       </div>
 
       {/* Room Content */}
       <div className="p-4">
         <div className="mb-3">
-          <h3 className="text-lg font-bold text-gray-800 mb-1">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-1">
             {room.category}
           </h3>
-          <p className="text-sm text-gray-600 line-clamp-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
             {room.description}
           </p>
         </div>
 
         {/* Room Details */}
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+        <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-4">
           <div className="flex items-center gap-1">
             <span>👥</span>
             <span>{room.capacity} чел.</span>
           </div>
-          <div className="font-semibold text-gray-800">
+          <div className="font-semibold text-gray-800 dark:text-white">
             {room.price.toLocaleString("ru-RU")} ₽
           </div>
         </div>
@@ -70,13 +70,13 @@ export default function RoomCard({
               {room.amenities.slice(0, 3).map((amenity, idx) => (
                 <span
                   key={idx}
-                  className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded"
+                  className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded"
                 >
                   {amenity}
                 </span>
               ))}
               {room.amenities.length > 3 && (
-                <span className="text-xs text-gray-500 px-2 py-1">
+                <span className="text-xs text-gray-500 dark:text-gray-500 px-2 py-1">
                   +{room.amenities.length - 3}
                 </span>
               )}
@@ -92,7 +92,7 @@ export default function RoomCard({
               onChange={(e) =>
                 onStatusChange(room.id, e.target.value as Room["status"])
               }
-              className="flex-1 text-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
               <option value="Available">Доступна</option>
               <option value="Occupied">Занята</option>
@@ -103,7 +103,7 @@ export default function RoomCard({
           {onViewDetails && (
             <button
               onClick={() => onViewDetails(room.id)}
-              className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white text-xs font-medium rounded-md hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
             >
               Детали
             </button>
