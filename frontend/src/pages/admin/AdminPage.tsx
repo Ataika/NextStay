@@ -55,13 +55,13 @@ export default function AdminPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Панель управления</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">Управление номерами и статусами</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Панель управления</h1>
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Управление номерами и статусами</p>
         </div>
       </div>
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Всего номеров</div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
@@ -115,19 +115,19 @@ export default function AdminPage() {
       {/* Rooms Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
             Номера ({filteredRooms.length})
           </h2>
         </div>
         {filteredRooms.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 border border-gray-200 dark:border-gray-700 text-center">
-            <p className="text-gray-500 dark:text-gray-400 text-lg">Номера не найдены</p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-8 sm:p-12 border border-gray-200 dark:border-gray-700 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-base sm:text-lg">Номера не найдены</p>
             <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
               Попробуйте изменить фильтры поиска
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
             {filteredRooms.map((room) => (
               <RoomCard
                 key={room.id}
@@ -142,8 +142,8 @@ export default function AdminPage() {
 
       {/* Room Details Modal */}
       {selectedRoom && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedRoom(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                 Комната #{selectedRoom.number}
