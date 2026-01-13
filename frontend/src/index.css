@@ -10,10 +10,9 @@ body {
   @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
 }
 
-/* Darken sidebar and header when drawer is open */
-body.drawer-open aside,
-body.drawer-open header {
-  opacity: 0.5;
-  pointer-events: none;
-  transition: opacity 0.2s ease-in-out;
+/* Блокируем скролл main контента когда drawer открыт */
+body.drawer-open main {
+  overflow: hidden !important;
 }
+
+/* Header и Sidebar остаются видимыми и не затемняются - overlay затемняет только main контент через backdrop */

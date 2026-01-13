@@ -24,8 +24,8 @@ export default function Header() {
   }
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30">
-      <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+    <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-30">
+      <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
         <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 dark:text-white truncate">
           {role === "OWNER" ? "Admin Dashboard" : "Staff Dashboard"}
         </h1>
