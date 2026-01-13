@@ -10,6 +10,7 @@ interface SidebarItem {
 
 const items: SidebarItem[] = [
   { path: "/admin", label: "Rooms", roles: ["OWNER"] },
+  { path: "/bookings", label: "Bookings", roles: ["OWNER"] },
   { path: "/staff", label: "Tasks", roles: ["STAFF"] },
   { path: "/reports", label: "Reports", roles: ["OWNER"] },
 ];
@@ -46,12 +47,6 @@ export default function Sidebar() {
             })}
           </ul>
         </nav>
-
-        {role && (
-          <div className="mt-8 text-xs text-gray-400">
-            Role: {role === "OWNER" ? "Owner/Admin" : "Staff"}
-          </div>
-        )}
       </div>
     </aside>
   );

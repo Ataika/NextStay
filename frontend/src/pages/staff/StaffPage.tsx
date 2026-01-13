@@ -2,6 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import { tasksApi } from "../../api/api";
 import type { CleaningTask } from "../../mocks/tasks";
 import TaskCard from "../../components/TaskCard";
+import LoadingSpinner from "../../ui/LoadingSpinner";
+import ErrorState from "../../ui/ErrorState";
+import EmptyState from "../../ui/EmptyState";
+import PageHeader from "../../ui/PageHeader";
+import Card from "../../ui/Card";
+import { layout, colors } from "../../constants/designTokens";
 import toast from "react-hot-toast";
 
 type StatusFilter = CleaningTask["status"] | "All";
@@ -10,6 +16,7 @@ type PriorityFilter = CleaningTask["priority"] | "All";
 export default function StaffPage() {
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
@@ -25,10 +32,13 @@ export default function StaffPage() {
   const loadTasks = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await tasksApi.getAll();
       setTasks(data);
     } catch (error) {
-      toast.error("Error loading tasks");
+      const errorMessage = "Error loading tasks";
+      setError(errorMessage);
+      toast.error(errorMessage);
       console.error(error);
     } finally {
       setLoading(false);
@@ -76,43 +86,43 @@ export default function StaffPage() {
   }, [tasks]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600 dark:text-gray-400">Loading tasks...</div>
-      </div>
-    );
+    return <LoadingSpinner message="Loading tasks..." fullScreen={false} />;
+  }
+
+  if (error) {
+    return <ErrorState title="Error loading tasks" message={error} onRetry={loadTasks} />;
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">My tasks</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400">Management of cleaning tasks</p>
-      </div>
+    <div className={layout.container}>
+      <PageHeader
+        title="My tasks"
+        subtitle="Management of cleaning tasks"
+      />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-4">
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <Card padding="sm" className={colors.neutral.light}>
           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Pending</div>
           <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.pending}</div>
-        </div>
-        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+        </Card>
+        <Card padding="sm" className="bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800">
           <div className="text-xs text-blue-700 dark:text-blue-400 mb-1">In progress</div>
           <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.inProgress}</div>
-        </div>
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 border border-green-200 dark:border-green-800 hidden sm:block">
+        </Card>
+        <Card padding="sm" className={`${colors.success.light} hidden sm:block`}>
           <div className="text-xs text-green-700 dark:text-green-400 mb-1">Completed</div>
           <div className="text-xl font-bold text-green-800 dark:text-green-300">{stats.completed}</div>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700 hidden sm:block">
+        </Card>
+        <Card padding="sm" className={`${colors.neutral.light} hidden sm:block`}>
           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Total</div>
           <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-        </div>
+        </Card>
       </div>
 
       {/* Filters */}
-      <div className="mb-4 space-y-2">
+      <Card padding="md" className="mb-6">
+        <div className="space-y-2">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
@@ -142,7 +152,8 @@ export default function StaffPage() {
           />
           <span className="text-sm text-gray-900 dark:text-white">Only my tasks</span>
         </label>
-      </div>
+        </div>
+      </Card>
 
       {/* Tasks List */}
       <div>
@@ -153,12 +164,12 @@ export default function StaffPage() {
         </div>
 
         {filteredTasks.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-gray-500 dark:text-gray-400">No tasks</p>
-            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-              Try changing the filters
-            </p>
-          </div>
+          <Card>
+            <EmptyState
+              title="No tasks"
+              message="Try changing the filters to see more tasks."
+            />
+          </Card>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredTasks.map((task) => (

@@ -1,16 +1,16 @@
+import PageHeader from "../../ui/PageHeader";
+import Card from "../../ui/Card";
+
 export default function ReportsPage() {
   return (
     <div className="w-full space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Reports</h1>
-          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">Analytics and reports</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Reports"
+        subtitle="Analytics and reports"
+      />
 
       {/* Placeholder Dashboard - Superset style - fullscreen */}
-      <div className="bg-gray-900 dark:bg-gray-950 rounded-lg p-6 sm:p-8 lg:p-12 min-h-[600px] w-full">
+      <Card className="bg-gray-900 dark:bg-gray-950 min-h-[600px] w-full" padding="lg">
         <div className="text-center py-12 sm:py-20">
           <div className="inline-block mb-6">
             <svg
@@ -37,7 +37,7 @@ export default function ReportsPage() {
             In development
           </p>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

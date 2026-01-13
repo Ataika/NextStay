@@ -18,7 +18,7 @@ export const mockTasks: CleaningTask[] = [
     roomNumber: "201",
     status: "Pending",
     priority: "High",
-    createdAt: "2024-01-15T10:00:00Z",
+    createdAt: "2026-01-15T10:00:00Z",
     notes: "Urgent cleaning after check-out",
   },
   {
@@ -29,7 +29,7 @@ export const mockTasks: CleaningTask[] = [
     priority: "Medium",
     assignedTo: 1,
     assignedToName: "Maria Ivanova",
-    createdAt: "2024-01-15T09:30:00Z",
+    createdAt: "2026-01-15T09:30:00Z",
     notes: "Regular cleaning",
   },
   {
@@ -40,8 +40,8 @@ export const mockTasks: CleaningTask[] = [
     priority: "Low",
     assignedTo: 2,
     assignedToName: "Anna Petrova",
-    createdAt: "2024-01-15T08:00:00Z",
-    completedAt: "2024-01-15T09:15:00Z",
+    createdAt: "2026-01-15T08:00:00Z",
+    completedAt: "2026-01-15T09:15:00Z",
     notes: "Cleaning completed",
   },
   {
@@ -50,7 +50,7 @@ export const mockTasks: CleaningTask[] = [
     roomNumber: "202",
     status: "Pending",
     priority: "Medium",
-    createdAt: "2024-01-15T11:00:00Z",
+    createdAt: "2026-01-15T11:00:00Z",
   },
   {
     id: 5,
@@ -58,7 +58,7 @@ export const mockTasks: CleaningTask[] = [
     roomNumber: "302",
     status: "Pending",
     priority: "High",
-    createdAt: "2024-01-15T11:30:00Z",
+    createdAt: "2026-01-15T11:30:00Z",
     notes: "VIP room - requires special attention",
   },
 ];

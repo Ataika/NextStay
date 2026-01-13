@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../api/api";
 import { useAuthStore } from "../store/authStore";
+import Button from "../ui/Button";
+import Card from "../ui/Card";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -47,7 +49,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <div className="w-full max-w-md lg:max-w-lg xl:max-w-xl space-y-8 p-6 sm:p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+      <Card className="w-full max-w-md lg:max-w-lg xl:max-w-xl space-y-8" padding="lg">
         <div>
           <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white">
             NextStay
@@ -96,30 +98,31 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              fullWidth
               disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Login..." : "Login"}
-            </button>
+            </Button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => devLogin("OWNER")}
-              className="py-2 px-4 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors"
             >
               Dev: Owner
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => devLogin("STAFF")}
-              className="py-2 px-4 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 transition-colors"
             >
               Dev: Staff
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 space-y-1">
@@ -128,7 +131,7 @@ export default function LoginPage() {
             <p>Staff: staff@nextstay.com / staff</p>
           </div>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }
