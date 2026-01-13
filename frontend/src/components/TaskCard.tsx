@@ -1,4 +1,5 @@
 import type { CleaningTask } from "../mocks/tasks";
+import Button from "../ui/Button";
 
 interface TaskCardProps {
   task: CleaningTask;
@@ -116,20 +117,23 @@ export default function TaskCard({
       {/* Actions */}
       <div className="flex gap-2">
         {canStart && onStart && (
-          <button
+          <Button
+            variant="primary"
+            fullWidth
             onClick={() => onStart(task.id)}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors"
           >
             Start
-          </button>
+          </Button>
         )}
         {canComplete && onComplete && (
-          <button
+          <Button
+            variant="primary"
+            fullWidth
+            className="!bg-green-600 dark:!bg-green-500 hover:!bg-green-700 dark:hover:!bg-green-600 focus:!ring-green-500 dark:focus:!ring-green-400"
             onClick={() => onComplete(task.id)}
-            className="flex-1 px-4 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 active:bg-green-800 transition-colors"
           >
             Complete
-          </button>
+          </Button>
         )}
         {task.status === "Completed" && (
           <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
@@ -145,9 +149,9 @@ export default function TaskCard({
 
       {/* Timestamp */}
       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-        Created: {new Date(task.createdAt).toLocaleString("ru-RU")}
+        Created: {new Date(task.createdAt).toLocaleString("en-US")}
         {task.completedAt &&
-          ` • Completed: ${new Date(task.completedAt).toLocaleString("ru-RU")}`}
+          ` • Completed: ${new Date(task.completedAt).toLocaleString("en-US")}`}
       </div>
     </div>
   );

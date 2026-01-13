@@ -2,3 +2,4 @@
 export * from "./rooms";
 export * from "./tasks";
 export * from "./guest";
+export * from "./bookings";

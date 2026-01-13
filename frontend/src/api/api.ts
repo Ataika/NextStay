@@ -4,6 +4,7 @@ import { mockApi, USE_MOCK_API } from "./mockApi";
 import type { Room } from "../mocks/rooms";
 import type { CleaningTask } from "../mocks/tasks";
 import type { GuestToken } from "../mocks/guest";
+import type { Booking } from "../mocks/bookings";
 
 // Rooms API
 export const roomsApi = {
@@ -73,6 +74,14 @@ export const tasksApi = {
     return response.data;
   },
 
+  create: async (roomId: number, roomNumber: string, priority: "Low" | "Medium" | "High" = "Medium", notes?: string): Promise<CleaningTask> => {
+    if (USE_MOCK_API) {
+      return mockApi.tasks.create(roomId, roomNumber, priority, notes);
+    }
+    const response = await http.post("/tasks", { roomId, roomNumber, priority, notes });
+    return response.data;
+  },
+
   assign: async (taskId: number, staffId: number, staffName: string): Promise<CleaningTask> => {
     if (USE_MOCK_API) {
       return mockApi.tasks.assign(taskId, staffId, staffName);
@@ -139,5 +148,47 @@ export const authApi = {
       return;
     }
     await http.post("/auth/logout");
+  },
+};
+
+// Bookings API
+export const bookingsApi = {
+  getAll: async (): Promise<Booking[]> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.getAll();
+    }
+    const response = await http.get("/bookings");
+    return response.data;
+  },
+
+  getById: async (id: number): Promise<Booking | null> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.getById(id);
+    }
+    const response = await http.get(`/bookings/${id}`);
+    return response.data;
+  },
+
+  create: async (data: Omit<Booking, "id" | "createdAt">): Promise<Booking> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.create(data);
+    }
+    const response = await http.post("/bookings", data);
+    return response.data;
+  },
+
+  update: async (id: number, data: Partial<Booking>): Promise<Booking> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.update(id, data);
+    }
+    const response = await http.patch(`/bookings/${id}`, data);
+    return response.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.delete(id);
+    }
+    await http.delete(`/bookings/${id}`);
   },
 };

@@ -4,6 +4,8 @@ import AdminPage from "../pages/admin/AdminPage";
 import StaffPage from "../pages/staff/StaffPage";
 import GuestPage from "../pages/guest/GuestPage";
 import ReportsPage from "../pages/reports/ReportsPage";
+import BookingsPage from "../pages/admin/BookingsPage";
+import NotFoundPage from "../pages/NotFoundPage";
 import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import IndexRedirect from "./IndexRedirect";
@@ -41,7 +43,18 @@ export default function AppRouter() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/bookings"
+            element={
+              <ProtectedRoute requiredRole="OWNER">
+                <BookingsPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
+
+        {/* 404 - catch all route */}
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );
