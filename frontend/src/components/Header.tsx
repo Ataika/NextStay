@@ -24,23 +24,22 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-30">
-      <div className="px-4 sm:px-6 h-16 flex items-center justify-between">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800 dark:text-white truncate">
-          {role === "OWNER" ? "Admin Dashboard" : "Staff Dashboard"}
-        </h1>
-        <div className="flex items-center gap-2 sm:gap-4">
-          <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-300">
+    <header className="h-12 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 z-30">
+      <div className="px-3 sm:px-4 h-12 flex items-center justify-end">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600 dark:text-gray-400">
             {role === "OWNER" ? "Administrator" : "Staff"}
           </span>
-          <Button
-            variant="secondary"
-            size="sm"
+          <button
             onClick={handleLogout}
+            className="px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
+            title="Logout"
           >
-            Logout
-          </Button>
-          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs sm:text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+          <div className="w-6 h-6 bg-blue-600 dark:bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
             {role === "OWNER" ? "A" : "S"}
           </div>
         </div>

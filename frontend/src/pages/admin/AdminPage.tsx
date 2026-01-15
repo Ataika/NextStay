@@ -9,7 +9,6 @@ import PageHeader from "../../ui/PageHeader";
 import Card from "../../ui/Card";
 import Button from "../../ui/Button";
 import Modal from "../../ui/Modal";
-import Drawer from "../../ui/Drawer";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import { layout, colors } from "../../constants/designTokens";
 import toast from "react-hot-toast";
@@ -41,7 +40,10 @@ export default function AdminPage() {
   const [showMaintenanceConfirmModal, setShowMaintenanceConfirmModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ roomId: number; newStatus: Room["status"] } | null>(null);
   const [isEditingRoom, setIsEditingRoom] = useState(false);
+  const [showRoomDetailsModal, setShowRoomDetailsModal] = useState(false);
+  const [roomDetailsView, setRoomDetailsView] = useState<"details" | "edit" | "cleaning">("details");
   const [loading, setLoading] = useState(true);
+  const [amenitiesInput, setAmenitiesInput] = useState("");
   const [roomForm, setRoomForm] = useState<Omit<Room, "id">>({
     number: "",
     category: "",
@@ -106,29 +108,6 @@ export default function AdminPage() {
     };
   }, [rooms, tasks]);
 
-  // Tasks analytics
-  const tasksStats = useMemo(() => {
-    return {
-      pending: tasks.filter((t) => t.status === "Pending").length,
-      inProgress: tasks.filter((t) => t.status === "In Progress").length,
-      completed: tasks.filter((t) => t.status === "Completed").length,
-    };
-  }, [tasks]);
-
-  // Upcoming tasks (Pending + In Progress, sorted by priority and date)
-  const upcomingTasks = useMemo(() => {
-    return tasks
-      .filter((t) => t.status === "Pending" || t.status === "In Progress")
-      .sort((a, b) => {
-        const priorityOrder = { High: 3, Medium: 2, Low: 1 };
-        if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
-        }
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      })
-      .slice(0, 5);
-  }, [tasks]);
-
   // Filtering rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
@@ -142,79 +121,28 @@ export default function AdminPage() {
     });
   }, [rooms, statusFilter, searchQuery]);
 
-  const handleStatusChange = async (roomId: number, newStatus: Room["status"], currentStatus: Room["status"]) => {
-    const room = rooms.find((r) => r.id === roomId);
-    if (!room) return;
-
-    // If status didn't change, do nothing
-    if (newStatus === currentStatus) return;
-
-    // Maintenance requires confirmation
-    if (newStatus === "Maintenance") {
-      setPendingStatusChange({ roomId, newStatus });
-      setShowMaintenanceConfirmModal(true);
-      return;
-    }
-
-    // Available → only if clean (no active cleaning tasks)
-    if (newStatus === "Available") {
-      const roomTasks = getRoomTasks(roomId);
-      const hasActiveTasks = roomTasks.some(
-        (t) => t.status === "Pending" || t.status === "In Progress"
-      );
-      
-      if (hasActiveTasks) {
-        toast.error("Cannot set room as Available: active cleaning tasks exist");
-        return;
-      }
-
-      try {
-        await roomsApi.update(roomId, { status: newStatus });
-        await loadRooms();
-        toast.success(`Room #${room.number} set to Available`);
-      } catch (error) {
-        toast.error("Error updating room status");
-        console.error(error);
-      }
-      return;
-    }
-
-    // Dirty → trigger cleaning task (but Dirty is not a room status anymore, so this shouldn't happen)
-    // But for backward compatibility, if someone tries to set Dirty, create a task instead
-    if (newStatus === "Dirty") {
-      try {
-        await tasksApi.create(roomId, room.number, "High");
-        toast.success(`Cleaning task created for Room #${room.number}`);
-        await loadTasks();
-        // Don't change room status to Dirty
-      } catch (error) {
-        toast.error("Error creating cleaning task");
-        console.error(error);
-      }
-      return;
-    }
-
-    // Occupied - direct change
-    try {
-      await roomsApi.update(roomId, { status: newStatus });
-      await loadRooms();
-      toast.success(`Room #${room.number} set to ${newStatus}`);
-    } catch (error) {
-      toast.error("Error updating room status");
-      console.error(error);
-    }
-  };
-
   const confirmMaintenanceChange = async () => {
     if (!pendingStatusChange) return;
 
     try {
       await roomsApi.update(pendingStatusChange.roomId, { status: pendingStatusChange.newStatus });
       await loadRooms();
-      const room = rooms.find((r) => r.id === pendingStatusChange.roomId);
+      const updatedRooms = await roomsApi.getAll();
+      const room = updatedRooms.find((r) => r.id === pendingStatusChange.roomId);
       toast.success(`Room #${room?.number || pendingStatusChange.roomId} set to Maintenance`);
       setShowMaintenanceConfirmModal(false);
       setPendingStatusChange(null);
+      // Update selectedRoom if it's the same room
+      if (selectedRoom && selectedRoom.id === pendingStatusChange.roomId && room) {
+        setSelectedRoom(room);
+      }
+      // Ensure scroll is restored after modal operations
+      setTimeout(() => {
+        const openModals = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+        if (openModals.length === 0) {
+          document.body.style.overflow = "";
+        }
+      }, 100);
     } catch (error) {
       toast.error("Error updating room status");
       console.error(error);
@@ -225,6 +153,8 @@ export default function AdminPage() {
     const room = rooms.find((r) => r.id === roomId);
     if (room) {
       setSelectedRoom(room);
+      setRoomDetailsView("details");
+      setShowRoomDetailsModal(true);
     }
   };
 
@@ -260,37 +190,48 @@ export default function AdminPage() {
       description: "",
       amenities: [],
     });
+    setAmenitiesInput("");
     setShowRoomFormModal(true);
   };
 
-  const handleEditRoom = () => {
-    if (!selectedRoom) return;
-    setIsEditingRoom(true);
-    setRoomForm({
-      number: selectedRoom.number,
-      category: selectedRoom.category,
-      status: selectedRoom.status,
-      price: selectedRoom.price,
-      capacity: selectedRoom.capacity,
-      description: selectedRoom.description || "",
-      amenities: selectedRoom.amenities || [],
-    });
-    setShowRoomFormModal(true);
-  };
 
   const handleSaveRoom = async () => {
     try {
+      // Convert amenities input string to array before saving
+      const amenitiesArray = amenitiesInput
+        .split(",")
+        .map((a) => a.trim())
+        .filter((a) => a.length > 0);
+      
+      const roomData = {
+        ...roomForm,
+        amenities: amenitiesArray,
+      };
+
       if (isEditingRoom && selectedRoom) {
-        await roomsApi.update(selectedRoom.id, roomForm);
+        await roomsApi.update(selectedRoom.id, roomData);
         toast.success(`Room #${roomForm.number} updated successfully`);
+        await loadRooms();
+        // Reload and update selectedRoom with fresh data from API
+        const updatedRooms = await roomsApi.getAll();
+        const updatedRoom = updatedRooms.find((r) => r.id === selectedRoom.id);
+        if (updatedRoom) {
+          setSelectedRoom(updatedRoom);
+        }
+        setRoomDetailsView("details");
+        setIsEditingRoom(false);
+        // Ensure scroll is restored after modal operations
+        setTimeout(() => {
+          const openModals = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+          if (openModals.length === 0) {
+            document.body.style.overflow = "";
+          }
+        }, 100);
       } else {
-        await roomsApi.create(roomForm);
+        await roomsApi.create(roomData);
         toast.success(`Room #${roomForm.number} created successfully`);
-      }
-      setShowRoomFormModal(false);
-      await loadRooms();
-      if (isEditingRoom) {
-        setSelectedRoom(null);
+        setShowRoomFormModal(false);
+        await loadRooms();
       }
     } catch (error) {
       toast.error(`Error ${isEditingRoom ? "updating" : "creating"} room`);
@@ -305,8 +246,16 @@ export default function AdminPage() {
       await roomsApi.delete(selectedRoom.id);
       toast.success(`Room #${selectedRoom.number} deleted successfully`);
       setShowDeleteConfirmModal(false);
+      setShowRoomDetailsModal(false);
       setSelectedRoom(null);
       await loadRooms();
+      // Ensure scroll is restored after modal operations
+      setTimeout(() => {
+        const openModals = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+        if (openModals.length === 0) {
+          document.body.style.overflow = "";
+        }
+      }, 100);
     } catch (error) {
       toast.error("Error deleting room");
       console.error(error);
@@ -379,182 +328,68 @@ export default function AdminPage() {
     });
   };
 
-  const handleTaskClick = (task: CleaningTask) => {
-    setSelectedTask(task);
-    setShowTaskDetailsModal(true);
-  };
 
   if (loading) {
     return <LoadingSpinner message="Loading rooms..." />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageHeader
         title="Administration Panel"
         subtitle="Management of rooms and statuses"
         action={
-          <Button variant="primary" onClick={handleAddRoom}>
+          <Button variant="primary" size="sm" onClick={handleAddRoom}>
             Add room
           </Button>
         }
       />
 
       {/* Room Availability */}
-      <Card padding="md">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
+      <Card padding="sm">
+        <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
           Room Availability
         </h3>
         <div className={layout.grid.stats}>
-          <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total rooms</div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+          <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Total rooms</div>
+            <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
           </div>
-          <div className={`p-4 rounded-lg border ${colors.success.light}`}>
-            <div className="text-sm text-green-700 dark:text-green-400 mb-1">Available</div>
-            <div className="text-2xl font-bold text-green-800 dark:text-green-300">{stats.available}</div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-1">Ready to sell</p>
+          <div className={`p-3 rounded-lg border ${colors.success.light}`}>
+            <div className="text-xs text-green-700 dark:text-green-400 mb-0.5">Available</div>
+            <div className="text-xl font-bold text-green-800 dark:text-green-300">{stats.available}</div>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">Ready to sell</p>
           </div>
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="text-sm text-blue-700 dark:text-blue-400 mb-1">Occupied</div>
-            <div className="text-2xl font-bold text-blue-800 dark:text-blue-300">{stats.occupied}</div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">Currently occupied</p>
+          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className="text-xs text-blue-700 dark:text-blue-400 mb-0.5">Occupied</div>
+            <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.occupied}</div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Currently occupied</p>
           </div>
-          <div className={`p-4 rounded-lg border ${colors.danger.light}`}>
-            <div className="text-sm text-red-700 dark:text-red-400 mb-1">Maintenance</div>
-            <div className="text-2xl font-bold text-red-800 dark:text-red-300">{stats.maintenance}</div>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-1">Cannot be sold</p>
+          <div className={`p-3 rounded-lg border ${colors.danger.light}`}>
+            <div className="text-xs text-red-700 dark:text-red-400 mb-0.5">Maintenance</div>
+            <div className="text-xl font-bold text-red-800 dark:text-red-300">{stats.maintenance}</div>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Cannot be sold</p>
           </div>
-        </div>
-      </Card>
-
-      {/* Cleaning Workload */}
-      <Card padding="md">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
-          Cleaning Workload
-        </h3>
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <button
-            onClick={() => {
-              const pendingTasks = tasks.filter((t) => t.status === "Pending");
-              if (pendingTasks.length > 0) {
-                // Scroll to tasks section or show filtered view
-                // For now, just show first task
-                handleTaskClick(pendingTasks[0]);
-              }
-            }}
-            className="text-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-          >
-            <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              {tasksStats.pending}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-          </button>
-          <button
-            onClick={() => {
-              const inProgressTasks = tasks.filter((t) => t.status === "In Progress");
-              if (inProgressTasks.length > 0) {
-                handleTaskClick(inProgressTasks[0]);
-              }
-            }}
-            className="text-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-          >
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-1">
-              {tasksStats.inProgress}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">In progress</div>
-          </button>
-          <button
-            onClick={() => {
-              const completedTasks = tasks.filter((t) => t.status === "Completed");
-              if (completedTasks.length > 0) {
-                handleTaskClick(completedTasks[0]);
-              }
-            }}
-            className="text-center p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
-          >
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400 mb-1">
-              {tasksStats.completed}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Completed</div>
-          </button>
-        </div>
-
-        {/* Upcoming Tasks List */}
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Upcoming tasks ({upcomingTasks.length})
-          </h4>
-          {upcomingTasks.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-3">
-              No upcoming tasks
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {upcomingTasks.map((task) => (
-                <div
-                  key={task.id}
-                  onClick={() => handleTaskClick(task)}
-                  className="flex items-center gap-4 p-2 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors cursor-pointer"
-                >
-                  {/* Status indicator */}
-                  <div className="flex-shrink-0 w-2 h-2 rounded-full">
-                    {task.status === "Pending" && (
-                      <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
-                    )}
-                    {task.status === "In Progress" && (
-                      <div className="w-2 h-2 rounded-full bg-blue-500" />
-                    )}
-                    {task.status === "Completed" && (
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
-                    )}
-                  </div>
-                  
-                  {/* Room */}
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      Room #{task.roomNumber}
-                    </span>
-                  </div>
-                  
-                  {/* Assigned staff */}
-                  <div className="flex-1 min-w-0 text-sm text-gray-600 dark:text-gray-400">
-                    {task.assignedToName || (
-                      <span className="text-gray-400 dark:text-gray-500 italic">Unassigned</span>
-                    )}
-                  </div>
-                  
-                  {/* Priority */}
-                  <div className="flex-shrink-0 flex items-center gap-1.5">
-                    <span className="text-xs">{getPriorityIcon(task.priority)}</span>
-                    <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                      {task.priority}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </Card>
 
       {/* Filters */}
-      <Card padding="md">
-        <div className="flex flex-col md:flex-row gap-4">
+      <Card padding="sm">
+        <div className="flex flex-col md:flex-row gap-2">
           <div className="flex-1">
             <input
               type="text"
               placeholder="Search by number or category..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             />
           </div>
-          <div className="md:w-64">
+          <div className="md:w-48">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
+              className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
               <option value="All">All statuses</option>
               <option value="Available">Available</option>
@@ -567,8 +402,8 @@ export default function AdminPage() {
 
       {/* Rooms Grid */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white">
             Rooms ({filteredRooms.length})
           </h2>
         </div>
@@ -585,56 +420,358 @@ export default function AdminPage() {
               <RoomCard
                 key={room.id}
                 room={room}
-                onStatusChange={handleStatusChange}
-                onViewDetails={handleViewDetails}
+                onClick={handleViewDetails}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Room Details Drawer */}
-      <Drawer
-        isOpen={!!selectedRoom}
+      {/* Room Details Modal */}
+      <Modal
+        isOpen={showRoomDetailsModal}
         onClose={() => {
+          setShowRoomDetailsModal(false);
           setSelectedRoom(null);
+          setRoomDetailsView("details");
           setShowCreateTaskForm(false);
           setTaskNotes("");
           setTaskPriority("Medium");
+          setIsEditingRoom(false);
+          setAmenitiesInput("");
         }}
-        title=""
-        width="lg"
+        title="Room Details"
+        size="xl"
+        footer={
+          roomDetailsView === "edit" ? (
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={() => {
+                  setRoomDetailsView("details");
+                  setIsEditingRoom(false);
+                  // Restore amenities input from roomForm when canceling
+                  if (selectedRoom) {
+                    setAmenitiesInput(selectedRoom.amenities?.join(", ") || "");
+                  }
+                }}
+              >
+                Cancel
+              </Button>
+              <Button variant="primary" size="sm" fullWidth onClick={handleSaveRoom}>
+                Save Changes
+              </Button>
+            </div>
+          ) : null
+        }
       >
         {selectedRoom && (() => {
           const currentBooking = getCurrentBooking(selectedRoom.id);
           const roomTasks = getRoomTasks(selectedRoom.id);
           const currentTask = roomTasks.find(t => t.status === "Pending" || t.status === "In Progress");
 
-          return (
-            <div className="space-y-6">
-              {/* Header: Room #XXX, Current status, Quick actions */}
-              <div className="flex items-center justify-between pb-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    Room #{selectedRoom.number}
-                  </h2>
-                  <span
-                    className={`px-3 py-1 text-sm font-semibold rounded-full ${statusColors[selectedRoom.status]}`}
-                  >
-                    {selectedRoom.status}
-                  </span>
+          if (roomDetailsView === "edit") {
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Room Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={roomForm.number}
+                      onChange={(e) => setRoomForm({ ...roomForm, number: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      placeholder="e.g., 101"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Category *
+                    </label>
+                    <input
+                      type="text"
+                      value={roomForm.category}
+                      onChange={(e) => setRoomForm({ ...roomForm, category: e.target.value })}
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      placeholder="e.g., Standard, Deluxe, Suite"
+                      required
+                    />
+                  </div>
                 </div>
-                <Button variant="secondary" size="sm" onClick={handleEditRoom}>
-                  Edit
-                </Button>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Status *
+                    </label>
+                    <select
+                      value={roomForm.status}
+                      onChange={(e) =>
+                        setRoomForm({
+                          ...roomForm,
+                          status: e.target.value as Room["status"],
+                        })
+                      }
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    >
+                      <option value="Available">Available</option>
+                      <option value="Occupied">Occupied</option>
+                      <option value="Maintenance">Maintenance</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                      Capacity *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={roomForm.capacity}
+                      onChange={(e) =>
+                        setRoomForm({ ...roomForm, capacity: parseInt(e.target.value) || 1 })
+                      }
+                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Price per night ($) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={roomForm.price}
+                    onChange={(e) =>
+                      setRoomForm({ ...roomForm, price: parseFloat(e.target.value) || 0 })
+                    }
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Description
+                  </label>
+                  <textarea
+                    value={roomForm.description}
+                    onChange={(e) => setRoomForm({ ...roomForm, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    placeholder="Room description..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    Amenities (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={amenitiesInput}
+                    onChange={(e) => setAmenitiesInput(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    placeholder="e.g., Wi-Fi, TV, Air conditioner"
+                  />
+                </div>
+              </div>
+            );
+          }
+
+          if (roomDetailsView === "cleaning") {
+            return (
+              <div className="space-y-4">
+                <Card padding="sm">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
+                    Cleaning
+                  </h3>
+                  {currentTask ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
+                          Current Task
+                        </label>
+                        <div className="p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className={`px-1.5 py-0.5 text-xs font-semibold rounded ${getTaskStatusColor(currentTask.status)}`}>
+                              {currentTask.status}
+                            </span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
+                              {getPriorityIcon(currentTask.priority)} {currentTask.priority}
+                            </span>
+                          </div>
+                          {currentTask.notes && (
+                            <p className="text-xs text-gray-700 dark:text-gray-300 mt-1.5">
+                              {currentTask.notes}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        {currentTask.status !== "Completed" && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="sm:flex-1"
+                            onClick={async () => {
+                              try {
+                                await tasksApi.complete(currentTask.id);
+                                toast.success("Task marked as completed");
+                                await loadTasks();
+                              } catch (error) {
+                                toast.error("Error completing task");
+                                console.error(error);
+                              }
+                            }}
+                          >
+                            Mark Complete
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : showCreateTaskForm ? (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
+                              Priority
+                            </label>
+                            <select
+                              value={taskPriority}
+                              onChange={(e) => setTaskPriority(e.target.value as "Low" | "Medium" | "High")}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                            >
+                              <option value="Low">Low</option>
+                              <option value="Medium">Medium</option>
+                              <option value="High">High</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
+                              Notes (optional)
+                            </label>
+                            <textarea
+                              value={taskNotes}
+                              onChange={(e) => setTaskNotes(e.target.value)}
+                              rows={3}
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors resize-none"
+                              placeholder="Add any special instructions..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="sm:flex-1"
+                          onClick={() => {
+                            setShowCreateTaskForm(false);
+                            setTaskNotes("");
+                            setTaskPriority("Medium");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          className="sm:flex-1"
+                          onClick={handleCreateTask}
+                        >
+                          Create Task
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                        No active cleaning task
+                      </p>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => setShowCreateTaskForm(true)}
+                      >
+                        Create Cleaning Task
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 w-full mt-4">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    fullWidth
+                    onClick={() => {
+                      if (selectedRoom) {
+                        setIsEditingRoom(true);
+                        setRoomForm({
+                          number: selectedRoom.number,
+                          category: selectedRoom.category,
+                          status: selectedRoom.status,
+                          price: selectedRoom.price,
+                          capacity: selectedRoom.capacity,
+                          description: selectedRoom.description || "",
+                          amenities: selectedRoom.amenities || [],
+                        });
+                        setAmenitiesInput(selectedRoom.amenities?.join(", ") || "");
+                        setRoomDetailsView("edit");
+                      }
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    fullWidth
+                    onClick={() => {
+                      if (selectedRoom) {
+                        setPendingStatusChange({ roomId: selectedRoom.id, newStatus: "Maintenance" });
+                        setShowMaintenanceConfirmModal(true);
+                      }
+                    }}
+                  >
+                    Danger Zone
+                  </Button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-4">
+              {/* Header: Room #XXX, Current status */}
+              <div className="flex items-center gap-2 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Room #{selectedRoom.number}
+                </h2>
+                <span
+                  className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusColors[selectedRoom.status]}`}
+                >
+                  {selectedRoom.status}
+                </span>
               </div>
 
               {/* Primary info */}
-              <Card padding="md">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
+              <Card padding="sm">
+                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
                   Primary Info
                 </h3>
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
                       Room Type
@@ -683,11 +820,11 @@ export default function AdminPage() {
 
               {/* Booking (если есть) */}
               {currentBooking && (
-                <Card padding="md">
-                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
+                <Card padding="sm">
+                  <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
                     Booking
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
                         Guest Name
@@ -735,8 +872,8 @@ export default function AdminPage() {
               )}
 
               {/* Cleaning */}
-              <Card padding="md">
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 uppercase tracking-wide">
+              <Card padding="sm">
+                <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
                   Cleaning
                 </h3>
                 {currentTask ? (
@@ -886,36 +1023,49 @@ export default function AdminPage() {
                 )}
               </Card>
 
-              {/* Danger zone (всегда внизу, отделена визуально) */}
-              <div className="mt-6 pt-6 border-t-2 border-red-200 dark:border-red-800">
-                <Card padding="md" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10">
-                  <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-4 uppercase tracking-wide">
-                    Danger Zone
-                  </h3>
-                  <div className="space-y-3">
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => {
-                        handleStatusChange(selectedRoom.id, "Maintenance", selectedRoom.status);
-                      }}
-                    >
-                      Mark as Maintenance
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setShowDeleteConfirmModal(true)}
-                    >
-                      Delete Room
-                    </Button>
-                  </div>
-                </Card>
+              {/* Action Buttons */}
+              <div className="flex gap-2 w-full mt-4">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  fullWidth
+                  onClick={() => {
+                    if (selectedRoom) {
+                      setIsEditingRoom(true);
+                      setRoomForm({
+                        number: selectedRoom.number,
+                        category: selectedRoom.category,
+                        status: selectedRoom.status,
+                        price: selectedRoom.price,
+                        capacity: selectedRoom.capacity,
+                        description: selectedRoom.description || "",
+                        amenities: selectedRoom.amenities || [],
+                      });
+                      setAmenitiesInput(selectedRoom.amenities?.join(", ") || "");
+                      setRoomDetailsView("edit");
+                    }
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  fullWidth
+                  onClick={() => {
+                    if (selectedRoom) {
+                      setPendingStatusChange({ roomId: selectedRoom.id, newStatus: "Maintenance" });
+                      setShowMaintenanceConfirmModal(true);
+                    }
+                  }}
+                >
+                  Danger Zone
+                </Button>
               </div>
             </div>
           );
         })()}
-      </Drawer>
+      </Modal>
 
       {/* Room Form Modal (Create/Edit) */}
       <Modal
@@ -931,6 +1081,7 @@ export default function AdminPage() {
             description: "",
             amenities: [],
           });
+          setAmenitiesInput("");
         }}
         title={isEditingRoom ? `Edit Room #${roomForm.number}` : "Add New Room"}
         size="lg"
@@ -950,6 +1101,7 @@ export default function AdminPage() {
                   description: "",
                   amenities: [],
                 });
+                setAmenitiesInput("");
               }}
             >
               Cancel
@@ -1063,16 +1215,8 @@ export default function AdminPage() {
             </label>
             <input
               type="text"
-              value={roomForm.amenities?.join(", ") || ""}
-              onChange={(e) =>
-                setRoomForm({
-                  ...roomForm,
-                  amenities: e.target.value
-                    .split(",")
-                    .map((a) => a.trim())
-                    .filter((a) => a.length > 0),
-                })
-              }
+              value={amenitiesInput}
+              onChange={(e) => setAmenitiesInput(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               placeholder="e.g., Wi-Fi, TV, Air conditioner"
             />
@@ -1175,12 +1319,30 @@ export default function AdminPage() {
           setShowMaintenanceConfirmModal(false);
           setPendingStatusChange(null);
         }}
-        title="Confirm Maintenance"
+        title="Danger Zone"
         size="sm"
         footer={
-          <div className="flex gap-3 w-full">
+          <div className="flex flex-col gap-2 w-full">
+            <Button variant="danger" size="sm" fullWidth onClick={confirmMaintenanceChange}>
+              Mark as Maintenance
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              fullWidth
+              onClick={() => {
+                setShowMaintenanceConfirmModal(false);
+                setPendingStatusChange(null);
+                if (selectedRoom) {
+                  setShowDeleteConfirmModal(true);
+                }
+              }}
+            >
+              Delete Room
+            </Button>
             <Button
               variant="secondary"
+              size="sm"
               fullWidth
               onClick={() => {
                 setShowMaintenanceConfirmModal(false);
@@ -1188,9 +1350,6 @@ export default function AdminPage() {
               }}
             >
               Cancel
-            </Button>
-            <Button variant="danger" fullWidth onClick={confirmMaintenanceChange}>
-              Mark as Maintenance
             </Button>
           </div>
         }
@@ -1200,7 +1359,7 @@ export default function AdminPage() {
             <div className="text-4xl mb-4">⚠️</div>
             <p className="text-gray-700 dark:text-gray-300">
               Are you sure you want to mark{" "}
-              <span className="font-semibold">Room #{rooms.find((r) => r.id === pendingStatusChange?.roomId)?.number || pendingStatusChange?.roomId}</span>{" "}
+              <span className="font-semibold">Room #{rooms.find((r) => r.id === pendingStatusChange?.roomId)?.number || selectedRoom?.number || pendingStatusChange?.roomId}</span>{" "}
               as Maintenance?
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
@@ -1217,15 +1376,16 @@ export default function AdminPage() {
         title="Confirm Delete"
         size="sm"
         footer={
-          <div className="flex gap-3 w-full">
+          <div className="flex gap-2 w-full">
             <Button
               variant="secondary"
+              size="sm"
               fullWidth
               onClick={() => setShowDeleteConfirmModal(false)}
             >
               Cancel
             </Button>
-            <Button variant="danger" fullWidth onClick={handleDeleteRoom}>
+            <Button variant="danger" size="sm" fullWidth onClick={handleDeleteRoom}>
               Delete
             </Button>
           </div>

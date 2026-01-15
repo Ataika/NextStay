@@ -25,7 +25,7 @@ export default function AppLayout() {
         <Header />
 
         {/* Main content area */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-4">
+        <main className="flex-1 p-3 sm:p-4 lg:p-5 pb-20 md:pb-3 overflow-y-auto">
           <Outlet />
         </main>
       </div>
