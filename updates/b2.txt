@@ -1,0 +1,5 @@
+the connection is tested to test it :
+1)create a postgre db and insert the credentials in the .env file 
+2)activate the venv
+3)install all the requirements 
+4)run 'python3 test_db.py' in the terminal in the backend folder
