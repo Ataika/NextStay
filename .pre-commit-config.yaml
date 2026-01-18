@@ -1,0 +1,26 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace      # Delete extra spaces in the end of the raws
+      - id: end-of-file-fixer        # ADD free line of code in the end of the code
+      - id: check-yaml               # Check syntax of YAML files
+      - id: check-added-large-files  # Cant permiss to push heavy binaries
+
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black                    # AUTO-FORMATTER - make clean code
+        args: [--line-length=120]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort                    # AUTO-SORT OF IMPORTS
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
+    hooks:
+      - id: flake8                   # CHECK FOR ERRORS
+        args: [--max-line-length=120, --extend-ignore=E203]
