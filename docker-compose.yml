@@ -1,19 +1,23 @@
 services: 
-  # 1. DATABASE: PostgreSQL
   db:
     image: postgres:15-alpine
     container_name: nextstay_db  
     restart: always
     environment:   
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-nextstay} 
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME} 
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql 
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # 2. BACKEND: FastAPI
   backend:
     build: ./backend
     container_name: nextstay_backend
@@ -23,11 +27,11 @@ services:
     volumes:
       - ./backend:/app 
     environment:
-      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@db:5432/${DB_NAME:-nextstay}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
     depends_on:
-      - db
-  
-  # 3. ANALYTICS: Apache Superset
+      db:
+        condition: service_healthy
+
   superset:
     image: apache/superset:latest
     container_name: nextstay_superset
@@ -35,11 +39,11 @@ services:
     ports:
       - "8088:8088"
     environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-your_secret_key_here}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
-  # 4. Analytics ETL/ELT pipeline: DBT
   dbt:
     build:
       context: ./analytics
@@ -50,7 +54,8 @@ services:
     environment:
       - DBT_PROFILES_DIR=/usr/app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
