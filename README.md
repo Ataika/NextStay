@@ -52,16 +52,6 @@ For detailed structure, see [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md).
 - Automatic task creation on checkout
 - RESTful API with FastAPI
 
-### In Progress / Planned 🚧
-- User authentication (JWT + BCrypt)
-- User/staff management
-- Dynamic pricing engine
-- Weighted task dispatcher
-- Telegram bot notifications
-- PDF invoice generation
-- SMTP email confirmations
-- dbt ELT pipelines
-- Superset dashboards
 
 ## Academic Requirements
 
