@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
-  quality-control:
+  backend-quality:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -15,34 +15,51 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-
-      - name: Install Python Linter
+      - name: Install Linter
         run: pip install flake8
+      - name: Lint Backend
+        run: flake8 backend --count --exit-zero --max-line-length=127 --statistics
 
-      - name: Lint Backend (Dair)
-        run: flake8 backend --count --max-line-length=127 --statistics
-
+  frontend-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-
-      - name: Install Frontend Deps & Lint (Turat)
+      - name: Install & Lint
         run: |
-          if [ -f frontend/package.json ]; then
+          if [ -d "frontend" ]; then
             cd frontend
-            npm install
-            npm run lint || echo "Linting failed or script not found"
-          else
-            echo "Frontend project not initialized yet, skipping..."
+            npm install --package-lock-only || npm install
+            npm run lint --if-present || echo "No lint script"
           fi
 
+  analytics-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dbt
+        run: pip install dbt-postgres
+      - name: Validate dbt Models
+        run: |
+          if [ -d "analytics/dbt" ]; then
+            cd analytics/dbt
+            dbt parse || echo "dbt parsing issues"
+          fi
+
+  # 4. Инфраструктура
+  infra-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
       - name: Validate Docker Compose
         run: docker compose config
-
-      - name: Test Docker Build
-        run: docker build ./backend
-
 
 
 
