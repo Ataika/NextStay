@@ -1,0 +1,136 @@
+from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import List, Optional
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.db.session import SessionLocal
+from app.models.task import CleaningTask as TaskModel
+
+router = APIRouter(tags=["tasks"])
+
+
+# Dependency для получения сессии БД
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# Pydantic models
+class TaskBase(BaseModel):
+    roomId: int
+    roomNumber: str
+    status: str
+    priority: str
+    notes: Optional[str] = None
+
+
+class TaskCreate(BaseModel):
+    roomId: int
+    roomNumber: str
+    priority: str = "Medium"
+    notes: Optional[str] = None
+
+
+class TaskAssign(BaseModel):
+    staffId: int
+    staffName: str
+
+
+class Task(TaskBase):
+    id: int
+    assignedTo: Optional[int] = None
+    assignedToName: Optional[str] = None
+    createdAt: str
+    completedAt: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+        
+    @classmethod
+    def from_orm_with_dates(cls, obj: TaskModel):
+        """Преобразует ORM объект в Pydantic модель с правильным форматом дат"""
+        return cls(
+            id=obj.id,
+            roomId=obj.room_id,
+            roomNumber=obj.room_number,
+            status=obj.status,
+            priority=obj.priority,
+            notes=obj.notes,
+            assignedTo=obj.assigned_to,
+            assignedToName=obj.assigned_to_name,
+            createdAt=obj.created_at.isoformat() if obj.created_at else datetime.now().isoformat(),
+            completedAt=obj.completed_at.isoformat() if obj.completed_at else None
+        )
+
+
+# CRUD операции
+@router.get("/tasks", response_model=List[Task])
+def get_all_tasks(
+    room_id: Optional[int] = Query(None, alias="room_id"),
+    db: Session = Depends(get_db)
+):
+    """Получить все задачи или задачи по комнате"""
+    query = db.query(TaskModel)
+    if room_id:
+        query = query.filter(TaskModel.room_id == room_id)
+    tasks = query.all()
+    return [Task.from_orm_with_dates(task) for task in tasks]
+
+
+@router.get("/tasks/{task_id}", response_model=Task)
+def get_task_by_id(task_id: int, db: Session = Depends(get_db)):
+    """Получить задачу по ID"""
+    task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return Task.from_orm_with_dates(task)
+
+
+@router.post("/tasks", response_model=Task, status_code=201)
+def create_task(task: TaskCreate, db: Session = Depends(get_db)):
+    """Создать новую задачу"""
+    db_task = TaskModel(
+        room_id=task.roomId,
+        room_number=task.roomNumber,
+        status="Pending",
+        priority=task.priority,
+        notes=task.notes
+    )
+    db.add(db_task)
+    db.commit()
+    db.refresh(db_task)
+    return Task.from_orm_with_dates(db_task)
+
+
+@router.patch("/tasks/{task_id}/assign", response_model=Task)
+def assign_task(task_id: int, assign_data: TaskAssign, db: Session = Depends(get_db)):
+    """Назначить задачу сотруднику"""
+    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    db_task.assigned_to = assign_data.staffId
+    db_task.assigned_to_name = assign_data.staffName
+    db_task.status = "In Progress"
+    
+    db.commit()
+    db.refresh(db_task)
+    return Task.from_orm_with_dates(db_task)
+
+
+@router.patch("/tasks/{task_id}/complete", response_model=Task)
+def complete_task(task_id: int, db: Session = Depends(get_db)):
+    """Завершить задачу"""
+    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    db_task.status = "Completed"
+    db_task.completed_at = datetime.now()
+    
+    db.commit()
+    db.refresh(db_task)
+    return Task.from_orm_with_dates(db_task)
