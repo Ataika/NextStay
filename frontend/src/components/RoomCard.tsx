@@ -8,12 +8,14 @@ interface RoomCardProps {
 const statusColors = {
   Available: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
   Occupied: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700",
+  Cleaning: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
   Maintenance: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
 };
 
 const statusIcons = {
   Available: "✓",
   Occupied: "👤",
+  Cleaning: "🧹",
   Maintenance: "🔧",
 };
 
@@ -22,7 +24,7 @@ export default function RoomCard({
   onClick,
 }: RoomCardProps) {
   // Handle "Dirty" status for backward compatibility (should not be used as room status anymore)
-  const roomStatus = room.status === "Dirty" ? "Available" : room.status;
+  const roomStatus = room.status === "Dirty" ? "Cleaning" : room.status;
   const statusColor = statusColors[roomStatus] || statusColors.Available;
   const statusIcon = statusIcons[roomStatus] || statusIcons.Available;
 
@@ -42,6 +44,8 @@ export default function RoomCard({
             title={
               roomStatus === "Available"
                 ? "Ready to sell - room is clean and available for booking"
+                : roomStatus === "Cleaning"
+                ? "Room is being cleaned - not available for booking"
                 : roomStatus === "Maintenance"
                 ? "Under maintenance - cannot be sold"
                 : "Currently occupied by guests"

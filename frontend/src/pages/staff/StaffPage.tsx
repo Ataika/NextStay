@@ -59,7 +59,7 @@ export default function StaffPage() {
   const handleComplete = async (taskId: number) => {
     try {
       await tasksApi.complete(taskId);
-      toast.success("Task completed");
+      toast.success("Task completed. Room status updated to Available.");
       await loadTasks();
     } catch (error) {
       toast.error("Error completing task");

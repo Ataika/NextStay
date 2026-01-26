@@ -2,7 +2,7 @@ export interface Room {
   id: number;
   number: string;
   category: string;
-  status: "Available" | "Occupied" | "Dirty" | "Maintenance";
+  status: "Available" | "Occupied" | "Dirty" | "Maintenance" | "Cleaning";
   price: number;
   capacity: number;
   description?: string;

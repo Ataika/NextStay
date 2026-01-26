@@ -19,7 +19,8 @@ const statusColors = {
   Available: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
   Occupied: "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700",
   Maintenance: "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
-  // Dirty is no longer a room status - it's a cleaning state
+  Cleaning: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
+  // Dirty is kept for backward compatibility but should not be used as room status
   Dirty: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
 };
 
@@ -48,8 +49,8 @@ export default function AdminPage() {
     number: "",
     category: "",
     status: "Available",
-    price: 0,
-    capacity: 2,
+    price: null as any,
+    capacity: null as any,
     description: "",
     amenities: [],
   });
@@ -99,6 +100,7 @@ export default function AdminPage() {
       total: rooms.length,
       available: rooms.filter((r) => r.status === "Available").length,
       occupied: rooms.filter((r) => r.status === "Occupied").length,
+      cleaning: rooms.filter((r) => r.status === "Cleaning").length,
       maintenance: rooms.filter((r) => r.status === "Maintenance").length,
       // Rooms needing cleaning (have pending/in-progress tasks)
       needsCleaning: rooms.filter((r) => {
@@ -185,8 +187,8 @@ export default function AdminPage() {
       number: "",
       category: "",
       status: "Available",
-      price: 0,
-      capacity: 2,
+      price: null as any,
+      capacity: null as any,
       description: "",
       amenities: [],
     });
@@ -196,6 +198,24 @@ export default function AdminPage() {
 
 
   const handleSaveRoom = async () => {
+    // Валидация обязательных полей
+    if (!roomForm.number.trim()) {
+      toast.error("Please fill in the Room Number field");
+      return;
+    }
+    if (!roomForm.category.trim()) {
+      toast.error("Please fill in the Category field");
+      return;
+    }
+    if (roomForm.capacity === null || roomForm.capacity === undefined || roomForm.capacity <= 0) {
+      toast.error("Please fill in the Capacity field with a valid number");
+      return;
+    }
+    if (roomForm.price === null || roomForm.price === undefined || roomForm.price < 0) {
+      toast.error("Please fill in the Price per night field with a valid number");
+      return;
+    }
+
     try {
       // Convert amenities input string to array before saving
       const amenitiesArray = amenitiesInput
@@ -365,6 +385,11 @@ export default function AdminPage() {
             <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.occupied}</div>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Currently occupied</p>
           </div>
+          <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-0.5">Cleaning</div>
+            <div className="text-xl font-bold text-yellow-800 dark:text-yellow-300">{stats.cleaning}</div>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">Being cleaned</p>
+          </div>
           <div className={`p-3 rounded-lg border ${colors.danger.light}`}>
             <div className="text-xs text-red-700 dark:text-red-400 mb-0.5">Maintenance</div>
             <div className="text-xl font-bold text-red-800 dark:text-red-300">{stats.maintenance}</div>
@@ -394,6 +419,7 @@ export default function AdminPage() {
               <option value="All">All statuses</option>
               <option value="Available">Available</option>
               <option value="Occupied">Occupied</option>
+              <option value="Cleaning">Cleaning</option>
               <option value="Maintenance">Maintenance</option>
             </select>
           </div>
@@ -521,6 +547,7 @@ export default function AdminPage() {
                     >
                       <option value="Available">Available</option>
                       <option value="Occupied">Occupied</option>
+                      <option value="Cleaning">Cleaning</option>
                       <option value="Maintenance">Maintenance</option>
                     </select>
                   </div>
@@ -529,12 +556,21 @@ export default function AdminPage() {
                       Capacity *
                     </label>
                     <input
-                      type="number"
-                      min="1"
-                      value={roomForm.capacity}
-                      onChange={(e) =>
-                        setRoomForm({ ...roomForm, capacity: parseInt(e.target.value) || 1 })
-                      }
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={roomForm.capacity === null || roomForm.capacity === undefined ? "" : roomForm.capacity}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "") {
+                          setRoomForm({ ...roomForm, capacity: null as any });
+                        } else {
+                          const numValue = parseInt(value);
+                          if (!isNaN(numValue) && numValue > 0) {
+                            setRoomForm({ ...roomForm, capacity: numValue });
+                          }
+                        }
+                      }}
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                       required
                     />
@@ -546,14 +582,31 @@ export default function AdminPage() {
                     Price per night ($) *
                   </label>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={roomForm.price}
-                    onChange={(e) =>
-                      setRoomForm({ ...roomForm, price: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*\.?[0-9]*"
+                    value={roomForm.price === null || roomForm.price === undefined ? "" : roomForm.price}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "") {
+                        setRoomForm({ ...roomForm, price: null as any });
+                      } else {
+                        // Разрешаем только цифры и точку
+                        const cleanedValue = value.replace(/[^0-9.]/g, '');
+                        // Проверяем, что точка только одна
+                        const parts = cleanedValue.split('.');
+                        const finalValue = parts.length > 2 
+                          ? parts[0] + '.' + parts.slice(1).join('')
+                          : cleanedValue;
+                        const numValue = parseFloat(finalValue);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setRoomForm({ ...roomForm, price: numValue });
+                        } else if (finalValue === '' || finalValue === '.') {
+                          setRoomForm({ ...roomForm, price: null as any });
+                        }
+                      }
+                    }}
+                    className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     required
                   />
                 </div>
@@ -627,6 +680,16 @@ export default function AdminPage() {
                                 await tasksApi.complete(currentTask.id);
                                 toast.success("Task marked as completed");
                                 await loadTasks();
+                                // Обновить список комнат, чтобы увидеть новый статус (Available)
+                                await loadRooms();
+                                // Обновить selectedRoom, если он был выбран
+                                if (selectedRoom) {
+                                  const updatedRooms = await roomsApi.getAll();
+                                  const updatedRoom = updatedRooms.find((r) => r.id === selectedRoom.id);
+                                  if (updatedRoom) {
+                                    setSelectedRoom(updatedRoom);
+                                  }
+                                }
                               } catch (error) {
                                 toast.error("Error completing task");
                                 console.error(error);
@@ -1076,8 +1139,8 @@ export default function AdminPage() {
             number: "",
             category: "",
             status: "Available",
-            price: 0,
-            capacity: 2,
+            price: null as any,
+            capacity: null as any,
             description: "",
             amenities: [],
           });
@@ -1096,8 +1159,8 @@ export default function AdminPage() {
                   number: "",
                   category: "",
                   status: "Available",
-                  price: 0,
-                  capacity: 2,
+                  price: null as any,
+                  capacity: null as any,
                   description: "",
                   amenities: [],
                 });
@@ -1159,6 +1222,7 @@ export default function AdminPage() {
               >
                 <option value="Available">Available</option>
                 <option value="Occupied">Occupied</option>
+                <option value="Cleaning">Cleaning</option>
                 <option value="Maintenance">Maintenance</option>
               </select>
             </div>
@@ -1167,12 +1231,21 @@ export default function AdminPage() {
                 Capacity *
               </label>
               <input
-                type="number"
-                min="1"
-                value={roomForm.capacity}
-                onChange={(e) =>
-                  setRoomForm({ ...roomForm, capacity: parseInt(e.target.value) || 1 })
-                }
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={roomForm.capacity === null || roomForm.capacity === undefined ? "" : roomForm.capacity}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === "") {
+                    setRoomForm({ ...roomForm, capacity: null as any });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue > 0) {
+                      setRoomForm({ ...roomForm, capacity: numValue });
+                    }
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 required
               />
@@ -1184,14 +1257,31 @@ export default function AdminPage() {
               Price per night ($) *
             </label>
             <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={roomForm.price}
-              onChange={(e) =>
-                setRoomForm({ ...roomForm, price: parseFloat(e.target.value) || 0 })
-              }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              type="text"
+              inputMode="decimal"
+              pattern="[0-9]*\.?[0-9]*"
+              value={roomForm.price === null || roomForm.price === undefined ? "" : roomForm.price}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === "") {
+                  setRoomForm({ ...roomForm, price: null as any });
+                } else {
+                  // Разрешаем только цифры и точку
+                  const cleanedValue = value.replace(/[^0-9.]/g, '');
+                  // Проверяем, что точка только одна
+                  const parts = cleanedValue.split('.');
+                  const finalValue = parts.length > 2 
+                    ? parts[0] + '.' + parts.slice(1).join('')
+                    : cleanedValue;
+                  const numValue = parseFloat(finalValue);
+                  if (!isNaN(numValue) && numValue >= 0) {
+                    setRoomForm({ ...roomForm, price: numValue });
+                  } else if (finalValue === '' || finalValue === '.') {
+                    setRoomForm({ ...roomForm, price: null as any });
+                  }
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               required
             />
           </div>
