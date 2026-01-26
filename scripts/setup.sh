@@ -58,8 +58,8 @@ docker exec nextstay_superset superset init
 # 5. Создание Read-Only пользователя (Issue #22)
 echo "👤 Создаю Read-Only пользователя для Superset..."
 docker exec -it nextstay_db_clean psql -U "$DB_USER" -d "$DB_NAME" -c "
-    DO \$\$ 
-    BEGIN 
+    DO \$\$
+    BEGIN
         IF NOT EXISTS (SELECT FROM pg_catalog.pg_user WHERE usename = 'superset_ro') THEN
             CREATE USER superset_ro WITH PASSWORD 'read_only_pass';
         END IF;

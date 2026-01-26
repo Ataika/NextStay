@@ -19,7 +19,7 @@ services:
       retries: 5
 
   backend:
-    build: 
+    build:
       context: ./backend # Docker заглянет в папку backend и найдет там Dockerfile
     container_name: nextstay_backend
     restart: always
@@ -36,7 +36,7 @@ services:
   airflow:
     image: apache/airflow:2.7.1-python3.10
     container_name: nextstay_airflow
-    environment:   
+    environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - DBT_PROFILES_DIR=/opt/airflow/dbt
@@ -56,8 +56,8 @@ services:
     image: apache/superset:latest
     container_name: nextstay_superset
     restart: always
-    ports:  
-      - "8088:8088"   
+    ports:
+      - "8088:8088"
     volumes:
       - ./analytics/superset:/app/superset_home
     environment:
@@ -83,6 +83,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-volumes:   
+volumes:
   nextstay_data_v2:
     external: false

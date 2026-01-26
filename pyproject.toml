@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint] # Вот эта секция исправляет то самое предупреждение
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E231"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
