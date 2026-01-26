@@ -1,4 +1,5 @@
 NexStay OS 
+
 Enterprise Resource Planning (ERP) & Property Management System (PMS)
 
 NexStay OS is a professional-grade Property Management System designed to minimize human intervention in hospitality operations through automated access control, intelligent task orchestration, and advanced business intelligence.
@@ -17,8 +18,12 @@ Analytics Layer: dbt Core (ELT transformations) and Apache Superset (BI Visualiz
 
 Orchestration: Docker Compose and Apache Airflow for automated data pipelines.
 
- Business Value & Core Functionalities
+
+
+Business Value & Core Functionalities
+ 
 The system is engineered to maximize Revenue Per Available Room (RevPAR) and optimize operational overhead. It is categorized into three functional pillars:
+
 
 Category A: Data-Oriented Functionalities (CRUD)
 
@@ -28,6 +33,7 @@ Booking System: Robust guest registration, stay tracking, and historical reserva
 
 Staff Roles: Role-Based Access Control (RBAC) for managing employee profiles and organizational hierarchies.
 
+
 Category B: Third-Party Integrations
 
 BI Visualization: Native integration with Apache Superset for real-time executive dashboards.
@@ -35,6 +41,7 @@ BI Visualization: Native integration with Apache Superset for real-time executiv
 Notification Engine: Telegram Bot API integration for instantaneous housekeeping alerts and status updates.
 
 Financial Services: Automated PDF invoice generation via ReportLab and SMTP-based email confirmations.
+
 
 Category C: Complex Algorithmic Logic
 
@@ -46,7 +53,9 @@ Analytical DWH Pipeline: A multi-layer ELT process (STG -> CORE -> MART) utilizi
 
 
 
+
 Data Warehouse Design
+
 To support Category C requirements, the Data Layer is organized into three analytical stages:
 
 Staging (STG): Raw data ingestion from backend sources with audit metadata.
@@ -55,14 +64,17 @@ Core (DDS): A normalized model using Surrogate Keys and Slowly Changing Dimensio
 
 Mart: High-performance analytical views for calculating KPIs such as Occupancy Rates, Revenue Forecasts, and Staff Performance.
 
+
 👥 Project Team
+
 Dair: Core Software Engineer (Backend API & Category C Algorithms).
 
-Atay: Data & Infrastructure Architect (DWH Design, Airflow/dbt Pipelines, & BI Infrastructure).
+Atay: Data & Infrastructure Architect (DWH Design, Airflow/dbt Pipelines, & BI Infrastructure, Project Management).
 
 Turat: UX & Integration Engineer (Frontend SPA, 3rd Party APIs, & Financial Services).
 
- Deployment
+
+Deployment
 Bash
 # 1. Clone the repository and configure the .env file
 # 2. Deploy the full infrastructure
