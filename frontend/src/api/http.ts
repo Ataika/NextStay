@@ -3,7 +3,8 @@ import { useAuthStore } from "../store/authStore";
 import toast from "react-hot-toast";
 
 // Base API URL (can be moved to .env)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+// Бэкенд использует префикс /api/v1, поэтому добавляем его здесь
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 // Create axios instance
 const http = axios.create({
