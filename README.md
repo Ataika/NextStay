@@ -1,48 +1,106 @@
-# NexStay OS 🏨
+# NextStay 🏨
 
-**NexStay OS** is a professional Enterprise Resource Planning (ERP) and Property Management System (PMS) designed to automate hotel operations, optimize service workflows, and provide advanced business intelligence.
+A Property Management System (PMS) designed to automate hotel operations, optimize workflows, and provide business intelligence.
 
----
+## Tech Stack
 
-##  Project Architecture
-The system follows a **Service-Oriented Architecture (SOA)** approach, fully containerized for scalable deployment.
+- **Frontend:** React 19 + TypeScript + Tailwind CSS (Vite)
+- **Backend:** FastAPI + SQLAlchemy + PostgreSQL 15
+- **Analytics:** dbt Core + Apache Superset
+- **Infrastructure:** Docker & Docker Compose
 
-* **Frontend:** React.js + TypeScript + Tailwind CSS (Vite-based SPA).
-* **Backend:** FastAPI (Python) + SQLAlchemy (High-performance asynchronous API).
-* **Database:** PostgreSQL 15 (Relational Storage & Data Warehouse).
-* **Analytics:** dbt Core (ELT transformations) + Apache Superset (BI Visualization).
-* **Orchestration:** Docker & Docker Compose.
+## Quick Start
 
----
+See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for detailed setup instructions.
 
-##  Academic Requirements (Software Engineering)
-*This project is categorized according to the three functional pillars required by the course:*
-
-###  Category A: Data-Oriented Functionalities (CRUD)
-* **Inventory Management:** Full lifecycle of rooms and occupancy states.
-* **Booking System:** Guest registration, stay tracking, and reservation history.
-* **Staff Roles:** Management of employee profiles and access levels.
-
-###  Category B: Third-Party Services & Integrations
-* **BI Visualization:** Apache Superset integration for real-time dashboards.
-* **Notification Engine:** Telegram Bot API for instant housekeeping alerts.
-* **Financial Services:** Automated PDF Invoice generation (ReportLab) and SMTP email confirmations.
-
-###  Category C: Complex Functionalities (Algorithms)
-* **Dynamic Pricing Engine:** Real-time price adjustment algorithm based on supply/demand and lead time.
-* **Weighted Task Dispatcher:** Intelligent housekeeping prioritization algorithm.
-* **Analytical DWH Pipeline:** Multi-layer ELT (STG -> CORE -> MART) with SCD Type 2 logic and Loyalty Tiering algorithms.
-
----
-
-##  The Team
-* **Dair:** Core Software Engineer (Backend API, Category C Algorithms).
-* **Atay:** Data & Infrastructure Architect (DWH Design, dbt Pipelines, BI).
-* **Turat:** UX & Integration Engineer (Frontend, 3rd Party API, PDF/SMTP).
-
----
-
-##  Quick Start
 ```bash
-# Start the entire infrastructure (DB, Backend, BI, dbt)
-docker-compose up -d --build
+# Start database and backend
+docker-compose up db backend
+
+# In another terminal, start frontend
+cd frontend
+npm install
+npm run dev
+```
+
+**Access:**
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000/api/v1
+- API Docs: http://localhost:8000/docs
+
+## Project Structure
+
+```
+NextStay/
+├── backend/          # FastAPI backend application
+├── frontend/         # React frontend application
+├── docs/             # Project documentation
+├── scripts/          # Database initialization scripts
+├── analytics/        # dbt configuration
+└── docker-compose.yml
+```
+
+For detailed structure, see [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md).
+
+## Features
+
+### Implemented ✅
+- Room management (CRUD)
+- Booking system with guest tokens
+- Cleaning task management
+- Guest self-service portal (token-based access)
+- Automatic task creation on checkout
+- RESTful API with FastAPI
+
+### In Progress / Planned 🚧
+- User authentication (JWT + BCrypt)
+- User/staff management
+- Dynamic pricing engine
+- Weighted task dispatcher
+- Telegram bot notifications
+- PDF invoice generation
+- SMTP email confirmations
+- dbt ELT pipelines
+- Superset dashboards
+
+## Academic Requirements
+
+This project fulfills three functional categories:
+
+**Category A (CRUD):** Room inventory, bookings, staff management  
+**Category B (3rd Party):** Telegram Bot, PDF generation, SMTP  
+**Category C (Algorithms):** Dynamic pricing, task prioritization, DWH pipelines
+
+## Documentation
+
+- [Local Setup Guide](./LOCAL_SETUP.md) - How to run the project locally
+- [Project Structure](./PROJECT_STRUCTURE.md) - Detailed file structure
+- [Architecture](./docs/architecture.md) - System architecture
+- [SRS](./docs/srs.md) - Software Requirements Specification
+- [API Documentation](./backend/app/api/v1/README.md) - API endpoints status
+
+## Development
+
+### Backend
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Test Credentials (stub)
+- Admin: `admin@nextstay.com` / `admin`
+- Staff: `staff@nextstay.com` / `staff`
+
+## Team
+
+- **Dair:** Backend API, Algorithms
+- **Atay:** Data Architecture, dbt, BI
+- **Turat:** Frontend, Integrations
