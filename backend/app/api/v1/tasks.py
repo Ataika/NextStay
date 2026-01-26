@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 from app.db.session import SessionLocal
 from app.models.task import CleaningTask as TaskModel
+from app.models.room import Room as RoomModel
+from app.models.booking import Booking as BookingModel
 
 router = APIRouter(tags=["tasks"])
 
@@ -91,7 +93,13 @@ def get_task_by_id(task_id: int, db: Session = Depends(get_db)):
 
 @router.post("/tasks", response_model=Task, status_code=201)
 def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    """Создать новую задачу"""
+    """Создать новую задачу и автоматически изменить статус комнаты на Cleaning"""
+    # Проверка существования комнаты
+    room = db.query(RoomModel).filter(RoomModel.id == task.roomId).first()
+    if not room:
+        raise HTTPException(status_code=404, detail="Room not found")
+    
+    # Создание задачи
     db_task = TaskModel(
         room_id=task.roomId,
         room_number=task.roomNumber,
@@ -100,6 +108,10 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         notes=task.notes
     )
     db.add(db_task)
+    
+    # Автоматическое изменение статуса комнаты на "Cleaning"
+    room.status = "Cleaning"
+    
     db.commit()
     db.refresh(db_task)
     return Task.from_orm_with_dates(db_task)
@@ -123,13 +135,19 @@ def assign_task(task_id: int, assign_data: TaskAssign, db: Session = Depends(get
 
 @router.patch("/tasks/{task_id}/complete", response_model=Task)
 def complete_task(task_id: int, db: Session = Depends(get_db)):
-    """Завершить задачу"""
+    """Завершить задачу уборки и автоматически перевести комнату в статус Available"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
     
     db_task.status = "Completed"
     db_task.completed_at = datetime.now()
+    
+    # Получаем комнату и переводим её в статус Available после завершения уборки
+    room = db.query(RoomModel).filter(RoomModel.id == db_task.room_id).first()
+    if room:
+        # После завершения уборки комната всегда переходит в статус Available
+        room.status = "Available"
     
     db.commit()
     db.refresh(db_task)
