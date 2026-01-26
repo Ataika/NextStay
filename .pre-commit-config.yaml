@@ -1,26 +1,33 @@
+# Global exclude: ignore legacy or large files that don't need linting
+exclude: '^(backend/init_db_v1\.sql|init\.sql|scripts/db_backup\.sql|analytics/dbt/models/example/.*)'
+
 repos:
+  # Standard hooks for general file quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
-      - id: trailing-whitespace      # Delete extra spaces in the end of the raws
-      - id: end-of-file-fixer        # ADD free line of code in the end of the code
-      - id: check-yaml               # Check syntax of YAML files
-      - id: check-added-large-files  # Cant permiss to push heavy binaries
+      - id: trailing-whitespace    # Remove extra spaces at the end of lines
+      - id: end-of-file-fixer      # Ensure files end with a newline
+      - id: check-yaml             # Validate YAML syntax
+      - id: check-added-large-files # Prevent accidental upload of huge files
+      - id: detect-private-key     # Scan for accidentally included API keys/secrets
+      - id: check-toml             # Validate TOML syntax (for pyproject.toml)
 
-  - repo: https://github.com/psf/black
-    rev: 23.3.0
+  # Ruff: The fast all-in-one Python linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.6
     hooks:
-      - id: black                    # AUTO-FORMATTER - make clean code
-        args: [--line-length=120]
+      - id: ruff
+        # --fix: automatically fix standard errors
+        # --unsafe-fixes: allow ruff to delete unused variables/imports
+        # --exit-non-zero-on-fix: fail the check if any auto-fixes were made
+        args: [ --fix, --unsafe-fixes, --exit-non-zero-on-fix ]
+      - id: ruff-format            # Auto-format code style (replaces Black)
 
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
+  # SQLFluff: Linter for SQL and dbt models
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 2.3.2
     hooks:
-      - id: isort                    # AUTO-SORT OF IMPORTS
-        args: ["--profile", "black"]
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
-    hooks:
-      - id: flake8                   # CHECK FOR ERRORS
-        args: [--max-line-length=120, --extend-ignore=E203]
+      - id: sqlfluff-lint          # Check SQL code for best practices
+        args: [--dialect, postgres]
+        additional_dependencies: ['sqlfluff-templater-dbt']
