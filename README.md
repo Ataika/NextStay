@@ -1,9 +1,10 @@
-NexStay OS 🏨
+NexStay OS 
 Enterprise Resource Planning (ERP) & Property Management System (PMS)
 
 NexStay OS is a professional-grade Property Management System designed to minimize human intervention in hospitality operations through automated access control, intelligent task orchestration, and advanced business intelligence.
 
-🏗 Project Architecture
+
+Project Architecture
 The system utilizes a Service-Oriented Architecture (SOA), fully containerized to ensure scalable deployment and environmental consistency.
 
 Frontend: React.js, TypeScript, and Tailwind CSS (Vite-based SPA).
@@ -16,7 +17,7 @@ Analytics Layer: dbt Core (ELT transformations) and Apache Superset (BI Visualiz
 
 Orchestration: Docker Compose and Apache Airflow for automated data pipelines.
 
-📊 Business Value & Core Functionalities
+ Business Value & Core Functionalities
 The system is engineered to maximize Revenue Per Available Room (RevPAR) and optimize operational overhead. It is categorized into three functional pillars:
 
 Category A: Data-Oriented Functionalities (CRUD)
@@ -43,7 +44,9 @@ Weighted Task Dispatcher: An intelligent housekeeping prioritization algorithm d
 
 Analytical DWH Pipeline: A multi-layer ELT process (STG -> CORE -> MART) utilizing SCD Type 2 logic and automated Loyalty Tiering.
 
-📁 Data Warehouse Design
+
+
+Data Warehouse Design
 To support Category C requirements, the Data Layer is organized into three analytical stages:
 
 Staging (STG): Raw data ingestion from backend sources with audit metadata.
@@ -59,7 +62,7 @@ Atay: Data & Infrastructure Architect (DWH Design, Airflow/dbt Pipelines, & BI I
 
 Turat: UX & Integration Engineer (Frontend SPA, 3rd Party APIs, & Financial Services).
 
-🚀 Deployment
+ Deployment
 Bash
 # 1. Clone the repository and configure the .env file
 # 2. Deploy the full infrastructure
