@@ -35,14 +35,17 @@
 - **`mock_data.json`** - Тестовые данные (legacy)
 - **`test_db.py`** - Скрипт для тестирования подключения к БД
 
+### Миграции (`backend/migrations/`)
+- **`add_stripe_fields.sql`** - SQL миграция для добавления полей Stripe в таблицу `bookings` (`guest_email`, `stripe_session_id`, `stripe_payment_intent_id`, `amount_paid`)
+
 ### Приложение (`backend/app/`)
 
 #### Основные файлы
-- **`main.py`** - Точка входа FastAPI приложения, регистрация роутеров, CORS, создание таблиц
-- **`exceptions.py`** - Обработчики исключений (HTTP, валидация, общие ошибки)
+- **`main.py`** - Точка входа FastAPI приложения, регистрация роутеров (включая stripe_router), CORS настройки, создание таблиц (временно отключено)
+- **`exceptions.py`** - Обработчики исключений (HTTP, валидация, общие ошибки, ошибки подключения к БД)
 
 #### Конфигурация (`app/core/`)
-- **`config.py`** - Настройки приложения, подключение к БД через переменные окружения
+- **`config.py`** - Настройки приложения, подключение к БД через переменные окружения, конфигурация Stripe (секретные ключи, webhook secret), настройки SMTP для email уведомлений
 
 #### База данных (`app/db/`)
 - **`base.py`** - Базовый класс SQLAlchemy для моделей
@@ -50,18 +53,22 @@
 
 #### Модели (`app/models/`)
 - **`__init__.py`** - Экспорт всех моделей
-- **`room.py`** - Модель Room (комнаты отеля: номер, категория, статус, цена, вместимость)
-- **`booking.py`** - Модель Booking (бронирования: гость, комната, даты заезда/выезда, статус)
+- **`room.py`** - Модель Room (комнаты отеля: номер, категория, статус, цена, вместимость, описание, удобства)
+- **`booking.py`** - Модель Booking (бронирования: гость, email, комната, даты заезда/выезда, статус, Stripe поля: `stripe_session_id`, `stripe_payment_intent_id`, `amount_paid`)
 - **`task.py`** - Модель CleaningTask (задачи уборки: комната, статус, приоритет, исполнитель)
 - **`guest_token.py`** - Модель GuestToken (токены для гостей: WiFi, контакты, инструкции, правила)
+
+#### Сервисы (`app/services/`)
+- **`email_service.py`** - Сервис отправки email уведомлений (SMTP): подтверждение бронирования гостю, уведомление владельцу
 
 #### API (`app/api/v1/`)
 - **`health.py`** - Health check эндпоинт (`GET /api/v1/health`)
 - **`auth.py`** - Аутентификация (заглушка): логин/логаут
-- **`rooms.py`** - CRUD операции для комнат (`GET/POST/PATCH/DELETE /api/v1/rooms`)
-- **`bookings.py`** - CRUD операции для бронирований, автоматическое создание токенов
+- **`rooms.py`** - CRUD операции для комнат (`GET/POST/PATCH/DELETE /api/v1/rooms`), поиск доступных номеров (`GET /api/v1/rooms/available`)
+- **`bookings.py`** - CRUD операции для бронирований, автоматическое создание токенов, проверка доступности
 - **`tasks.py`** - CRUD операции для задач уборки, назначение и завершение задач
 - **`guest.py`** - API для гостей: получение данных по токену, checkout (создание задачи уборки)
+- **`stripe.py`** - Интеграция с Stripe: создание checkout сессий, обработка webhooks для подтверждения платежей
 
 #### Документация API (`app/api/v1/`)
 - **`README.md`** - Описание API эндпоинтов (статус реализации)
@@ -90,8 +97,8 @@
 - **`index.css`** - Глобальные стили, Tailwind директивы
 
 #### API (`src/api/`)
-- **`http.ts`** - HTTP клиент (Axios), настройка базового URL, interceptors
-- **`api.ts`** - API функции для всех эндпоинтов (rooms, bookings, tasks, auth, guest)
+- **`http.ts`** - HTTP клиент (Axios), настройка базового URL, interceptors, обработка ошибок сети
+- **`api.ts`** - API функции для всех эндпоинтов (rooms, bookings, tasks, auth, guest, stripe): `roomsApi.getAvailable()`, `stripeApi.createCheckoutSession()`
 - **`mockApi.ts`** - Mock API для разработки без бэкенда
 
 #### Роутинг (`src/router/`)
@@ -101,10 +108,13 @@
 #### Страницы (`src/pages/`)
 - **`LoginPage.tsx`** - Страница авторизации
 - **`NotFoundPage.tsx`** - Страница 404
-- **`admin/AdminPage.tsx`** - Главная страница администратора (управление комнатами)
+- **`admin/AdminPage.tsx`** - Главная страница администратора (управление комнатами, задачами, бронированиями)
 - **`admin/BookingsPage.tsx`** - Страница управления бронированиями
 - **`staff/StaffPage.tsx`** - Страница персонала (задачи уборки)
 - **`guest/GuestPage.tsx`** - Страница гостя (доступ по токену, QR код, checkout)
+- **`booking/BookingPage.tsx`** - Публичная страница бронирования (поиск номеров, форма бронирования, редирект на Stripe)
+- **`booking/BookingSuccessPage.tsx`** - Страница успешного бронирования после оплаты
+- **`booking/BookingCancelPage.tsx`** - Страница отмены бронирования
 - **`reports/ReportsPage.tsx`** - Страница отчетов и аналитики
 
 #### Компоненты (`src/components/`)
@@ -178,6 +188,17 @@
 - **`.pre-commit-config.yaml`** - Конфигурация pre-commit хуков
 - **`updates/`** - Временные файлы обновлений (можно удалить)
 
+## 📄 Документация проекта
+
+### Основные гайды
+- **`PROJECT_FEATURES.md`** - Полный список функций и операций проекта
+- **`STRIPE_SETUP.md`** - Инструкция по настройке Stripe интеграции
+- **`QUICK_START.md`** - Быстрый старт приложения
+- **`HOW_TO_BOOK.md`** - Подробное описание процесса бронирования
+- **`FIX_DATABASE.md`** - Инструкции по миграции БД
+- **`RUN_BACKEND_LOCALLY.md`** - Запуск backend локально (без Docker)
+- **`DOCKER_FIX.md`** - Решение проблем с Docker
+
 ---
 
 ## 🏗️ Архитектура проекта
@@ -216,6 +237,9 @@ NextStay/
 - PostgreSQL - БД
 - JWT (python-jose) - аутентификация
 - BCrypt (passlib) - хеширование паролей
+- Stripe - платежный шлюз (checkout sessions, webhooks)
+- aiosmtplib - асинхронная отправка email (SMTP)
+- email-validator - валидация email адресов
 
 **Frontend:**
 - React 19 - UI библиотека
