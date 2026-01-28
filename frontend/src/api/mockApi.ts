@@ -106,6 +106,13 @@ export const mockApi = {
       task.completedAt = new Date().toISOString();
       return task;
     },
+
+    delete: async (taskId: number): Promise<void> => {
+      await delay(300);
+      const index = mockTasks.findIndex((t) => t.id === taskId);
+      if (index === -1) throw new Error("Task not found");
+      mockTasks.splice(index, 1);
+    },
   },
 
   // Guest API

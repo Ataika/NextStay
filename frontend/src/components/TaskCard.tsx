@@ -5,6 +5,7 @@ interface TaskCardProps {
   task: CleaningTask;
   onStart?: (taskId: number) => void;
   onComplete?: (taskId: number) => void;
+  onDelete?: (taskId: number) => void;
   currentStaffId?: number;
 }
 
@@ -30,6 +31,7 @@ export default function TaskCard({
   task,
   onStart,
   onComplete,
+  onDelete,
   currentStaffId = 1,
 }: TaskCardProps) {
   const priorityColor = priorityColors[task.priority];
@@ -115,7 +117,7 @@ export default function TaskCard({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {canStart && onStart && (
           <Button
             variant="primary"
@@ -144,6 +146,15 @@ export default function TaskCard({
           <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
             Assigned to someone else
           </div>
+        )}
+        {onDelete && (
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={() => onDelete(task.id)}
+          >
+            Delete
+          </Button>
         )}
       </div>
 

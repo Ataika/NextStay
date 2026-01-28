@@ -74,8 +74,6 @@ export default function GuestPage() {
       setCheckingOut(true);
       setShowCheckoutModal(false);
       await guestApi.checkOut(token);
-      // Reload data to make the token invalid in UI
-      await loadGuestData(token);
       setJustCheckedOut(true);
     } catch (error) {
       toast.error("Error checking out");
@@ -159,18 +157,8 @@ Booking ID: ${guest.bookingId}`;
     return <LoadingSpinner message="Loading..." fullScreen={true} />;
   }
 
-  if (!guest) {
-    return (
-      <ErrorState
-        title="Invalid or expired token"
-        message="The token you're using is invalid or has expired. Please contact support."
-        fullScreen={true}
-      />
-    );
-  }
-
-  // Checkout completion screen
-  if (justCheckedOut && guest.accessStatus === "Checked out") {
+  // Прощание — показываем сразу после успешного checkout (без повторной загрузки токена)
+  if (justCheckedOut) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
         <Card className="max-w-md w-full text-center" padding="lg">
@@ -191,36 +179,43 @@ Booking ID: ${guest.bookingId}`;
               </svg>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Checkout completed
+              Прощание
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-              Thank you for staying with us!
+              Спасибо, что были с нами!
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-              We hope you enjoyed your stay at NextStay. We'd love to hear about your experience!
+              Надеемся, вам понравилось в NextStay. Будем рады видеть вас снова!
             </p>
           </div>
           <div className="space-y-3">
             <Button
               variant="primary"
               fullWidth
-              onClick={() => {
-                // In real app, this would open a review form or redirect to review platform
-                toast.success("Thank you! Your feedback helps us improve.");
-              }}
+              onClick={() => toast.success("Спасибо! Ваш отзыв нам очень поможет.")}
             >
-              Leave a review
+              Оставить отзыв
             </Button>
             <Button
               variant="secondary"
               fullWidth
-              onClick={() => setJustCheckedOut(false)}
+              onClick={() => (window.location.href = "/book")}
             >
-              View booking details
+              Забронировать снова
             </Button>
           </div>
         </Card>
       </div>
+    );
+  }
+
+  if (!guest) {
+    return (
+      <ErrorState
+        title="Invalid or expired token"
+        message="The token you're using is invalid or has expired. Please contact support."
+        fullScreen={true}
+      />
     );
   }
 

@@ -8,6 +8,8 @@ import EmptyState from "../../ui/EmptyState";
 import PageHeader from "../../ui/PageHeader";
 import Card from "../../ui/Card";
 import { layout, colors } from "../../constants/designTokens";
+import Modal from "../../ui/Modal";
+import Button from "../../ui/Button";
 import toast from "react-hot-toast";
 
 type StatusFilter = CleaningTask["status"] | "All";
@@ -20,6 +22,8 @@ export default function StaffPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
   const [onlyMyTasks, setOnlyMyTasks] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CleaningTask | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Mock data for the current staff
   const currentStaffId = 1;
@@ -64,6 +68,22 @@ export default function StaffPage() {
     } catch (error) {
       toast.error("Error completing task");
       console.error(error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await tasksApi.delete(deleteTarget.id);
+      toast.success("Task deleted");
+      setDeleteTarget(null);
+      await loadTasks();
+    } catch (error) {
+      toast.error("Error deleting task");
+      console.error(error);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -178,12 +198,36 @@ export default function StaffPage() {
                 task={task}
                 onStart={handleStart}
                 onComplete={handleComplete}
+                onDelete={(id) => setDeleteTarget(filteredTasks.find((t) => t.id === id) ?? null)}
                 currentStaffId={currentStaffId}
               />
             ))}
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Delete task"
+        size="sm"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button variant="secondary" fullWidth onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button variant="danger" fullWidth onClick={handleDelete} disabled={deleting}>
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        }
+      >
+        {deleteTarget && (
+          <p className="text-gray-700 dark:text-gray-300">
+            Delete task for Room #{deleteTarget.roomNumber}? This cannot be undone.
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

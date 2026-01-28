@@ -31,6 +31,7 @@ class BookingBase(BaseModel):
     checkOut: str
     status: str
     notes: Optional[str] = None
+    email: Optional[str] = None
 
 
 class BookingCreate(BaseModel):
@@ -39,8 +40,9 @@ class BookingCreate(BaseModel):
     roomNumber: str
     checkIn: str
     checkOut: str
-    status: str = "Upcoming"
+    status: str = "Pending"  # Changed default to Pending
     notes: Optional[str] = None
+    email: Optional[str] = None
 
 
 class BookingUpdate(BaseModel):
@@ -112,14 +114,62 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     except (ValueError, AttributeError):
         raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format (e.g., 2026-01-20T14:00:00Z)")
     
+    # Валидация дат
+    now = datetime.now(check_in.tzinfo) if check_in.tzinfo else datetime.now()
+    if check_in < now.replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Check-in date cannot be in the past")
+    
+    if check_out <= check_in:
+        raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
+    
     # Проверка существования комнаты
     room = db.query(RoomModel).filter(RoomModel.id == booking.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
+    # Проверка доступности комнаты
+    if room.status != "Available":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Room is not available. Current status: {room.status}"
+        )
+    
+    # Проверка на конфликтующие бронирования
+    from sqlalchemy import and_, or_
+    conflicting_booking = db.query(BookingModel).filter(
+        and_(
+            BookingModel.room_id == booking.roomId,
+            BookingModel.status.in_(["Upcoming", "Checked-in"]),
+            or_(
+                # Бронирование начинается в нашем периоде
+                and_(
+                    BookingModel.check_in >= check_in,
+                    BookingModel.check_in < check_out
+                ),
+                # Бронирование заканчивается в нашем периоде
+                and_(
+                    BookingModel.check_out > check_in,
+                    BookingModel.check_out <= check_out
+                ),
+                # Бронирование полностью покрывает наш период
+                and_(
+                    BookingModel.check_in <= check_in,
+                    BookingModel.check_out >= check_out
+                )
+            )
+        )
+    ).first()
+    
+    if conflicting_booking:
+        raise HTTPException(
+            status_code=400,
+            detail="Room is already booked for the selected dates"
+        )
+    
     # Создание бронирования
     db_booking = BookingModel(
         guest_name=booking.guestName,
+        guest_email=booking.email,
         room_id=booking.roomId,
         room_number=booking.roomNumber,
         check_in=check_in,
@@ -134,6 +184,12 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     token = f"guest-token-{secrets.token_urlsafe(12)}"
     
     # Создание токена гостя
+    contact_info = {
+        "phone": "+1 (555) 123-4567",
+        "whatsapp": "+1 (555) 123-4567",
+        "email": booking.email if booking.email else "support@nextstay.com"
+    }
+    
     guest_token = GuestTokenModel(
         token=token,
         booking_id=db_booking.id,
@@ -144,11 +200,7 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
         check_out=check_out,
         is_valid=True,
         access_status="Active",
-        contact_info={
-            "phone": "+1 (555) 123-4567",
-            "whatsapp": "+1 (555) 123-4567",
-            "email": "support@nextstay.com"
-        },
+        contact_info=contact_info,
         instructions={
             "accessInfo": "Use the QR code at the main entrance and your room door. The code is active during your stay.",
             "activeFrom": booking.checkIn,
@@ -162,6 +214,12 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
         }
     )
     db.add(guest_token)
+    
+    # Обновление статуса комнаты на "Occupied" если check-in сегодня или в прошлом
+    # Иначе оставляем "Available" до даты заезда
+    if check_in.date() <= datetime.now(check_in.tzinfo).date():
+        room.status = "Occupied"
+    
     db.commit()
     db.refresh(db_booking)
     
@@ -205,11 +263,12 @@ def update_booking(booking_id: int, booking_update: BookingUpdate, db: Session =
 
 @router.delete("/bookings/{booking_id}", status_code=204)
 def delete_booking(booking_id: int, db: Session = Depends(get_db)):
-    """Удалить бронирование"""
+    """Удалить бронирование и связанные guest tokens"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    
+    # Сначала удаляем связанные guest tokens (FK на bookings.id)
+    db.query(GuestTokenModel).filter(GuestTokenModel.booking_id == booking_id).delete()
     db.delete(db_booking)
     db.commit()
     return None
