@@ -20,16 +20,16 @@ async def send_email(
     html_body: Optional[str] = None
 ) -> bool:
     """
-    Отправка email через SMTP
+    Send email via SMTP
     
     Args:
-        to_email: Email получателя
-        subject: Тема письма
-        body: Текст письма (plain text)
-        html_body: HTML версия письма (опционально)
+        to_email: Email recipient
+        subject: Email subject
+        body: Email body (plain text)
+        html_body: HTML version of the email (optional)
     
     Returns:
-        True если отправлено успешно, False иначе
+        True if sent successfully, False otherwise
     """
     if not SMTP_USER or not SMTP_PASSWORD:
         print(f"[EMAIL] SMTP not configured. Would send to {to_email}: {subject}")
@@ -72,7 +72,7 @@ async def send_booking_confirmation_to_guest(
     total_amount: float,
     guest_token: str
 ) -> bool:
-    """Отправка подтверждения бронирования гостю"""
+    """Send booking confirmation to guest"""
     guest_link = f"{FRONTEND_URL}/guest/{guest_token}"
     
     subject = "Booking Confirmed - NextStay"
@@ -144,7 +144,7 @@ async def send_booking_notification_to_owner(
     check_out: str,
     total_amount: float
 ) -> bool:
-    """Отправка уведомления о новом бронировании владельцу"""
+    """Send notification about new booking to owner"""
     subject = "New Booking - NextStay"
     
     body = f"""

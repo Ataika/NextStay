@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(tags=["auth"])
-security = HTTPBearer(auto_error=False)  # Не требует токен обязательно
+security = HTTPBearer(auto_error=False)  # Does not require a token
 
 
 # Pydantic models
@@ -25,12 +25,12 @@ class LoginResponse(BaseModel):
     user: User
 
 
-# Заглушки эндпоинтов
+# Stub endpoints
 @router.post("/auth/login", response_model=LoginResponse)
 def login(credentials: LoginRequest):
-    """Авторизация пользователя"""
-    # TODO: Реализовать проверку учетных данных и генерацию токена
-    # Временная заглушка для тестирования
+    """User authentication"""
+    # TODO: Implement credential check and token generation
+    # Temporary stub for testing
     if credentials.email == "admin@nextstay.com" and credentials.password == "admin":
         return LoginResponse(
             token="temp-admin-token",
@@ -48,6 +48,6 @@ def login(credentials: LoginRequest):
 
 @router.post("/auth/logout")
 def logout(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
-    """Выход пользователя"""
-    # TODO: Реализовать инвалидацию токена
+    """User logout"""
+    # TODO: Implement token invalidation
     return {"message": "Logged out successfully"}

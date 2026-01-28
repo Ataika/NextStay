@@ -12,7 +12,7 @@ from app.models.task import CleaningTask as TaskModel
 router = APIRouter(tags=["guest"])
 
 
-# Dependency для получения сессии БД
+# Dependency to get the DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -65,22 +65,22 @@ class GuestToken(BaseModel):
 # CRUD операции
 @router.get("/guest/{token}", response_model=GuestToken)
 def get_guest_by_token(token: str, db: Session = Depends(get_db)):
-    """Получить данные гостя по токену"""
+    """Get guest data by token"""
     guest_token = db.query(GuestTokenModel).filter(GuestTokenModel.token == token).first()
     
     if not guest_token:
         raise HTTPException(status_code=404, detail="Invalid or expired token")
     
-    # Проверка валидности токена
+    # Check token validity
     if not guest_token.is_valid:
         raise HTTPException(status_code=404, detail="Token is no longer valid")
     
-    # Проверка срока действия
+    # Check expiration date
     from datetime import timezone
     now = datetime.now(timezone.utc) if guest_token.check_out.tzinfo else datetime.now()
     check_out_time = guest_token.check_out
     if check_out_time.tzinfo is None:
-        # Если нет временной зоны, считаем что это UTC
+        # If no timezone, assume UTC
         check_out_time = check_out_time.replace(tzinfo=timezone.utc)
     
     if now > check_out_time:
@@ -89,7 +89,7 @@ def get_guest_by_token(token: str, db: Session = Depends(get_db)):
         db.commit()
         raise HTTPException(status_code=404, detail="Token has expired")
     
-    # Формирование ответа
+    # Form response
     return GuestToken(
         token=guest_token.token,
         bookingId=guest_token.booking_id,
@@ -117,27 +117,27 @@ def get_guest_by_token(token: str, db: Session = Depends(get_db)):
 
 @router.post("/guest/{token}/checkout")
 def checkout_guest(token: str, db: Session = Depends(get_db)):
-    """Обработать выезд гостя: обновить статус бронирования, комнаты и создать задачу уборки"""
+    """Process guest checkout: update booking, room and create cleaning task"""
     guest_token = db.query(GuestTokenModel).filter(GuestTokenModel.token == token).first()
     
     if not guest_token or not guest_token.is_valid:
         raise HTTPException(status_code=404, detail="Invalid or expired token")
     
-    # Обновление статуса токена
+    # Update token status
     guest_token.is_valid = False
     guest_token.access_status = "Checked out"
     
-    # Обновление статуса бронирования
+    # Update booking status
     booking = db.query(BookingModel).filter(BookingModel.id == guest_token.booking_id).first()
     if booking:
         booking.status = "Checked-out"
     
-    # Обновление статуса комнаты на "Dirty"
+    # Update room status to "Dirty"
     room = db.query(RoomModel).filter(RoomModel.id == guest_token.room_id).first()
     if room:
         room.status = "Dirty"
         
-        # Создание задачи уборки
+        # Create cleaning task
         cleaning_task = TaskModel(
             room_id=room.id,
             room_number=room.number,

@@ -1,7 +1,7 @@
 services: 
   db:
     image: postgres:15-alpine
-    container_name: nextstay_db_clean  # Новое имя
+    container_name: nextstay_db_clean 
     restart: always
     environment:    
       POSTGRES_USER: ${DB_USER}

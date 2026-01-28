@@ -24,7 +24,7 @@ if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
 
-# Dependency для получения сессии БД
+# Dependency to get the DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -49,7 +49,7 @@ async def create_checkout_session(
     db: Session = Depends(get_db)
 ):
     """
-    Создать Stripe Checkout сессию для оплаты бронирования
+    Create Stripe Checkout session for booking payment
     """
     if not STRIPE_SECRET_KEY:
         raise HTTPException(
@@ -57,7 +57,7 @@ async def create_checkout_session(
             detail="Stripe is not configured. Please set STRIPE_SECRET_KEY."
         )
     
-    # Получаем бронирование
+    # Get booking
     booking = db.query(BookingModel).filter(BookingModel.id == request.booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -68,16 +68,16 @@ async def create_checkout_session(
             detail=f"Booking is already {booking.status}. Cannot create checkout session."
         )
     
-    # Получаем комнату для расчета цены
+    # Get room for price calculation
     room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Вычисляем количество ночей и общую стоимость
+    # Calculate number of nights and total amount
     nights = (booking.check_out - booking.check_in).days
     total_amount = room.price * nights
     
-    # Создаем Stripe Checkout Session
+    # Create Stripe Checkout Session
     try:
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -89,7 +89,7 @@ async def create_checkout_session(
                             "name": f"Room {booking.room_number} - NextStay",
                             "description": f"Booking from {booking.check_in.date()} to {booking.check_out.date()} ({nights} nights)",
                         },
-                        "unit_amount": int(total_amount * 100),  # Stripe использует центы
+                        "unit_amount": int(total_amount * 100),  # Stripe uses cents
                     },
                     "quantity": 1,
                 }
@@ -105,7 +105,7 @@ async def create_checkout_session(
             customer_email=booking.guest_email if booking.guest_email else None,
         )
         
-        # Сохраняем session_id в бронировании
+        # Save session_id in booking    
         booking.stripe_session_id = checkout_session.id
         db.commit()
         
@@ -123,9 +123,9 @@ def confirm_and_get_booking(
     db: Session = Depends(get_db)
 ):
     """
-    По session_id Stripe проверяет оплату, при необходимости переводит бронь в Confirmed
-    и возвращает бронирование с guest token. Используется на странице успеха после оплаты
-    (когда webhook локально не вызывается).
+    Via session_id Stripe checks payment, if necessary converts booking to Confirmed
+    and returns booking with guest token. Used on success page after payment
+    (when webhook is not called locally).
     """
     if not STRIPE_SECRET_KEY:
         raise HTTPException(
@@ -145,7 +145,7 @@ def confirm_and_get_booking(
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    # Если ещё Pending — подтверждаем (как в webhook), без рассылки email
+    # If still Pending, confirm (as in webhook), without sending email
     if booking.status == "Pending":
         booking.status = "Confirmed"
         booking.stripe_payment_intent_id = session.get("payment_intent")
@@ -156,7 +156,7 @@ def confirm_and_get_booking(
             booking.amount_paid = room.price * nights
         db.commit()
         db.refresh(booking)
-    # Возвращаем бронирование с guest token в том же формате, что и GET /bookings/{id}
+    # Return booking with guest token in the same format as GET /bookings/{id}
     from app.api.v1.bookings import Booking
     return Booking.from_orm_with_dates(booking, include_token=True, db=db)
 
@@ -169,7 +169,7 @@ async def stripe_webhook(
     db: Session = Depends(get_db)
 ):
     """
-    Обработка webhook от Stripe для подтверждения платежей
+    Handle Stripe webhook for payment confirmation
     """
     if not STRIPE_WEBHOOK_SECRET:
         raise HTTPException(
@@ -180,7 +180,7 @@ async def stripe_webhook(
     payload = await request.body()
     
     try:
-        # Проверяем подпись webhook
+        # Check webhook signature
         event = stripe.Webhook.construct_event(
             payload, stripe_signature, STRIPE_WEBHOOK_SECRET
         )
@@ -189,7 +189,7 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError as e:
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(e)}")
     
-    # Обрабатываем событие
+    # Handle event
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         handle_checkout_session_completed(session, db, background_tasks)
@@ -201,7 +201,7 @@ async def stripe_webhook(
 
 
 def handle_checkout_session_completed(session: dict, db: Session, background_tasks: BackgroundTasks):
-    """Обработка завершенной checkout сессии"""
+    """Handle completed checkout session"""
     booking_id = int(session["metadata"]["booking_id"])
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     
@@ -209,12 +209,12 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
         print(f"[STRIPE] Booking {booking_id} not found")
         return
     
-    # Обновляем статус бронирования
+    # Update booking status
     booking.status = "Confirmed"
     booking.stripe_payment_intent_id = session.get("payment_intent")
-    booking.amount_paid = session.get("amount_total", 0) / 100  # Конвертируем из центов
+    booking.amount_paid = session.get("amount_total", 0) / 100  # Convert from cents
     
-    # Получаем комнату для расчета
+    # Get room for price calculation
     room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
     if room:
         nights = (booking.check_out - booking.check_in).days
@@ -223,7 +223,7 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
     db.commit()
     db.refresh(booking)
     
-    # Отправляем email уведомления
+    # Send email notification
     if booking.guest_email:
         from app.models.guest_token import GuestToken as GuestTokenModel
         guest_token = db.query(GuestTokenModel).filter(
@@ -232,7 +232,7 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
         
         token = guest_token.token if guest_token else None
         
-        # Отправляем email через background tasks (не блокируем webhook)
+        # Send email via background tasks (do not block webhook)
         background_tasks.add_task(
             send_booking_confirmation_to_guest,
             guest_email=booking.guest_email,
@@ -244,8 +244,8 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
             guest_token=token or ""
         )
         
-        # Отправляем уведомление владельцу (можно получить из настроек или использовать дефолтный email)
-        owner_email = "owner@nextstay.com"  # TODO: получить из настроек Property
+        # Send notification to owner (can be obtained from settings or use default email)
+        owner_email = "owner@nextstay.com"  # TODO: get from settings or use default email
         background_tasks.add_task(
             send_booking_notification_to_owner,
             owner_email=owner_email,
@@ -261,7 +261,7 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
 
 
 def handle_payment_intent_succeeded(payment_intent: dict, db: Session):
-    """Обработка успешного платежа (backup handler)"""
-    # Если checkout.session.completed уже обработал, этот handler не нужен
-    # Но оставляем для надежности
+    """Handle successful payment (backup handler)"""
+    # If checkout.session.completed already handled, this handler is not needed
+    # But we keep it for safety
     pass

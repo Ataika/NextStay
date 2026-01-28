@@ -13,7 +13,7 @@ from app.models.task import CleaningTask as TaskModel
 router = APIRouter(tags=["bookings"])
 
 
-# Dependency для получения сессии БД
+    # Dependency to get the DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -58,14 +58,14 @@ class BookingUpdate(BaseModel):
 class Booking(BookingBase):
     id: int
     createdAt: str
-    guestToken: Optional[str] = None  # Токен гостя (если есть)
+    guestToken: Optional[str] = None  # Guest token (if exists)
 
     class Config:
         from_attributes = True
         
     @classmethod
     def from_orm_with_dates(cls, obj: BookingModel, include_token: bool = False, db: Session = None):
-        """Преобразует ORM объект в Pydantic модель с правильным форматом дат"""
+        """Convert ORM object to Pydantic model with correct date format"""
         token = None
         if include_token and db:
             guest_token = db.query(GuestTokenModel).filter(
@@ -88,17 +88,17 @@ class Booking(BookingBase):
         )
 
 
-# CRUD операции
+# CRUD operations
 @router.get("/bookings", response_model=List[Booking])
 def get_all_bookings(db: Session = Depends(get_db)):
-    """Получить все бронирования"""
+    """Get all bookings"""
     bookings = db.query(BookingModel).all()
     return [Booking.from_orm_with_dates(booking, include_token=False) for booking in bookings]
 
 
 @router.get("/bookings/{booking_id}", response_model=Booking)
 def get_booking_by_id(booking_id: int, db: Session = Depends(get_db)):
-    """Получить бронирование по ID"""
+    """Get booking by ID"""
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -107,14 +107,14 @@ def get_booking_by_id(booking_id: int, db: Session = Depends(get_db)):
 
 @router.post("/bookings", response_model=Booking, status_code=201)
 def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
-    """Создать новое бронирование и автоматически создать токен для гостя"""
+    """Create new booking and automatically create token for guest"""
     try:
         check_in = datetime.fromisoformat(booking.checkIn.replace('Z', '+00:00'))
         check_out = datetime.fromisoformat(booking.checkOut.replace('Z', '+00:00'))
     except (ValueError, AttributeError):
         raise HTTPException(status_code=400, detail="Invalid date format. Use ISO format (e.g., 2026-01-20T14:00:00Z)")
     
-    # Валидация дат
+        # Validate dates
     now = datetime.now(check_in.tzinfo) if check_in.tzinfo else datetime.now()
     if check_in < now.replace(hour=0, minute=0, second=0, microsecond=0):
         raise HTTPException(status_code=400, detail="Check-in date cannot be in the past")
@@ -122,36 +122,36 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     if check_out <= check_in:
         raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
     
-    # Проверка существования комнаты
+    # Check if room exists
     room = db.query(RoomModel).filter(RoomModel.id == booking.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Проверка доступности комнаты
+    # Check if room is available
     if room.status != "Available":
         raise HTTPException(
             status_code=400,
             detail=f"Room is not available. Current status: {room.status}"
         )
     
-    # Проверка на конфликтующие бронирования
+    # Check for conflicting bookings
     from sqlalchemy import and_, or_
     conflicting_booking = db.query(BookingModel).filter(
         and_(
             BookingModel.room_id == booking.roomId,
             BookingModel.status.in_(["Upcoming", "Checked-in"]),
             or_(
-                # Бронирование начинается в нашем периоде
+                # Booking starts in our period
                 and_(
                     BookingModel.check_in >= check_in,
                     BookingModel.check_in < check_out
                 ),
-                # Бронирование заканчивается в нашем периоде
+                # Booking ends in our period
                 and_(
                     BookingModel.check_out > check_in,
                     BookingModel.check_out <= check_out
                 ),
-                # Бронирование полностью покрывает наш период
+                # Booking fully covers our period
                 and_(
                     BookingModel.check_in <= check_in,
                     BookingModel.check_out >= check_out
@@ -166,7 +166,7 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
             detail="Room is already booked for the selected dates"
         )
     
-    # Создание бронирования
+    # Create booking
     db_booking = BookingModel(
         guest_name=booking.guestName,
         guest_email=booking.email,
@@ -178,12 +178,12 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
         notes=booking.notes
     )
     db.add(db_booking)
-    db.flush()  # Получаем ID бронирования
+    db.flush()  # Get booking ID
     
-    # Генерация уникального токена для гостя
+    # Generate unique token for guest
     token = f"guest-token-{secrets.token_urlsafe(12)}"
     
-    # Создание токена гостя
+    # Create guest token
     contact_info = {
         "phone": "+1 (555) 123-4567",
         "whatsapp": "+1 (555) 123-4567",
@@ -215,30 +215,30 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db)):
     )
     db.add(guest_token)
     
-    # Обновление статуса комнаты на "Occupied" если check-in сегодня или в прошлом
-    # Иначе оставляем "Available" до даты заезда
+    # Update room status to "Occupied" if check-in is today or in the past
+    # Otherwise keep "Available" until check-in date
     if check_in.date() <= datetime.now(check_in.tzinfo).date():
         room.status = "Occupied"
     
     db.commit()
     db.refresh(db_booking)
     
-    # Возвращаем бронирование с токеном
+    # Return booking with token
     return Booking.from_orm_with_dates(db_booking, include_token=True, db=db)
 
 
 @router.patch("/bookings/{booking_id}", response_model=Booking)
 def update_booking(booking_id: int, booking_update: BookingUpdate, db: Session = Depends(get_db)):
-    """Обновить бронирование"""
+    """Update booking"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     
-    # Обновление полей
+    # Update fields
     update_data = booking_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         if field in ["checkIn", "checkOut"]:
-            # Преобразование строк в datetime
+            # Convert strings to datetime
             try:
                 if field == "checkIn" and value:
                     value = datetime.fromisoformat(value.replace('Z', '+00:00'))
@@ -263,11 +263,11 @@ def update_booking(booking_id: int, booking_update: BookingUpdate, db: Session =
 
 @router.delete("/bookings/{booking_id}", status_code=204)
 def delete_booking(booking_id: int, db: Session = Depends(get_db)):
-    """Удалить бронирование и связанные guest tokens"""
+    """Delete booking and related guest tokens"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    # Сначала удаляем связанные guest tokens (FK на bookings.id)
+    # First delete related guest tokens (FK on bookings.id)
     db.query(GuestTokenModel).filter(GuestTokenModel.booking_id == booking_id).delete()
     db.delete(db_booking)
     db.commit()

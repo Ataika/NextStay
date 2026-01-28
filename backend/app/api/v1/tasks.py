@@ -11,7 +11,7 @@ from app.models.booking import Booking as BookingModel
 router = APIRouter(tags=["tasks"])
 
 
-# Dependency для получения сессии БД
+# Dependency to get the DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -53,7 +53,7 @@ class Task(TaskBase):
         
     @classmethod
     def from_orm_with_dates(cls, obj: TaskModel):
-        """Преобразует ORM объект в Pydantic модель с правильным форматом дат"""
+        """Converts ORM object to Pydantic model with correct date format"""
         return cls(
             id=obj.id,
             roomId=obj.room_id,
@@ -68,13 +68,13 @@ class Task(TaskBase):
         )
 
 
-# CRUD операции
+# CRUD operations
 @router.get("/tasks", response_model=List[Task])
 def get_all_tasks(
     room_id: Optional[int] = Query(None, alias="room_id"),
     db: Session = Depends(get_db)
 ):
-    """Получить все задачи или задачи по комнате"""
+    """Get all tasks or tasks by room"""
     query = db.query(TaskModel)
     if room_id:
         query = query.filter(TaskModel.room_id == room_id)
@@ -84,7 +84,7 @@ def get_all_tasks(
 
 @router.get("/tasks/{task_id}", response_model=Task)
 def get_task_by_id(task_id: int, db: Session = Depends(get_db)):
-    """Получить задачу по ID"""
+    """Get task by ID"""
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -93,13 +93,13 @@ def get_task_by_id(task_id: int, db: Session = Depends(get_db)):
 
 @router.post("/tasks", response_model=Task, status_code=201)
 def create_task(task: TaskCreate, db: Session = Depends(get_db)):
-    """Создать новую задачу и автоматически изменить статус комнаты на Cleaning"""
-    # Проверка существования комнаты
+    """Create a new task and automatically change room status to Cleaning"""
+    # Check if room exists
     room = db.query(RoomModel).filter(RoomModel.id == task.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Создание задачи
+    # Create task
     db_task = TaskModel(
         room_id=task.roomId,
         room_number=task.roomNumber,
@@ -109,7 +109,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     )
     db.add(db_task)
     
-    # Автоматическое изменение статуса комнаты на "Cleaning"
+    # Automatically change room status to "Cleaning"
     room.status = "Cleaning"
     
     db.commit()
@@ -119,7 +119,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
 
 @router.patch("/tasks/{task_id}/assign", response_model=Task)
 def assign_task(task_id: int, assign_data: TaskAssign, db: Session = Depends(get_db)):
-    """Назначить задачу сотруднику"""
+    """Assign task to staff"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -135,7 +135,7 @@ def assign_task(task_id: int, assign_data: TaskAssign, db: Session = Depends(get
 
 @router.patch("/tasks/{task_id}/complete", response_model=Task)
 def complete_task(task_id: int, db: Session = Depends(get_db)):
-    """Завершить задачу уборки и автоматически перевести комнату в статус Available"""
+    """Complete cleaning task and automatically change room status to Available"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -143,10 +143,10 @@ def complete_task(task_id: int, db: Session = Depends(get_db)):
     db_task.status = "Completed"
     db_task.completed_at = datetime.now()
     
-    # Получаем комнату и переводим её в статус Available после завершения уборки
+    # Get room and change it to Available after cleaning is completed
     room = db.query(RoomModel).filter(RoomModel.id == db_task.room_id).first()
     if room:
-        # После завершения уборки комната всегда переходит в статус Available
+        # After cleaning is completed, room always goes to Available status
         room.status = "Available"
     
     db.commit()
@@ -156,7 +156,7 @@ def complete_task(task_id: int, db: Session = Depends(get_db)):
 
 @router.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int, db: Session = Depends(get_db)):
-    """Удалить задачу уборки"""
+    """Delete cleaning task"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")

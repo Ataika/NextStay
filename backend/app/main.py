@@ -10,10 +10,10 @@ from app.api.v1.stripe import router as stripe_router
 from app.exceptions import register_exception_handlers
 from app.db.base import Base
 from app.db.session import engine
-from app.models import Room, CleaningTask, Booking, GuestToken  # Импорт моделей для создания таблиц
+from app.models import Room, CleaningTask, Booking, GuestToken  # table creation
 
-# Создание таблиц при старте приложения
-# ВРЕМЕННО ОТКЛЮЧЕНО из-за проблем с Docker - раскомментируйте после исправления
+# Create tables at startup
+# TEMPORARILY DISABLED due to Docker issues - uncomment after fixing
 # Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -21,8 +21,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware - разрешает запросы с фронтенда
-# Для разработки разрешаем все origins (в production нужно ограничить)
+# CORS middleware - allow requests from frontend
+# For development allow all origins (in production limit to specific domains)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -30,14 +30,14 @@ app.add_middleware(
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "*",  # Fallback для разработки
+        "*",  # Fallback for development
     ],
-    allow_credentials=False,  # Нельзя использовать True с "*" в origins
+    allow_credentials=False,  # Cannot use True with "*" in origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Подключение всех роутеров
+# Connect all routers
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(rooms_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
