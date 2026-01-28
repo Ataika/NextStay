@@ -1,43 +1,51 @@
-# Реализация CRUD операций
+# CRUD Implementation Notes
 
-## Что было реализовано
+This document describes what is implemented in the v1 API.
 
-### 1. Модели базы данных (SQLAlchemy)
+## 1) Database models (SQLAlchemy)
 
-Созданы модели в `app/models/`:
-- **Room** (`room.py`) - комнаты отеля
-- **CleaningTask** (`task.py`) - задачи уборки
-- **Booking** (`booking.py`) - бронирования
+Models in `app/models/`:
+- **Room** (`room.py`)
+- **CleaningTask** (`task.py`)
+- **Booking** (`booking.py`)
+- **GuestToken** (`guest_token.py`)
 
-### 2. CRUD операции
+## 2) API endpoints
 
-#### Rooms API (`/api/v1/rooms`)
-- ✅ `GET /rooms` - получить все комнаты
-- ✅ `GET /rooms/{id}` - получить комнату по ID
-- ✅ `POST /rooms` - создать комнату
-- ✅ `PATCH /rooms/{id}` - обновить комнату
-- ✅ `DELETE /rooms/{id}` - удалить комнату
+### Rooms (`/api/v1/rooms`)
+- ✅ `GET /rooms`
+- ✅ `GET /rooms/{id}`
+- ✅ `POST /rooms`
+- ✅ `PATCH /rooms/{id}`
+- ✅ `DELETE /rooms/{id}`
+- ✅ `GET /rooms/available`
 
-#### Tasks API (`/api/v1/tasks`)
-- ✅ `GET /tasks` - получить все задачи
-- ✅ `GET /tasks?room_id={roomId}` - получить задачи по комнате
-- ✅ `GET /tasks/{id}` - получить задачу по ID
-- ✅ `POST /tasks` - создать задачу
-- ✅ `PATCH /tasks/{taskId}/assign` - назначить задачу сотруднику
-- ✅ `PATCH /tasks/{taskId}/complete` - завершить задачу
+### Tasks (`/api/v1/tasks`)
+- ✅ `GET /tasks`
+- ✅ `GET /tasks?room_id={roomId}`
+- ✅ `GET /tasks/{id}`
+- ✅ `POST /tasks`
+- ✅ `PATCH /tasks/{id}/assign`
+- ✅ `PATCH /tasks/{id}/complete`
+- ✅ `DELETE /tasks/{id}`
 
-#### Bookings API (`/api/v1/bookings`)
-- ✅ `GET /bookings` - получить все бронирования
-- ✅ `GET /bookings/{id}` - получить бронирование по ID
-- ✅ `POST /bookings` - создать бронирование
-- ✅ `PATCH /bookings/{id}` - обновить бронирование
-- ✅ `DELETE /bookings/{id}` - удалить бронирование
+### Bookings (`/api/v1/bookings`)
+- ✅ `GET /bookings`
+- ✅ `GET /bookings/{id}`
+- ✅ `POST /bookings`
+- ✅ `PATCH /bookings/{id}`
+- ✅ `DELETE /bookings/{id}` (also removes related guest tokens)
 
-### 3. Автоматическое создание таблиц
+### Stripe (`/api/v1/stripe/*`)
+- ✅ Create checkout sessions
+- ✅ Webhook handler
+- ✅ Success-page confirmation endpoint
 
-Таблицы создаются автоматически при старте приложения через `Base.metadata.create_all(bind=engine)` в `main.py`.
+## 3) Table creation
 
-## Структура таблиц
+Note: automatic table creation via `Base.metadata.create_all(...)` in `main.py` may be disabled in some dev setups. Prefer migrations for schema changes (see `backend/migrations/`).
+
+## DB schema (high-level)
 
 ### rooms
 - `id` (SERIAL PRIMARY KEY)
@@ -47,7 +55,7 @@
 - `price` (FLOAT)
 - `capacity` (INTEGER)
 - `description` (TEXT)
-- `amenities` (JSON) - массив строк
+- `amenities` (JSON) - array of strings
 
 ### cleaning_tasks
 - `id` (SERIAL PRIMARY KEY)
@@ -55,7 +63,7 @@
 - `room_number` (VARCHAR(10))
 - `status` (VARCHAR(20))
 - `priority` (VARCHAR(20))
-- `assigned_to` (INTEGER) - ID сотрудника
+- `assigned_to` (INTEGER) - staff id
 - `assigned_to_name` (VARCHAR(100))
 - `created_at` (TIMESTAMP)
 - `completed_at` (TIMESTAMP, nullable)
@@ -72,19 +80,19 @@
 - `created_at` (TIMESTAMP)
 - `notes` (VARCHAR(500))
 
-## Формат данных
+## Data format
 
-### API использует camelCase:
+### API uses camelCase:
 - `roomId`, `roomNumber`, `checkIn`, `checkOut`, `createdAt`, `assignedTo`, `assignedToName`, `completedAt`
 
-### База данных использует snake_case:
+### Database uses snake_case:
 - `room_id`, `room_number`, `check_in`, `check_out`, `created_at`, `assigned_to`, `assigned_to_name`, `completed_at`
 
-Преобразование выполняется автоматически через Pydantic модели с `from_attributes = True`.
+Conversion is done in the Pydantic response models.
 
-## Примеры использования
+## Examples
 
-### Создать комнату
+### Create a room
 ```json
 POST /api/v1/rooms
 {
@@ -98,7 +106,7 @@ POST /api/v1/rooms
 }
 ```
 
-### Создать задачу
+### Create a task
 ```json
 POST /api/v1/tasks
 {
@@ -109,7 +117,7 @@ POST /api/v1/tasks
 }
 ```
 
-### Создать бронирование
+### Create a booking
 ```json
 POST /api/v1/bookings
 {
@@ -122,12 +130,9 @@ POST /api/v1/bookings
 }
 ```
 
-## Важные замечания
+## Notes
 
-1. **Даты**: Используйте ISO формат (например, `2026-01-20T14:00:00Z`)
-2. **Уникальность**: Номер комнаты должен быть уникальным
-3. **Внешние ключи**: При создании задач и бронирований убедитесь, что `room_id` существует
-4. **Статусы**: 
-   - Rooms: `Available`, `Occupied`, `Dirty`, `Maintenance`
-   - Tasks: `Pending`, `In Progress`, `Completed`
-   - Bookings: `Upcoming`, `Checked-in`, `Checked-out`
+1. Dates: ISO (e.g. `2026-01-20T14:00:00Z`)
+2. Room numbers must be unique
+3. Make sure referenced room IDs exist
+4. Status values are case-sensitive

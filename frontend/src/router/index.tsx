@@ -3,6 +3,9 @@ import LoginPage from "../pages/LoginPage";
 import AdminPage from "../pages/admin/AdminPage";
 import StaffPage from "../pages/staff/StaffPage";
 import GuestPage from "../pages/guest/GuestPage";
+import BookingPage from "../pages/booking/BookingPage";
+import BookingSuccessPage from "../pages/booking/BookingSuccessPage";
+import BookingCancelPage from "../pages/booking/BookingCancelPage";
 import ReportsPage from "../pages/reports/ReportsPage";
 import BookingsPage from "../pages/admin/BookingsPage";
 import NotFoundPage from "../pages/NotFoundPage";
@@ -16,6 +19,9 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<IndexRedirect />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/book" element={<BookingPage />} />
+        <Route path="/booking/success" element={<BookingSuccessPage />} />
+        <Route path="/booking/cancel" element={<BookingCancelPage />} />
         <Route path="/guest/:token" element={<GuestPage />} />
 
         <Route element={<AppLayout />}>

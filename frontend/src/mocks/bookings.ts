@@ -5,9 +5,11 @@ export interface Booking {
   roomNumber: string;
   checkIn: string; // ISO date string
   checkOut: string; // ISO date string
-  status: "Upcoming" | "Checked-in" | "Checked-out";
+  status: "Pending" | "Confirmed" | "Cancelled" | "Expired" | "Checked-in" | "Checked-out";
   createdAt: string; // ISO date string
   notes?: string;
+  email?: string;
+  guestToken?: string; // Token for guest access
 }
 
 export const mockBookings: Booking[] = [

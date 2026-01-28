@@ -1,48 +1,51 @@
-# API Endpoints (Stubs)
+# NextStay API (v1)
 
-Все эндпоинты созданы как заглушки (stubs) для предотвращения ошибок 404 на фронтенде. Они возвращают базовые ответы или пустые массивы.
+This folder contains the FastAPI v1 routes.
 
-## Реализованные эндпоинты
+For a complete feature/endpoint overview, see the repo-level `PROJECT_FEATURES.md`.
 
-### Health
-- `GET /api/v1/health` - проверка работоспособности ✅
+## Health
 
-### Rooms
-- `GET /api/v1/rooms` - возвращает пустой массив `[]`
-- `GET /api/v1/rooms/{id}` - возвращает 404
-- `POST /api/v1/rooms` - возвращает 501 (Not implemented)
-- `PATCH /api/v1/rooms/{id}` - возвращает 404
-- `DELETE /api/v1/rooms/{id}` - возвращает 404
+- `GET /api/v1/health`
 
-### Tasks
-- `GET /api/v1/tasks` - возвращает пустой массив `[]`
-- `GET /api/v1/tasks?room_id={roomId}` - возвращает пустой массив `[]`
-- `GET /api/v1/tasks/{id}` - возвращает 404
-- `POST /api/v1/tasks` - возвращает 501 (Not implemented)
-- `PATCH /api/v1/tasks/{taskId}/assign` - возвращает 404
-- `PATCH /api/v1/tasks/{taskId}/complete` - возвращает 404
+## Rooms
 
-### Bookings
-- `GET /api/v1/bookings` - возвращает пустой массив `[]`
-- `GET /api/v1/bookings/{id}` - возвращает 404
-- `POST /api/v1/bookings` - возвращает 501 (Not implemented)
-- `PATCH /api/v1/bookings/{id}` - возвращает 404
-- `DELETE /api/v1/bookings/{id}` - возвращает 404
+- `GET /api/v1/rooms`
+- `GET /api/v1/rooms/{room_id}`
+- `GET /api/v1/rooms/available`
+- `POST /api/v1/rooms`
+- `PATCH /api/v1/rooms/{room_id}`
+- `DELETE /api/v1/rooms/{room_id}`
 
-### Auth
-- `POST /api/v1/auth/login` - временная заглушка с тестовыми учетными данными:
-  - `admin@nextstay.com` / `admin` → OWNER
-  - `staff@nextstay.com` / `staff` → STAFF
-- `POST /api/v1/auth/logout` - возвращает успешный ответ
+## Bookings
 
-### Guest
-- `GET /api/v1/guest/{token}` - возвращает 404
-- `POST /api/v1/guest/{token}/checkout` - возвращает 404
+- `GET /api/v1/bookings`
+- `GET /api/v1/bookings/{booking_id}`
+- `POST /api/v1/bookings`
+- `PATCH /api/v1/bookings/{booking_id}`
+- `DELETE /api/v1/bookings/{booking_id}`
 
-## Следующие шаги
+## Tasks
 
-Все эндпоинты помечены комментариями `# TODO: Реализовать...` и должны быть заменены на реальную логику работы с базой данных.
+- `GET /api/v1/tasks` (optional `room_id`)
+- `GET /api/v1/tasks/{task_id}`
+- `POST /api/v1/tasks`
+- `PATCH /api/v1/tasks/{task_id}/assign`
+- `PATCH /api/v1/tasks/{task_id}/complete`
+- `DELETE /api/v1/tasks/{task_id}`
 
-## Тестирование
+## Guest
 
-После запуска бэкенда, все эндпоинты доступны и возвращают корректные HTTP ответы, что позволяет фронтенду работать без ошибок 404.
+- `GET /api/v1/guest/{token}`
+- `POST /api/v1/guest/{token}/checkout`
+
+## Stripe
+
+- `POST /api/v1/stripe/create-checkout-session`
+- `POST /api/v1/stripe/webhook`
+- `GET /api/v1/stripe/confirm-and-get-booking`
+
+## Auth (stub)
+
+- `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`

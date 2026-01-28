@@ -86,7 +86,8 @@ function getErrorMessage(error: AxiosError): string {
 
   // If there is no response from the server
   if (error.request) {
-    return "Server is not responding. Check your internet connection.";
+    const baseUrl = API_BASE_URL.replace('/api/v1', '');
+    return `Cannot connect to backend at ${baseUrl}. Make sure the backend server is running.`;
   }
 
   // General error

@@ -7,6 +7,7 @@ import Button from "../../ui/Button";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import ErrorState from "../../ui/ErrorState";
 import EmptyState from "../../ui/EmptyState";
+import Modal from "../../ui/Modal";
 import toast from "react-hot-toast";
 
 type StatusFilter = Booking["status"] | "All";
@@ -17,6 +18,8 @@ export default function BookingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Booking | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadBookings();
@@ -50,11 +53,15 @@ export default function BookingsPage() {
 
   const getStatusColor = (status: Booking["status"]) => {
     switch (status) {
+      case "Confirmed":
+        return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300";
       case "Upcoming":
         return "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300";
       case "Checked-in":
         return "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300";
       case "Checked-out":
+        return "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300";
+      case "Pending":
         return "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300";
       default:
         return "bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300";
@@ -68,6 +75,22 @@ export default function BookingsPage() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleDeleteBooking = async () => {
+    if (!deleteTarget) return;
+    try {
+      setDeleting(true);
+      await bookingsApi.delete(deleteTarget.id);
+      toast.success("Booking deleted");
+      setDeleteTarget(null);
+      await loadBookings();
+    } catch (err) {
+      toast.error("Failed to delete booking");
+      console.error(err);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -104,6 +127,8 @@ export default function BookingsPage() {
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
               <option value="All">All statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="Confirmed">Confirmed</option>
               <option value="Upcoming">Upcoming</option>
               <option value="Checked-in">Checked-in</option>
               <option value="Checked-out">Checked-out</option>
@@ -140,6 +165,9 @@ export default function BookingsPage() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Status
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -178,6 +206,15 @@ export default function BookingsPage() {
                         {booking.status}
                       </span>
                     </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => setDeleteTarget(booking)}
+                      >
+                        Delete
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -185,6 +222,39 @@ export default function BookingsPage() {
           </div>
         </Card>
       )}
+
+      <Modal
+        isOpen={!!deleteTarget}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        title="Delete booking"
+        size="sm"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button
+              variant="secondary"
+              fullWidth
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              fullWidth
+              onClick={handleDeleteBooking}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        }
+      >
+        {deleteTarget && (
+          <p className="text-gray-700 dark:text-gray-300">
+            Delete booking #{deleteTarget.id} — {deleteTarget.guestName}, Room {deleteTarget.roomNumber}? This cannot be undone.
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

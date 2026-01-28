@@ -24,6 +24,23 @@ export const roomsApi = {
     return response.data;
   },
 
+  getAvailable: async (checkIn: string, checkOut: string, category?: string, capacity?: number) => {
+    if (USE_MOCK_API) {
+      // Mock implementation - return all available rooms
+      const rooms = await mockApi.rooms.getAll();
+      return {
+        availableRooms: rooms.filter(r => r.status === "Available"),
+        checkIn,
+        checkOut,
+      };
+    }
+    const params = new URLSearchParams({ checkIn, checkOut });
+    if (category) params.append("category", category);
+    if (capacity) params.append("capacity", capacity.toString());
+    const response = await http.get(`/rooms/available?${params.toString()}`);
+    return response.data;
+  },
+
   create: async (data: Omit<Room, "id">): Promise<Room> => {
     if (USE_MOCK_API) {
       return mockApi.rooms.create(data);
@@ -97,6 +114,13 @@ export const tasksApi = {
     const response = await http.patch(`/tasks/${taskId}/complete`);
     return response.data;
   },
+
+  delete: async (taskId: number): Promise<void> => {
+    if (USE_MOCK_API) {
+      return mockApi.tasks.delete(taskId);
+    }
+    await http.delete(`/tasks/${taskId}`);
+  },
 };
 
 // Guest API
@@ -169,7 +193,7 @@ export const bookingsApi = {
     return response.data;
   },
 
-  create: async (data: Omit<Booking, "id" | "createdAt">): Promise<Booking> => {
+  create: async (data: Omit<Booking, "id" | "createdAt"> & { email?: string }): Promise<Booking> => {
     if (USE_MOCK_API) {
       return mockApi.bookings.create(data);
     }
@@ -190,5 +214,35 @@ export const bookingsApi = {
       return mockApi.bookings.delete(id);
     }
     await http.delete(`/bookings/${id}`);
+  },
+};
+
+// Stripe API
+export const stripeApi = {
+  createCheckoutSession: async (bookingId: number) => {
+    if (USE_MOCK_API) {
+      // Mock - return a fake checkout URL
+      return {
+        session_id: "mock_session_123",
+        url: "https://checkout.stripe.com/mock",
+      };
+    }
+    const response = await http.post("/stripe/create-checkout-session", {
+      booking_id: bookingId,
+    });
+    return response.data;
+  },
+
+  /** Подтвердить оплату по session_id и получить бронирование с guest token (для страницы успеха) */
+  confirmAndGetBooking: async (sessionId: string): Promise<Booking> => {
+    if (USE_MOCK_API) {
+      const list = await mockApi.bookings.getAll();
+      const b = list[0];
+      return { ...b, guestToken: "guest-token-mock", status: "Confirmed" } as Booking;
+    }
+    const response = await http.get(
+      `/stripe/confirm-and-get-booking?session_id=${encodeURIComponent(sessionId)}`
+    );
+    return response.data;
   },
 };

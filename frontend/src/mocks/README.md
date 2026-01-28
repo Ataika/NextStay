@@ -1,47 +1,40 @@
-# Mock Data для разработки
+# Mock data (frontend)
 
-Этот модуль содержит моки данных для работы без backend.
+This module contains mock data so the UI can run without the backend.
 
-## Использование
+## Usage
 
-### Переключение между моками и реальным API
+### Switch between Mock API and real API
 
-По умолчанию используется mock API. Чтобы переключиться на реальный API:
+By default, mock API may be enabled depending on `VITE_USE_MOCK_API`.
 
-1. Создайте файл `.env` в корне `frontend/`
-2. Добавьте:
-   ```
-   VITE_USE_MOCK_API=false
-   VITE_API_BASE_URL=http://localhost:8000/api
-   ```
+Create `frontend/.env`:
 
-### Mock данные
+```env
+VITE_USE_MOCK_API=false
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
 
-- **Rooms** (`mocks/rooms.ts`) - 8 номеров с разными статусами
-- **Tasks** (`mocks/tasks.ts`) - 5 задач уборки
-- **Guest Tokens** (`mocks/guest.ts`) - 3 токена для гостей
+Restart the Vite dev server after changes.
 
-### Mock логин
+### Mock datasets
 
-Для тестирования аутентификации используйте:
+- **Rooms** (`mocks/rooms.ts`)
+- **Tasks** (`mocks/tasks.ts`)
+- **Guest tokens** (`mocks/guest.ts`)
 
-**Admin:**
-- Email: `admin@nextstay.com`
-- Password: `admin`
-- Роль: `OWNER`
+### Mock login (auth stub)
 
-**Staff:**
-- Email: `staff@nextstay.com`
-- Password: `staff`
-- Роль: `STAFF`
+- Admin: `admin@nextstay.com` / `admin` (role `OWNER`)
+- Staff: `staff@nextstay.com` / `staff` (role `STAFF`)
 
-### Guest токены
+### Guest tokens (examples)
 
-- `guest-token-abc123` - валидный токен для комнаты 102
-- `guest-token-xyz789` - валидный токен для комнаты 203
-- `guest-token-expired` - истекший токен
+- `guest-token-abc123` — valid token (room 102)
+- `guest-token-xyz789` — valid token (room 203)
+- `guest-token-expired` — expired token
 
-### Использование API
+### API usage
 
 ```typescript
 import { roomsApi, tasksApi, guestApi, authApi } from "../api/api";
