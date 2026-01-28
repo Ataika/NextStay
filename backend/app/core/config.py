@@ -3,17 +3,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Используем DATABASE_URL напрямую, если он установлен (для Docker)
-# Иначе строим из отдельных переменных
+# Use DATABASE_URL directly if it's set (for Docker)
+# Otherwise build from individual variables
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
-    # Строим URL из отдельных переменных
-    # Используем DB_USER, DB_PASSWORD, DB_NAME из .env (как в docker-compose.yml)
+    # Build URL from individual variables
+    # Use DB_USER, DB_PASSWORD, DB_NAME from .env (as in docker-compose.yml)
     postgres_user = os.getenv('DB_USER') or os.getenv('POSTGRES_USER', 'nextstay')
     postgres_password = os.getenv('DB_PASSWORD') or os.getenv('POSTGRES_PASSWORD', 'nextstay')
     postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
-    postgres_port = os.getenv('POSTGRES_PORT', '5433')  # Docker использует 5433
+    postgres_port = os.getenv('POSTGRES_PORT', '5433')  # Docker uses 5433
     postgres_db = os.getenv('DB_NAME') or os.getenv('POSTGRES_DB', 'nextstay')
     
     DATABASE_URL = (

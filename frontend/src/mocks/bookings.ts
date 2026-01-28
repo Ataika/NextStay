@@ -5,7 +5,7 @@ export interface Booking {
   roomNumber: string;
   checkIn: string; // ISO date string
   checkOut: string; // ISO date string
-  status: "Pending" | "Confirmed" | "Cancelled" | "Expired" | "Checked-in" | "Checked-out";
+  status: "Pending" | "Confirmed" | "Checked-in" | "Checked-out" | "Cancelled" | "Expired";
   createdAt: string; // ISO date string
   notes?: string;
   email?: string;
@@ -20,7 +20,7 @@ export const mockBookings: Booking[] = [
     roomNumber: "102",
     checkIn: "2026-01-14T14:00:00Z",
     checkOut: "2026-01-16T12:00:00Z",
-    status: "Checked-in",
+    status: "Confirmed",
     createdAt: "2026-01-10T10:00:00Z",
     notes: "VIP guest",
   },
@@ -31,7 +31,7 @@ export const mockBookings: Booking[] = [
     roomNumber: "103",
     checkIn: "2026-01-20T14:00:00Z",
     checkOut: "2026-01-22T12:00:00Z",
-    status: "Upcoming",
+    status: "Pending",
     createdAt: "2026-01-12T09:00:00Z",
   },
   {
@@ -62,7 +62,7 @@ export const mockBookings: Booking[] = [
     roomNumber: "201",
     checkIn: "2026-01-18T14:00:00Z",
     checkOut: "2026-01-20T12:00:00Z",
-    status: "Upcoming",
+    status: "Pending",
     createdAt: "2026-01-13T14:00:00Z",
   },
 ];

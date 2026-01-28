@@ -11,7 +11,7 @@ from app.models.booking import Booking as BookingModel
 router = APIRouter(tags=["rooms"])
 
 
-# Dependency для получения сессии БД
+# Dependency to get the DB session  
 def get_db():
     db = SessionLocal()
     try:
@@ -20,7 +20,7 @@ def get_db():
         db.close()
 
 
-# Pydantic models для запросов/ответов
+# Pydantic models for requests/responses
 class RoomBase(BaseModel):
     number: str
     category: str
@@ -83,15 +83,15 @@ def get_available_rooms(
     db: Session = Depends(get_db)
 ):
     """
-    Получить доступные комнаты для указанного периода
+    Get available rooms for the specified period
     
-    Проверяет:
-    - Статус комнаты (должен быть "Available")
-    - Отсутствие конфликтующих бронирований
-    - Фильтры по категории и вместимости
+    Checks:
+    - Room status (must be "Available")
+    - Absence of conflicting bookings
+    - Filters by category and capacity
     """
     try:
-        # Парсинг дат
+        # Parse dates
         check_in_date = datetime.fromisoformat(checkIn.replace('Z', '+00:00'))
         check_out_date = datetime.fromisoformat(checkOut.replace('Z', '+00:00'))
     except (ValueError, AttributeError):
@@ -100,7 +100,7 @@ def get_available_rooms(
             detail="Invalid date format. Use ISO format (e.g., 2026-02-01T14:00:00Z)"
         )
     
-    # Валидация дат
+    # Date validation
     now = datetime.now(check_in_date.tzinfo) if check_in_date.tzinfo else datetime.now()
     if check_in_date < now.replace(hour=0, minute=0, second=0, microsecond=0):
         raise HTTPException(status_code=400, detail="Check-in date cannot be in the past")
@@ -108,13 +108,13 @@ def get_available_rooms(
     if check_out_date <= check_in_date:
         raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
     
-    # Вычисление количества ночей
+    # Calculate number of nights
     nights = (check_out_date - check_in_date).days
     
-    # Получение всех комнат со статусом "Available"
+    # Get all rooms with status "Available"
     query = db.query(RoomModel).filter(RoomModel.status == "Available")
     
-    # Применение фильтров
+    # Apply filters
     if category:
         query = query.filter(RoomModel.category == category)
     if capacity:
@@ -122,22 +122,22 @@ def get_available_rooms(
     
     all_rooms = query.all()
     
-    # Поиск конфликтующих бронирований
+    # Search for conflicting bookings
     conflicting_bookings = db.query(BookingModel).filter(
         and_(
             BookingModel.status.in_(["Upcoming", "Checked-in"]),
             or_(
-                # Бронирование начинается в нашем периоде
+                # Booking starts in our period
                 and_(
                     BookingModel.check_in >= check_in_date,
                     BookingModel.check_in < check_out_date
                 ),
-                # Бронирование заканчивается в нашем периоде
+                # Booking ends in our period
                 and_(
                     BookingModel.check_out > check_in_date,
                     BookingModel.check_out <= check_out_date
                 ),
-                # Бронирование полностью покрывает наш период
+                # Booking fully covers our period
                 and_(
                     BookingModel.check_in <= check_in_date,
                     BookingModel.check_out >= check_out_date
@@ -146,16 +146,16 @@ def get_available_rooms(
         )
     ).all()
     
-    # Получение ID комнат с конфликтами
+    # Get IDs of rooms with conflicts
     conflicting_room_ids = {booking.room_id for booking in conflicting_bookings}
     
-    # Фильтрация доступных комнат
+    # Filter available rooms
     available_rooms = [
         room for room in all_rooms
         if room.id not in conflicting_room_ids
     ]
     
-    # Формирование ответа
+    # Form response
     available_rooms_response = [
         AvailableRoomResponse(
             id=room.id,
@@ -178,17 +178,17 @@ def get_available_rooms(
     )
 
 
-# CRUD операции
+# CRUD operations
 @router.get("/rooms", response_model=List[Room])
 def get_all_rooms(db: Session = Depends(get_db)):
-    """Получить все комнаты"""
+    """Get all rooms"""
     rooms = db.query(RoomModel).all()
     return rooms
 
 
 @router.get("/rooms/{room_id}", response_model=Room)
 def get_room_by_id(room_id: int, db: Session = Depends(get_db)):
-    """Получить комнату по ID"""
+    """Get room by ID"""
     room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -197,8 +197,8 @@ def get_room_by_id(room_id: int, db: Session = Depends(get_db)):
 
 @router.post("/rooms", response_model=Room, status_code=201)
 def create_room(room: RoomCreate, db: Session = Depends(get_db)):
-    """Создать новую комнату"""
-    # Проверка на уникальность номера комнаты
+    """Create a new room"""
+    # Check if number is unique
     existing_room = db.query(RoomModel).filter(RoomModel.number == room.number).first()
     if existing_room:
         raise HTTPException(status_code=400, detail="Room with this number already exists")
@@ -220,18 +220,18 @@ def create_room(room: RoomCreate, db: Session = Depends(get_db)):
 
 @router.patch("/rooms/{room_id}", response_model=Room)
 def update_room(room_id: int, room_update: RoomUpdate, db: Session = Depends(get_db)):
-    """Обновить комнату"""
+    """Update room"""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
     
-    # Проверка на уникальность номера, если он изменяется
+    # Check if number is unique, if it's changed
     if room_update.number and room_update.number != db_room.number:
         existing_room = db.query(RoomModel).filter(RoomModel.number == room_update.number).first()
         if existing_room:
             raise HTTPException(status_code=400, detail="Room with this number already exists")
     
-    # Обновление полей
+    # Update fields
     update_data = room_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_room, field, value)
@@ -243,7 +243,7 @@ def update_room(room_id: int, room_update: RoomUpdate, db: Session = Depends(get
 
 @router.delete("/rooms/{room_id}", status_code=204)
 def delete_room(room_id: int, db: Session = Depends(get_db)):
-    """Удалить комнату"""
+    """Delete room"""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")

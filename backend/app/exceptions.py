@@ -8,7 +8,7 @@ def register_exception_handlers(app):
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-        """Обработка HTTP исключений (404, 400, и т.д.)"""
+        """Handle HTTP exceptions (404, 400, etc.)"""
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.detail, "message": exc.detail}
@@ -16,7 +16,7 @@ def register_exception_handlers(app):
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Обработка ошибок валидации"""
+        """Handle validation errors"""
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"detail": exc.errors(), "message": "Validation error"}
@@ -24,7 +24,7 @@ def register_exception_handlers(app):
 
     @app.exception_handler(OperationalError)
     async def database_connection_handler(request: Request, exc: OperationalError):
-        """Обработка ошибок подключения к БД"""
+        """Handle database connection errors"""
         error_msg = str(exc.orig) if hasattr(exc, 'orig') else str(exc)
         if "Connection refused" in error_msg or "could not connect" in error_msg.lower():
             return JSONResponse(
@@ -42,7 +42,7 @@ def register_exception_handlers(app):
 
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception):
-        """Обработка всех остальных исключений"""
+        """Handle all other exceptions"""
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error", "message": "Internal server error"}

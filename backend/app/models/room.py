@@ -12,4 +12,4 @@ class Room(Base):
     price = Column(Float, nullable=False)
     capacity = Column(Integer, nullable=False, default=2)
     description = Column(Text, nullable=True)
-    amenities = Column(JSON, nullable=True)  # Используем JSON вместо ARRAY для совместимости
+    amenities = Column(JSON, nullable=True)  # Use JSON instead of ARRAY for compatibility
