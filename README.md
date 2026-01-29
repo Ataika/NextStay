@@ -11,7 +11,7 @@ A Property Management System (PMS) designed to automate hotel operations, optimi
 
 ## Quick Start
 
-See [LOCAL_SETUP.md](./LOCAL_SETUP.md) for detailed setup instructions.
+See [LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) for detailed setup instructions.
 
 ```bash
 # Start database and backend
@@ -40,7 +40,7 @@ NextStay/
 └── docker-compose.yml
 ```
 
-For detailed structure, see [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md).
+For detailed structure, see [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md).
 
 ## Features
 
@@ -63,8 +63,8 @@ This project fulfills three functional categories:
 
 ## Documentation
 
-- [Local Setup Guide](./LOCAL_SETUP.md) - How to run the project locally
-- [Project Structure](./PROJECT_STRUCTURE.md) - Detailed file structure
+- [Local Setup Guide](./docs/LOCAL_SETUP.md) - How to run the project locally
+- [Project Structure](./docs/PROJECT_STRUCTURE.md) - Detailed file structure
 - [Architecture](./docs/architecture.md) - System architecture
 - [SRS](./docs/srs.md) - Software Requirements Specification
 - [API Documentation](./backend/app/api/v1/README.md) - API endpoints status
