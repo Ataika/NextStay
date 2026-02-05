@@ -14,5 +14,8 @@ body {
 body.drawer-open main {
   overflow: hidden !important;
 }
+<<<<<<< HEAD
 
 /* Header и Sidebar остаются видимыми и не затемняются - overlay затемняет только main контент через backdrop */
+=======
+>>>>>>> dev

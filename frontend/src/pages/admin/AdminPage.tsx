@@ -352,6 +352,7 @@ export default function AdminPage() {
   if (loading) {
     return <LoadingSpinner message="Loading rooms..." />;
   }
+<<<<<<< HEAD
 
   return (
     <div className="space-y-4">
@@ -1497,3 +1498,5 @@ export default function AdminPage() {
     </div>
   );
 }
+=======
+>>>>>>> dev

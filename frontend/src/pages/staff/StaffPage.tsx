@@ -108,6 +108,7 @@ export default function StaffPage() {
   if (loading) {
     return <LoadingSpinner message="Loading tasks..." fullScreen={false} />;
   }
+<<<<<<< HEAD
 
   if (error) {
     return <ErrorState title="Error loading tasks" message={error} onRetry={loadTasks} />;
@@ -231,3 +232,5 @@ export default function StaffPage() {
     </div>
   );
 }
+=======
+>>>>>>> dev

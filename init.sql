@@ -6,6 +6,6 @@ CREATE TABLE IF NOT EXISTS rooms (
     status VARCHAR(20) DEFAULT 'available'
 );
 
-INSERT INTO rooms (room_number, type, price) VALUES 
+INSERT INTO rooms (room_number, type, price) VALUES
 ('101', 'Standard', 50.00),
 ('201', 'Deluxe', 120.00);

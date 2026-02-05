@@ -1,8 +1,10 @@
 import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
+<<<<<<< HEAD
 # Use DATABASE_URL directly if it's set (for Docker)
 # Otherwise build from individual variables
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -39,3 +41,12 @@ SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "NextStay")
 
 # Frontend URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+=======
+user = os.getenv("POSTGRES_USER")
+password = os.getenv("POSTGRES_PASSWORD")
+host = os.getenv("POSTGRES_HOST")
+port = os.getenv("POSTGRES_PORT")
+db = os.getenv("POSTGRES_DB")
+
+DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+>>>>>>> dev
