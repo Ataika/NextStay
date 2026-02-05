@@ -1,0 +1,8 @@
+version: 2
+sources:
+  - name: nexstay_source
+    database: nextstay_db_v2
+    schema: public
+    tables:
+      - name: rooms
+      - name: bookings

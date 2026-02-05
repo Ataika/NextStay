@@ -1,33 +1,58 @@
-services: 
+services:
   db:
     image: postgres:15-alpine
+<<<<<<< HEAD
     container_name: nextstay_db_clean 
+=======
+    container_name: nextstay_db_clean
+>>>>>>> dev
     restart: always
-    environment:    
+    environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME} 
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5433:5432"  
+      - "5433:5432"
     volumes:
-      - nextstay_data_v2:/var/lib/postgresql/data 
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql 
-    healthcheck: 
+      - nextstay_data_v2:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
+
   backend:
-    build: ./backend
+    build:
+      context: ./backend # Docker заглянет в папку backend и найдет там Dockerfile
     container_name: nextstay_backend
     restart: always
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app 
+      - ./backend:/app
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+
+  airflow:
+    image: apache/airflow:2.7.1-python3.10
+    container_name: nextstay_airflow
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - DBT_PROFILES_DIR=/opt/airflow/dbt
+    volumes:
+      - ./analytics/dags:/opt/airflow/dags
+      - ./analytics/dbt:/opt/airflow/dbt
+      - ./analytics/profiles.yml:/opt/airflow/dbt/profiles.yml # Пробрасываем профиль из analytics
+      - ./scripts:/opt/airflow/scripts
+    ports:
+      - "8080:8080"
+    command: standalone
     depends_on:
       db:
         condition: service_healthy
@@ -38,25 +63,31 @@ services:
     restart: always
     ports:
       - "8088:8088"
+    volumes:
+      - ./analytics/superset:/app/superset_home
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy
-
   dbt:
     build:
       context: ./analytics
+      dockerfile: Dockerfile.dbt
     container_name: nextstay_dbt
+    tty: true
+    stdin_open: true
+    # Мы убираем упоминание dbt из команды, чтобы запускался чистый Bash/Sleep
+    entrypoint: /bin/bash
+    command: -c "sleep infinity"
     volumes:
-      - ./analytics:/usr/app
-      - ~/.dbt:/root/.dbt
+      - ./analytics/dbt:/usr/app
+      - ./analytics/profiles.yml:/root/.dbt/profiles.yml
     environment:
       - DBT_PROFILES_DIR=/usr/app
     depends_on:
       db:
         condition: service_healthy
-
 volumes:
   nextstay_data_v2:
     external: false
