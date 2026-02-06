@@ -1,9 +1,6 @@
 -- creating user for  Superset (Read-Only)
 CREATE USER superset_ro WITH PASSWORD 'superset_pass';
-<<<<<<< HEAD
 GRANT CONNECT ON DATABASE nextstay TO superset_ro;
-=======
-GRANT CONNECT ON DATABASE nextstay_db TO superset_ro;
 -- Роли для разработчиков (Даир и Турат)
 DO $$
 BEGIN
@@ -129,7 +126,6 @@ CREATE TABLE mart_revpar_daily (
     rooms_available INT,
     revpar DECIMAL(10, 2)
 );
->>>>>>> dev
 
 -- After creating the dbt schema, we will give the permission to  SELECT
 -- We will integrate it in  Milestone 2

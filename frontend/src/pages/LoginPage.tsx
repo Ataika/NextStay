@@ -6,7 +6,6 @@ import Button from "../ui/Button";
 import Card from "../ui/Card";
 
 export default function LoginPage() {
-<<<<<<< HEAD
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,7 +26,7 @@ export default function LoginPage() {
     try {
       const response = await authApi.login(email, password);
       setAuth(response.token, response.role);
-      
+
       // Redirect based on role
       if (response.role === "OWNER") {
         navigate("/admin");
@@ -136,7 +135,3 @@ export default function LoginPage() {
     </div>
   );
 }
-=======
-    return <h1 className="text-2xl p-6">Login Page</h1>;
-  }
->>>>>>> dev

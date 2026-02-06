@@ -5,7 +5,7 @@ export interface Booking {
   roomNumber: string;
   checkIn: string; // ISO date string
   checkOut: string; // ISO date string
-  status: "Pending" | "Confirmed" | "Checked-in" | "Checked-out" | "Cancelled" | "Expired";
+  status: "Pending" | "Confirmed" | "Upcoming" | "Checked-in" | "Checked-out" | "Cancelled" | "Expired";
   createdAt: string; // ISO date string
   notes?: string;
   email?: string;

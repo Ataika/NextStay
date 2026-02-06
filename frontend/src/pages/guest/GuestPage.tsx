@@ -156,7 +156,6 @@ Booking ID: ${guest.bookingId}`;
   if (loading) {
     return <LoadingSpinner message="Loading..." fullScreen={true} />;
   }
-<<<<<<< HEAD
 
   // Прощание — показываем сразу после успешного checkout (без повторной загрузки токена)
   if (justCheckedOut) {
@@ -649,5 +648,3 @@ Booking ID: ${guest.bookingId}`;
     </div>
   );
 }
-=======
->>>>>>> dev
