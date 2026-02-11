@@ -14,19 +14,16 @@ A Property Management System (PMS) designed to automate hotel operations, optimi
 See [QUICK_START.md](./QUICK_START.md) or [LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) for detailed setup.
 
 ```bash
-# Start database and backend
-docker-compose up db backend
-
-# In another terminal, start frontend
-cd frontend
-npm install
-npm run dev
+# Start full stack (db + backend + frontend + airflow + superset + dbt)
+docker compose up -d
 ```
 
 **Access:**
 - Frontend: http://localhost:5173
 - Backend API: http://localhost:8000/api/v1
 - API Docs: http://localhost:8000/docs
+- Airflow: http://localhost:8080
+- Superset: http://localhost:8088
 
 ## Full infrastructure (DB + Backend + Airflow + Superset + dbt)
 
@@ -66,8 +63,8 @@ For detailed structure, see [PROJECT_STRUCTURE.md](./docs/PROJECT_STRUCTURE.md).
 
 ## Academic Requirements
 
-**Category A (CRUD):** Room inventory, bookings, staff management  
-**Category B (3rd Party):** Telegram Bot, PDF generation, SMTP, Superset  
+**Category A (CRUD):** Room inventory, bookings, staff management
+**Category B (3rd Party):** Telegram Bot, PDF generation, SMTP, Superset
 **Category C (Algorithms):** Dynamic pricing, task prioritization, DWH pipelines (STG → CORE → MART)
 
 ## Documentation
