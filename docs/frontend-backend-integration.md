@@ -21,7 +21,7 @@ Restart Vite after changes.
 Docker:
 
 ```bash
-docker compose up -d db backend
+docker compose up -d
 ```
 
 Local:

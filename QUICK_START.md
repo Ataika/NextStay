@@ -48,10 +48,10 @@ cd frontend
 npm run dev
 ```
 
-### Option C: Docker Compose
+### Option C: Docker Compose (Full Stack)
 
 ```bash
-docker compose up -d db backend
+docker compose up -d
 ```
 
 ### Help

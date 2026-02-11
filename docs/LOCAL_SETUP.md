@@ -6,7 +6,7 @@
 - Node.js 18+ (npm)
 - Python 3.11+ (optional, for running backend without Docker)
 
-## Quick start (Docker DB + Backend)
+## Quick start (Full Docker)
 
 ### 1) Create root `.env`
 
@@ -19,24 +19,16 @@ DB_PASSWORD=nextstay
 SUPERSET_SECRET_KEY=dev
 ```
 
-### 2) Start DB + backend
+### 2) Start all services
 
 ```bash
-docker compose up -d db backend
+docker compose up -d
 ```
 
 Check:
 - Backend health: `http://localhost:8000/api/v1/health`
 - API docs: `http://localhost:8000/docs`
 - Postgres on host: `localhost:5433`
-
-### 3) Start frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 Frontend: `http://localhost:5173`
 
