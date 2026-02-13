@@ -7,24 +7,44 @@ import Card from "../ui/Card";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState("");
+  const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const devLogin = (role: "OWNER" | "STAFF") => {
-    setAuth("dev-token", role);
-    navigate(role === "OWNER" ? "/admin" : "/staff");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const response = await authApi.login(email, password);
+      const response = await authApi.requestOtp(email);
+      if (response.retryAfterSeconds) {
+        setError(`Please wait ${response.retryAfterSeconds}s before requesting another code.`);
+        return;
+      }
+      setStep("otp");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to send OTP";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await authApi.verifyOtp(email, otpCode);
       setAuth(response.token, response.role);
 
       // Redirect based on role
@@ -40,7 +60,7 @@ export default function LoginPage() {
         err?.response?.data?.detail ||
         err?.response?.data?.error ||
         err?.message ||
-        "Error logging in";
+        "Failed to verify OTP";
       setError(msg);
     } finally {
       setLoading(false);
@@ -55,10 +75,10 @@ export default function LoginPage() {
             NextStay
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Login to the system
+            {step === "email" ? "Enter your email to receive OTP" : "Enter the 6-digit OTP sent to your email"}
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="mt-8 space-y-6" onSubmit={step === "email" ? handleRequestOtp : handleVerifyOtp}>
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
               {error}
@@ -75,26 +95,30 @@ export default function LoginPage() {
                 type="email"
                 required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value.trim())}
                 className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                placeholder="admin@nextstay.com"
+                placeholder="you@example.com"
+                disabled={step === "otp"}
               />
             </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                placeholder="admin"
-              />
-            </div>
+            {step === "otp" && (
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  OTP Code
+                </label>
+                <input
+                  id="otp"
+                  name="otp"
+                  type="text"
+                  required
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
+                  placeholder="123456"
+                  maxLength={6}
+                />
+              </div>
+            )}
           </div>
 
           <div>
@@ -104,32 +128,27 @@ export default function LoginPage() {
               fullWidth
               disabled={loading}
             >
-              {loading ? "Login..." : "Login"}
+              {loading
+                ? step === "email" ? "Sending OTP..." : "Verifying..."
+                : step === "email" ? "Send OTP" : "Verify OTP"}
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {step === "otp" && (
             <Button
               type="button"
               variant="secondary"
-              onClick={() => devLogin("OWNER")}
+              fullWidth
+              onClick={() => {
+                setStep("email");
+                setOtpCode("");
+                setError("");
+              }}
             >
-              Dev: Owner
+              Change Email
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => devLogin("STAFF")}
-            >
-              Dev: Staff
-            </Button>
-          </div>
+          )}
 
-          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-            <p className="font-semibold">Test accounts:</p>
-            <p>Admin: admin@nextstay.com / admin</p>
-            <p>Staff: staff@nextstay.com / staff</p>
-          </div>
         </form>
       </Card>
     </div>

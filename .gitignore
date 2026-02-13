@@ -30,3 +30,6 @@ analytics/target/
 
 # --- Data migration ---
 scripts/data/dumps/
+
+.cache/
+pip/

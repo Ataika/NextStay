@@ -11,19 +11,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     # Build URL from individual variables
     # Use DB_USER, DB_PASSWORD, DB_NAME from .env (as in docker-compose.yml)
-    postgres_user = os.getenv('DB_USER') or os.getenv('POSTGRES_USER', 'nextstay')
-    postgres_password = os.getenv('DB_PASSWORD') or os.getenv('POSTGRES_PASSWORD', 'nextstay')
-    postgres_host = os.getenv('POSTGRES_HOST', 'localhost')
-    postgres_port = os.getenv('POSTGRES_PORT', '5433')  # Docker uses 5433
-    postgres_db = os.getenv('DB_NAME') or os.getenv('POSTGRES_DB', 'nextstay')
+    postgres_user = os.getenv("DB_USER") or os.getenv("POSTGRES_USER", "nextstay")
+    postgres_password = os.getenv("DB_PASSWORD") or os.getenv("POSTGRES_PASSWORD", "nextstay")
+    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
+    postgres_port = os.getenv("POSTGRES_PORT", "5433")  # Docker uses 5433
+    postgres_db = os.getenv("DB_NAME") or os.getenv("POSTGRES_DB", "nextstay")
 
-    DATABASE_URL = (
-        f"postgresql://{postgres_user}:"
-        f"{postgres_password}@"
-        f"{postgres_host}:"
-        f"{postgres_port}/"
-        f"{postgres_db}"
-    )
+    DATABASE_URL = f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}"
 
 # Stripe configuration
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
@@ -40,3 +34,16 @@ SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "NextStay")
 
 # Frontend URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Brevo email (OTP)
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "")
+BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "NextStay")
+
+# OTP/Auth settings
+OTP_EXP_MINUTES = int(os.getenv("OTP_EXP_MINUTES", "5"))
+OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
+OTP_RESEND_SECONDS = int(os.getenv("OTP_RESEND_SECONDS", "60"))
+OTP_SECRET = os.getenv("OTP_SECRET", "change-me-in-production")
+AUTH_JWT_SECRET = os.getenv("AUTH_JWT_SECRET", "change-me-in-production")
+AUTH_TOKEN_EXPIRES_MINUTES = int(os.getenv("AUTH_TOKEN_EXPIRES_MINUTES", "720"))

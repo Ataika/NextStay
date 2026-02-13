@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
-from sqlalchemy.sql import func
 from app.db.base import Base
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.sql import func
 
 
 class Booking(Base):
@@ -13,7 +13,9 @@ class Booking(Base):
     room_number = Column(String(10), nullable=False)
     check_in = Column(DateTime(timezone=True), nullable=False)
     check_out = Column(DateTime(timezone=True), nullable=False)
-    status = Column(String(20), nullable=False, default="Pending")  # Pending, Confirmed, Cancelled, Expired, Checked-in, Checked-out
+    status = Column(
+        String(20), nullable=False, default="Pending"
+    )  # Pending, Confirmed, Cancelled, Expired, Checked-in, Checked-out
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     notes = Column(String(500), nullable=True)
     # Stripe fields

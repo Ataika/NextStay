@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, Text, JSON
 from app.db.base import Base
+from sqlalchemy import JSON, Column, Float, Integer, String, Text
 
 
 class Room(Base):

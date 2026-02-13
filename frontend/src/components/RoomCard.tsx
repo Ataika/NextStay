@@ -29,7 +29,7 @@ export default function RoomCard({
   const statusIcon = statusIcons[roomStatus] || statusIcons.Available;
 
   return (
-    <div 
+    <div
       className="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg hover:shadow-blue-500/20 hover:ring-2 hover:ring-blue-500/50 transition-all duration-200 border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col cursor-pointer"
       onClick={() => onClick?.(room.id)}
     >

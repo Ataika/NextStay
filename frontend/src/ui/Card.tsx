@@ -14,7 +14,7 @@ export default function Card({
   hover = false,
 }: CardProps) {
   const baseClasses = "bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700";
-  
+
   const paddingClasses = {
     none: "",
     sm: "p-2.5",

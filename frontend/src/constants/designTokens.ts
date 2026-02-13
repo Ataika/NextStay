@@ -1,6 +1,6 @@
 /**
  * Design System Tokens
- * 
+ *
  * Centralized color and spacing definitions for consistent UI across the application.
  * All components should use these tokens instead of hardcoded values.
  */
@@ -14,7 +14,7 @@ export const colors = {
     border: "border-blue-600 dark:border-blue-500",
     focus: "focus:ring-blue-500 dark:focus:ring-blue-400",
   },
-  
+
   // Success / Completed
   success: {
     bg: "bg-green-600 dark:bg-green-500",
@@ -23,7 +23,7 @@ export const colors = {
     border: "border-green-600 dark:border-green-500",
     light: "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800",
   },
-  
+
   // Warning
   warning: {
     bg: "bg-yellow-600 dark:bg-yellow-500",
@@ -32,7 +32,7 @@ export const colors = {
     border: "border-yellow-600 dark:border-yellow-500",
     light: "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
   },
-  
+
   // Error / Danger
   danger: {
     bg: "bg-red-600 dark:bg-red-500",
@@ -41,7 +41,7 @@ export const colors = {
     border: "border-red-600 dark:border-red-500",
     light: "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800",
   },
-  
+
   // Neutral / Secondary
   neutral: {
     bg: "bg-gray-200 dark:bg-gray-700",

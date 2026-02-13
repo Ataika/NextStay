@@ -1,10 +1,10 @@
 # Global exclude: ignore legacy or large files that don't need linting
-exclude: '^(backend/init_db_v1\.sql|init\.sql|scripts/db_backup\.sql|analytics/dbt/models/example/.*)'
+exclude: '^(backend/init_db_v1\.sql|init\.sql|scripts/db_backup\.sql|analytics/dbt/models/example/.*|analytics/dbt/models/test_ci\.sql|backend/migrations/.*\.sql|scripts/init-db\.sql|scripts/seed/seed\.sql)'
 
 repos:
   # Standard hooks for general file quality
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace    # Remove extra spaces at the end of lines
       - id: end-of-file-fixer      # Ensure files end with a newline
@@ -15,7 +15,7 @@ repos:
 
   # Ruff: The fast all-in-one Python linter and formatter
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.6
+    rev: v0.15.1
     hooks:
       - id: ruff
         # --fix: automatically fix standard errors
@@ -26,7 +26,7 @@ repos:
 
   # SQLFluff: Linter for SQL and dbt models
   - repo: https://github.com/sqlfluff/sqlfluff
-    rev: 2.3.2
+    rev: 4.0.4
     hooks:
       - id: sqlfluff-lint          # Check SQL code for best practices
         args: [--dialect, postgres]

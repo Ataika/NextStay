@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, JSON
-from sqlalchemy.sql import func
 from app.db.base import Base
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.sql import func
 
 
 class GuestToken(Base):

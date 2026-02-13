@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    connect_args={"connect_timeout": 5}  # Timeout connection to the database
+    connect_args={"connect_timeout": 5},  # Timeout connection to the database
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

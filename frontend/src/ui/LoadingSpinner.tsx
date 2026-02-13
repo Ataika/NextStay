@@ -3,9 +3,9 @@ interface LoadingSpinnerProps {
   fullScreen?: boolean;
 }
 
-export default function LoadingSpinner({ 
-  message = "Loading...", 
-  fullScreen = false 
+export default function LoadingSpinner({
+  message = "Loading...",
+  fullScreen = false
 }: LoadingSpinnerProps) {
   const containerClass = fullScreen
     ? "min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900"

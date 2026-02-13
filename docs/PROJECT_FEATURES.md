@@ -8,7 +8,7 @@ This document describes what the NextStay app can do (API + UI).
 
 - **GET** `/api/v1/rooms` — list rooms
 - **GET** `/api/v1/rooms/{room_id}` — get room by id
-- **GET** `/api/v1/rooms/available` — availability search by dates  
+- **GET** `/api/v1/rooms/available` — availability search by dates
   Params: `checkIn`, `checkOut`, optional `category`, optional `capacity`
 - **POST** `/api/v1/rooms` — create room
 - **PATCH** `/api/v1/rooms/{room_id}` — update room
@@ -46,7 +46,7 @@ Task statuses: `Pending`, `In Progress`, `Completed`
 ## Guest portal (token-based)
 
 - **GET** `/api/v1/guest/{token}` — guest details (Wi‑Fi, contacts, instructions, rules)
-- **POST** `/api/v1/guest/{token}/checkout` — guest checkout  
+- **POST** `/api/v1/guest/{token}/checkout` — guest checkout
   Effects:
   - booking → `Checked-out`
   - room → `Dirty`
