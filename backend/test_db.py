@@ -1,5 +1,5 @@
-from sqlalchemy import create_engine, text
 from app.core.config import DATABASE_URL
+from sqlalchemy import create_engine, text
 
 try:
     engine = create_engine(DATABASE_URL)

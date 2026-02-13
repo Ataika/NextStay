@@ -8,18 +8,18 @@ This document describes the outcome of merging the **dev** branch into **integra
 
 ### Infrastructure and orchestration
 
-- **Airflow service** in `docker-compose.yml`  
-  - Image: `apache/airflow:2.7.1-python3.10`  
-  - Port: 8080  
-  - Mounts: `analytics/dags`, `analytics/dbt`, `analytics/profiles.yml`, `scripts`  
+- **Airflow service** in `docker-compose.yml`
+  - Image: `apache/airflow:2.7.1-python3.10`
+  - Port: 8080
+  - Mounts: `analytics/dags`, `analytics/dbt`, `analytics/profiles.yml`, `scripts`
   - Command: `standalone`
 
-- **dbt service** in `docker-compose.yml` (extended)  
-  - Build via `Dockerfile.dbt`  
-  - Mode: `tty: true`, `stdin_open: true`, `entrypoint: /bin/bash`, `command: sleep infinity`  
+- **dbt service** in `docker-compose.yml` (extended)
+  - Build via `Dockerfile.dbt`
+  - Mode: `tty: true`, `stdin_open: true`, `entrypoint: /bin/bash`, `command: sleep infinity`
   - Volumes: `./analytics/dbt:/usr/app`, `./analytics/profiles.yml:/root/.dbt/profiles.yml`
 
-- **Superset volume**  
+- **Superset volume**
   - `./analytics/superset:/app/superset_home`
 
 ### Analytics (dbt)
@@ -72,49 +72,49 @@ Several files had merge conflicts. The following decisions were applied in the f
 
 ### Docker and configuration
 
-- **`docker-compose.yml`**  
-  - Single consolidated config: db, backend (with `command: uvicorn ... --reload`), airflow, superset (with volume), dbt (with Dockerfile.dbt and `sleep infinity`).  
+- **`docker-compose.yml`**
+  - Single consolidated config: db, backend (with `command: uvicorn ... --reload`), airflow, superset (with volume), dbt (with Dockerfile.dbt and `sleep infinity`).
   - DB container name: `nextstay_db_clean` (no trailing spaces).
 
 ### Backend
 
-- **`backend/app/main.py`**  
+- **`backend/app/main.py`**
   - Kept: FastAPI and CORS imports, all routers (health, rooms, tasks, bookings, auth, guest, stripe), `register_exception_handlers(app)` call, commented-out `Base.metadata.create_all`.
 
-- **`backend/app/core/config.py`**  
+- **`backend/app/core/config.py`**
   - Kept integration/fullstack config: building `DATABASE_URL` from `DB_USER`/`DB_PASSWORD`/`DB_NAME` or from `DATABASE_URL`, plus Stripe, SMTP, `FRONTEND_URL`.
 
-- **`backend/app/db/session.py`**  
+- **`backend/app/db/session.py`**
   - Kept engine with `connect_args={"connect_timeout": 5}` (integration version).
 
-- **`backend/app/exceptions.py`**  
+- **`backend/app/exceptions.py`**
   - Merged: `register_exception_handlers(app)` from dev and the full set of handlers from integration/fullstack (HTTP, validation, OperationalError, generic).
 
 ### Frontend
 
-- **`frontend/src/index.css`**  
+- **`frontend/src/index.css`**
   - Kept the overlay/drawer comment (integration version).
 
-- **`frontend/src/pages/LoginPage.tsx`**  
+- **`frontend/src/pages/LoginPage.tsx`**
   - Kept the full login form from integration/fullstack (email/password, API, dev buttons Owner/Staff, test accounts).
 
-- **`frontend/src/pages/admin/AdminPage.tsx`**  
+- **`frontend/src/pages/admin/AdminPage.tsx`**
   - Kept the full admin panel (rooms, stats, filters, modals, etc.).
 
-- **`frontend/src/pages/guest/GuestPage.tsx`**  
+- **`frontend/src/pages/guest/GuestPage.tsx`**
   - Kept the full guest page (QR, details, checkout, modals, contact).
 
-- **`frontend/src/pages/staff/StaffPage.tsx`**  
+- **`frontend/src/pages/staff/StaffPage.tsx`**
   - Kept the full tasks page (stats, filters, task cards, modals).
 
 ### Scripts and database
 
-- **`scripts/init-db.sql`**  
+- **`scripts/init-db.sql`**
   - Merged: `superset_ro` user and `GRANT CONNECT ON DATABASE nextstay` (as in integration/fullstack), plus `dair_dev`/`turat_dev` roles and the full DWH layer (ENUMS, STG, CORE, MART) from dev.
 
 ### Documentation
 
-- **`README.md`**  
+- **`README.md`**
   - Merged: Quick Start, project structure, features, and doc links from integration/fullstack; added full-deploy section (`docker-compose up -d --build`, `scripts/setup_all.sh`) and Airflow mention from dev.
 
 ---

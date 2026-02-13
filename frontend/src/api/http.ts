@@ -19,11 +19,11 @@ const http = axios.create({
 http.interceptors.request.use(
   (config) => {
     const { token } = useAuthStore.getState();
-    
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
+
     return config;
   },
   (error) => {
@@ -41,12 +41,12 @@ http.interceptors.response.use(
     if (error.response?.status === 401) {
       const { clearAuth } = useAuthStore.getState();
       clearAuth();
-      
+
       // Redirect to login page
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
-      
+
       toast.error("Session expired. Please login again.");
       return Promise.reject(error);
     }
@@ -54,7 +54,7 @@ http.interceptors.response.use(
     // Handle other errors
     const errorMessage = getErrorMessage(error);
     toast.error(errorMessage);
-    
+
     return Promise.reject(error);
   }
 );
@@ -64,7 +64,7 @@ function getErrorMessage(error: AxiosError): string {
   // If there is a message from the server
   if (error.response?.data) {
     const data = error.response.data as { message?: string; detail?: string; error?: string };
-    
+
     if (data.message) return data.message;
     if (data.detail) return data.detail;
     if (data.error) return data.error;

@@ -7,14 +7,14 @@ This directory contains reusable UI components that are part of the design syste
 ### Button
 Unified button component with consistent styling.
 
-**Variants:** `primary`, `secondary`, `danger`  
-**Sizes:** `sm`, `md`, `lg`  
+**Variants:** `primary`, `secondary`, `danger`
+**Sizes:** `sm`, `md`, `lg`
 **Props:** `fullWidth`, `disabled`, standard button props
 
 ### Card
 Consistent container component for content blocks.
 
-**Padding:** `none`, `sm`, `md`, `lg`  
+**Padding:** `none`, `sm`, `md`, `lg`
 **Props:** `hover` (enables hover shadow effect)
 
 ### PageHeader

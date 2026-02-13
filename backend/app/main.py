@@ -1,16 +1,13 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1.auth import router as auth_router
+from app.api.v1.bookings import router as bookings_router
+from app.api.v1.guest import router as guest_router
 from app.api.v1.health import router as health_router
 from app.api.v1.rooms import router as rooms_router
-from app.api.v1.tasks import router as tasks_router
-from app.api.v1.bookings import router as bookings_router
-from app.api.v1.auth import router as auth_router
-from app.api.v1.guest import router as guest_router
 from app.api.v1.stripe import router as stripe_router
+from app.api.v1.tasks import router as tasks_router
 from app.exceptions import register_exception_handlers
-from app.db.base import Base
-from app.db.session import engine
-from app.models import Room, CleaningTask, Booking, GuestToken  # table creation
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Create tables at startup
 # TEMPORARILY DISABLED due to Docker issues - uncomment after fixing

@@ -143,27 +143,33 @@ export const guestApi = {
 
 // Auth API
 export const authApi = {
-  login: async (email: string, password: string) => {
+  requestOtp: async (email: string) => {
     if (USE_MOCK_API) {
-      // Mock login - returns token and role
       await new Promise((resolve) => setTimeout(resolve, 500));
-      if (email === "admin@nextstay.com" && password === "admin") {
-        return {
-          token: "mock-admin-token",
-          role: "OWNER" as const,
-          user: { id: 1, email, name: "Admin User" },
-        };
-      }
-      if (email === "staff@nextstay.com" && password === "staff") {
+      return { message: "Mock OTP sent", retryAfterSeconds: null };
+    }
+    const response = await http.post("/auth/request-otp", { email });
+    return response.data;
+  },
+
+  verifyOtp: async (email: string, code: string) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!/^\d{6}$/.test(code)) throw new Error("OTP must be 6 digits");
+      if (email === "staff@nextstay.com") {
         return {
           token: "mock-staff-token",
           role: "STAFF" as const,
           user: { id: 2, email, name: "Staff User" },
         };
       }
-      throw new Error("Invalid credentials");
+      return {
+        token: "mock-admin-token",
+        role: "OWNER" as const,
+        user: { id: 1, email, name: "Admin User" },
+      };
     }
-    const response = await http.post("/auth/login", { email, password });
+    const response = await http.post("/auth/verify-otp", { email, code });
     return response.data;
   },
 

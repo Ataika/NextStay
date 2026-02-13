@@ -83,7 +83,7 @@ You need to add new columns to `bookings`:
 
 ```sql
 -- Add new columns
-ALTER TABLE bookings 
+ALTER TABLE bookings
 ADD COLUMN IF NOT EXISTS guest_email VARCHAR(255),
 ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255),
 ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255),

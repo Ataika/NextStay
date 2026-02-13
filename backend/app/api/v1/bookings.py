@@ -1,11 +1,12 @@
 import secrets
 from datetime import datetime
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
 from app.models.room import Room as RoomModel
+from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
@@ -31,8 +32,8 @@ class BookingBase(BaseModel):
     checkIn: str
     checkOut: str
     status: str
-    notes: Optional[str] = None
-    email: Optional[str] = None
+    notes: str | None = None
+    email: str | None = None
 
 
 class BookingCreate(BaseModel):
@@ -42,24 +43,24 @@ class BookingCreate(BaseModel):
     checkIn: str
     checkOut: str
     status: str = "Pending"  # Changed default to Pending
-    notes: Optional[str] = None
-    email: Optional[str] = None
+    notes: str | None = None
+    email: str | None = None
 
 
 class BookingUpdate(BaseModel):
-    guestName: Optional[str] = None
-    roomId: Optional[int] = None
-    roomNumber: Optional[str] = None
-    checkIn: Optional[str] = None
-    checkOut: Optional[str] = None
-    status: Optional[str] = None
-    notes: Optional[str] = None
+    guestName: str | None = None
+    roomId: int | None = None
+    roomNumber: str | None = None
+    checkIn: str | None = None
+    checkOut: str | None = None
+    status: str | None = None
+    notes: str | None = None
 
 
 class Booking(BookingBase):
     id: int
     createdAt: str
-    guestToken: Optional[str] = None  # Guest token (if exists)
+    guestToken: str | None = None  # Guest token (if exists)
 
     class Config:
         from_attributes = True
@@ -69,7 +70,7 @@ class Booking(BookingBase):
         cls,
         obj: BookingModel,
         include_token: bool = False,
-        db: Optional[Session] = None,
+        db: Session | None = None,
     ):
         """Convert ORM object to Pydantic model with correct date format"""
         token = None
@@ -93,15 +94,22 @@ class Booking(BookingBase):
 
 
 # CRUD operations
-@router.get("/bookings", response_model=List[Booking])
-def get_all_bookings(db: Annotated[Session, Depends(get_db)]):
+@router.get("/bookings", response_model=list[Booking])
+def get_all_bookings(
+    db: Annotated[Session, Depends(get_db)],
+    _auth=Depends(require_roles("OWNER")),
+):
     """Get all bookings"""
     bookings = db.query(BookingModel).all()
     return [Booking.from_orm_with_dates(booking, include_token=True, db=db) for booking in bookings]
 
 
 @router.get("/bookings/{booking_id}", response_model=Booking)
-def get_booking_by_id(booking_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_booking_by_id(
+    booking_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _auth=Depends(require_roles("OWNER")),
+):
     """Get booking by ID"""
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
@@ -197,7 +205,7 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
         contact_info=contact_info,
         instructions={
             "accessInfo": (
-                "Use the QR code at the main entrance and your room door. " "The code is active during your stay."
+                "Use the QR code at the main entrance and your room door. The code is active during your stay."
             ),
             "activeFrom": booking.checkIn,
             "activeUntil": booking.checkOut,
@@ -231,6 +239,7 @@ def update_booking(
     booking_id: int,
     booking_update: BookingUpdate,
     db: Annotated[Session, Depends(get_db)],
+    _auth=Depends(require_roles("OWNER")),
 ):
     """Update booking"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
@@ -269,7 +278,11 @@ def update_booking(
 
 
 @router.delete("/bookings/{booking_id}", status_code=204)
-def delete_booking(booking_id: int, db: Annotated[Session, Depends(get_db)]):
+def delete_booking(
+    booking_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    _auth=Depends(require_roles("OWNER")),
+):
     """Delete booking and related guest tokens"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:

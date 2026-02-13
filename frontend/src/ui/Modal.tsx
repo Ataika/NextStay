@@ -19,10 +19,10 @@ export default function Modal({
 }: ModalProps) {
   useEffect(() => {
     if (!isOpen) return;
-    
+
     // Block scroll when modal opens
     document.body.style.overflow = "hidden";
-    
+
     return () => {
       // When modal closes, check if any other modals are open
       // Use a longer delay to ensure React has finished updating all modal states

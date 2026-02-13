@@ -61,7 +61,7 @@ export default function BookingPage() {
       const checkOutISO = `${checkOut}T12:00:00Z`;
       const result = await roomsApi.getAvailable(checkInISO, checkOutISO);
       setAvailableRooms(result.availableRooms || []);
-      
+
       if (result.availableRooms.length === 0) {
         toast.error("No rooms available for the selected dates");
       } else {
@@ -107,7 +107,7 @@ export default function BookingPage() {
 
     try {
       setSubmitting(true);
-      
+
       // Format dates for API (ISO format with time)
       const checkInDateTime = `${checkIn}T14:00:00Z`;
       const checkOutDateTime = `${checkOut}T12:00:00Z`;

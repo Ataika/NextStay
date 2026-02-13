@@ -14,7 +14,7 @@ export default function NotFoundPage() {
             The page you're looking for doesn't exist or has been moved.
           </p>
         </div>
-        
+
         <div className="space-y-4">
           <Link to="/">
             <Button variant="primary" size="lg">

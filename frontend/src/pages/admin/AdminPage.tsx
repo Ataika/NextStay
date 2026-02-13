@@ -222,7 +222,7 @@ export default function AdminPage() {
         .split(",")
         .map((a) => a.trim())
         .filter((a) => a.length > 0);
-      
+
       const roomData = {
         ...roomForm,
         amenities: amenitiesArray,
@@ -595,7 +595,7 @@ export default function AdminPage() {
                         const cleanedValue = value.replace(/[^0-9.]/g, '');
                         // Проверяем, что точка только одна
                         const parts = cleanedValue.split('.');
-                        const finalValue = parts.length > 2 
+                        const finalValue = parts.length > 2
                           ? parts[0] + '.' + parts.slice(1).join('')
                           : cleanedValue;
                         const numValue = parseFloat(finalValue);
@@ -1270,7 +1270,7 @@ export default function AdminPage() {
                   const cleanedValue = value.replace(/[^0-9.]/g, '');
                   // Проверяем, что точка только одна
                   const parts = cleanedValue.split('.');
-                  const finalValue = parts.length > 2 
+                  const finalValue = parts.length > 2
                     ? parts[0] + '.' + parts.slice(1).join('')
                     : cleanedValue;
                   const numValue = parseFloat(finalValue);
