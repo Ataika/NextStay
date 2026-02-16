@@ -5,7 +5,7 @@ The visual diagram can be found here: https://dbdiagram.io/d/69618669d6e030a0249
 
 1. Overview
 The database is organized into four layers:
-OLTP (public schema):
+OLTP (oltp schema):
 Source of truth for the application (rooms, bookings, tasks, guest tokens).
 
 STG (stg schema):

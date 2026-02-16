@@ -140,6 +140,32 @@ export const mockApi = {
       return [...mockBookings];
     },
 
+    getPage: async (
+      params: {
+        limit: number;
+        offset: number;
+        status?: string;
+        search?: string;
+      }
+    ): Promise<{ items: Booking[]; total: number }> => {
+      await delay(300);
+      let rows = [...mockBookings];
+      if (params.status) {
+        rows = rows.filter((b) => b.status === params.status);
+      }
+      if (params.search) {
+        const s = params.search.toLowerCase();
+        rows = rows.filter(
+          (b) =>
+            b.guestName.toLowerCase().includes(s) ||
+            b.roomNumber.toLowerCase().includes(s)
+        );
+      }
+      const total = rows.length;
+      const items = rows.slice(params.offset, params.offset + params.limit);
+      return { items, total };
+    },
+
     getById: async (id: number): Promise<Booking | null> => {
       await delay(300);
       return mockBookings.find((booking) => booking.id === id) || null;

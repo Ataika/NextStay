@@ -48,6 +48,7 @@ services:
     environment:
       VITE_USE_MOCK_API: ${VITE_USE_MOCK_API:-false}
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+      VITE_SUPERSET_URL: ${VITE_SUPERSET_URL:-http://localhost:8088}
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     depends_on:
       - backend
@@ -81,6 +82,7 @@ services:
       - ./analytics/superset:/app/superset_home
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_CONFIG_PATH: /app/superset_home/superset_config.py
     depends_on:
       db:
         condition: service_healthy

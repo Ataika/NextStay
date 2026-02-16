@@ -40,3 +40,30 @@ SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "NextStay")
 
 # Frontend URL for redirects
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Brevo email (OTP)
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", "")
+BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "NextStay")
+
+# OTP/Auth settings
+OTP_EXP_MINUTES = int(os.getenv("OTP_EXP_MINUTES", "5"))
+OTP_MAX_ATTEMPTS = int(os.getenv("OTP_MAX_ATTEMPTS", "5"))
+OTP_RESEND_SECONDS = int(os.getenv("OTP_RESEND_SECONDS", "60"))
+OTP_SECRET = os.getenv("OTP_SECRET", "change-me-in-production")
+AUTH_JWT_SECRET = os.getenv("AUTH_JWT_SECRET", "change-me-in-production")
+AUTH_TOKEN_EXPIRES_MINUTES = int(os.getenv("AUTH_TOKEN_EXPIRES_MINUTES", "720"))
+
+# Dev auth bypass (password login without OTP for selected emails)
+DEV_BYPASS_EMAILS = [
+    email.strip().lower()
+    for email in os.getenv(
+        "DEV_BYPASS_EMAILS",
+        "nextstay@yandex.com,staff.uborka@yandex.com",
+    ).split(",")
+    if email.strip()
+]
+DEV_BYPASS_PASSWORD = os.getenv("DEV_BYPASS_PASSWORD", "")
+
+# Registration settings
+ALLOW_OWNER_SELF_REGISTER = os.getenv("ALLOW_OWNER_SELF_REGISTER", "false").lower() == "true"

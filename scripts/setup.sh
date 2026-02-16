@@ -66,8 +66,11 @@ docker exec -it nextstay_db_clean psql -U "$DB_USER" -d "$DB_NAME" -c "
     END \$\$;
     GRANT CONNECT ON DATABASE $DB_NAME TO superset_ro;
     GRANT USAGE ON SCHEMA public TO superset_ro;
+    GRANT USAGE ON SCHEMA oltp TO superset_ro;
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO superset_ro;
+    GRANT SELECT ON ALL TABLES IN SCHEMA oltp TO superset_ro;
     ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO superset_ro;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA oltp GRANT SELECT ON TABLES TO superset_ro;
 "
 
 # 6. Настройка dbt

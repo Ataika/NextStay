@@ -1,6 +1,6 @@
 # Test Data Seed
 
-This folder contains scripts to populate the OLTP database with predictable test data.
+This folder contains scripts to populate the OLTP schema (`oltp`) with predictable test data.
 
 ## Usage
 

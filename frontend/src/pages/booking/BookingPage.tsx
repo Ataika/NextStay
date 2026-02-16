@@ -1,12 +1,9 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { roomsApi, bookingsApi, stripeApi } from "../../api/api";
-import type { Room } from "../../mocks/rooms";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 import Modal from "../../ui/Modal";
 import LoadingSpinner from "../../ui/LoadingSpinner";
-import ErrorState from "../../ui/ErrorState";
 import toast from "react-hot-toast";
 
 interface AvailableRoom {
@@ -22,7 +19,6 @@ interface AvailableRoom {
 }
 
 export default function BookingPage() {
-  const navigate = useNavigate();
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
@@ -36,8 +32,6 @@ export default function BookingPage() {
     specialRequests: "",
   });
   const [submitting, setSubmitting] = useState(false);
-  const [bookingComplete, setBookingComplete] = useState(false);
-  const [guestToken, setGuestToken] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const today = new Date().toISOString().split("T")[0];
@@ -61,7 +55,7 @@ export default function BookingPage() {
       const checkOutISO = `${checkOut}T12:00:00Z`;
       const result = await roomsApi.getAvailable(checkInISO, checkOutISO);
       setAvailableRooms(result.availableRooms || []);
-      
+
       if (result.availableRooms.length === 0) {
         toast.error("No rooms available for the selected dates");
       } else {
@@ -107,7 +101,7 @@ export default function BookingPage() {
 
     try {
       setSubmitting(true);
-      
+
       // Format dates for API (ISO format with time)
       const checkInDateTime = `${checkIn}T14:00:00Z`;
       const checkOutDateTime = `${checkOut}T12:00:00Z`;
@@ -139,124 +133,6 @@ export default function BookingPage() {
       setSubmitting(false);
     }
   };
-
-  const handleAccessRoom = () => {
-    if (guestToken) {
-      navigate(`/guest/${guestToken}`);
-    }
-  };
-
-  // Booking complete screen
-  if (bookingComplete && guestToken) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
-        <Card className="max-w-2xl w-full" padding="lg">
-          <div className="text-center mb-6">
-            <div className="inline-block bg-green-100 dark:bg-green-900/30 rounded-full p-4 mb-4">
-              <svg
-                className="w-16 h-16 text-green-600 dark:text-green-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Booking Confirmed!
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-              Your reservation has been successfully created.
-            </p>
-          </div>
-
-          {selectedRoom && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Booking Details
-              </h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Guest:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {bookingData.guestName}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Room:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {selectedRoom.number} ({selectedRoom.category})
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Check-in:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(checkIn).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Check-out:</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(checkOut).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                  <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
-                    ${selectedRoom.totalPrice.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <Button variant="primary" fullWidth size="lg" onClick={handleAccessRoom}>
-              Access Your Room
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                setBookingComplete(false);
-                setCheckIn("");
-                setCheckOut("");
-                setAvailableRooms([]);
-                setBookingData({
-                  guestName: "",
-                  email: "",
-                  phone: "",
-                  specialRequests: "",
-                });
-              }}
-            >
-              Book Another Room
-            </Button>
-          </div>
-
-          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              💡 <strong>Tip:</strong> Save the link to your room access page. You'll need it to
-              check in and access your room during your stay.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">

@@ -7,10 +7,11 @@ from app.api.v1.bookings import router as bookings_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.guest import router as guest_router
 from app.api.v1.stripe import router as stripe_router
+from app.api.v1.reports import router as reports_router
 from app.exceptions import register_exception_handlers
 from app.db.base import Base
 from app.db.session import engine
-from app.models import Room, CleaningTask, Booking, GuestToken  # table creation
+from app.models import AuthSession, Booking, CleaningTask, EmailOtp, GuestToken, Payment, Room, User  # table creation
 
 # Create tables at startup
 # TEMPORARILY DISABLED due to Docker issues - uncomment after fixing
@@ -32,6 +33,7 @@ app.add_middleware(
     allow_credentials=False,  # Cannot use True with "*" in origins
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Total-Count"],
 )
 
 # Connect all routers
@@ -42,5 +44,6 @@ app.include_router(bookings_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(guest_router, prefix="/api/v1")
 app.include_router(stripe_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
 
 register_exception_handlers(app)

@@ -79,30 +79,14 @@ Booking status **Pending → Confirmed** is updated in two cases:
 
 ### 5. Database migration
 
-You need to add new columns to `bookings`:
-
-```sql
--- Add new columns
-ALTER TABLE bookings 
-ADD COLUMN IF NOT EXISTS guest_email VARCHAR(255),
-ADD COLUMN IF NOT EXISTS stripe_session_id VARCHAR(255),
-ADD COLUMN IF NOT EXISTS stripe_payment_intent_id VARCHAR(255),
-ADD COLUMN IF NOT EXISTS amount_paid FLOAT;
-
--- Create an index for faster lookup by session_id
-CREATE INDEX IF NOT EXISTS idx_bookings_stripe_session_id ON bookings(stripe_session_id);
-
--- Update existing rows (optional)
-UPDATE bookings SET status = 'Pending' WHERE status = 'Upcoming';
-```
-
-Or use Alembic (recommended for larger projects):
+Run project SQL migrations (PostgreSQL in `oltp` schema):
 
 ```bash
-cd backend
-alembic revision --autogenerate -m "Add Stripe fields to bookings"
-alembic upgrade head
+docker exec -i nextstay_db_clean psql -U nextstay -d nextstay < backend/migrations/add_stripe_fields.sql
+docker exec -i nextstay_db_clean psql -U nextstay -d nextstay < backend/migrations/add_payments_table.sql
 ```
+
+`add_payments_table.sql` creates `oltp.payments` where Stripe events/session snapshots are stored.
 
 ## Testing
 
@@ -129,6 +113,14 @@ Use test cards from [Stripe Docs](https://stripe.com/docs/testing):
    - Booking status is `"Confirmed"` in the admin UI
    - Webhook logs in Stripe Dashboard (if using webhooks)
    - Success page shows the guest link (no email required)
+   - Payment row exists in DB:
+
+```sql
+SELECT booking_id, stripe_session_id, stripe_payment_intent_id, event_type, payment_status, amount_total_cents
+FROM oltp.payments
+ORDER BY id DESC
+LIMIT 20;
+```
 
 ### 3. Webhook verification
 

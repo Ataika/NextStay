@@ -145,25 +145,69 @@ export const guestApi = {
 export const authApi = {
   login: async (email: string, password: string) => {
     if (USE_MOCK_API) {
-      // Mock login - returns token and role
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      if (email === "admin@nextstay.com" && password === "admin") {
-        return {
-          token: "mock-admin-token",
-          role: "OWNER" as const,
-          user: { id: 1, email, name: "Admin User" },
-        };
-      }
-      if (email === "staff@nextstay.com" && password === "staff") {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      if (email.includes("staff")) {
         return {
           token: "mock-staff-token",
           role: "STAFF" as const,
           user: { id: 2, email, name: "Staff User" },
         };
       }
-      throw new Error("Invalid credentials");
+      return {
+        token: "mock-owner-token",
+        role: "OWNER" as const,
+        user: { id: 1, email, name: "Owner User" },
+      };
     }
     const response = await http.post("/auth/login", { email, password });
+    return response.data;
+  },
+
+  register: async (payload: {
+    email: string;
+    fullName: string;
+    password: string;
+    role: "OWNER" | "STAFF";
+  }) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return {
+        token: "mock-register-token",
+        role: payload.role,
+        user: { id: Date.now(), email: payload.email, name: payload.fullName },
+      };
+    }
+    const response = await http.post("/auth/register", payload);
+    return response.data;
+  },
+
+  requestOtp: async (email: string) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return { message: "Mock OTP sent", retryAfterSeconds: null };
+    }
+    const response = await http.post("/auth/request-otp", { email });
+    return response.data;
+  },
+
+  verifyOtp: async (email: string, code: string) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (!/^\d{6}$/.test(code)) throw new Error("OTP must be 6 digits");
+      if (email === "staff@nextstay.com") {
+        return {
+          token: "mock-staff-token",
+          role: "STAFF" as const,
+          user: { id: 2, email, name: "Staff User" },
+        };
+      }
+      return {
+        token: "mock-admin-token",
+        role: "OWNER" as const,
+        user: { id: 1, email, name: "Admin User" },
+      };
+    }
+    const response = await http.post("/auth/verify-otp", { email, code });
     return response.data;
   },
 
@@ -183,6 +227,31 @@ export const bookingsApi = {
     }
     const response = await http.get("/bookings");
     return response.data;
+  },
+
+  getPage: async (
+    params: { limit: number; offset: number; status?: string; search?: string }
+  ): Promise<{ items: Booking[]; total: number }> => {
+    if (USE_MOCK_API) {
+      return mockApi.bookings.getPage(params);
+    }
+    const query = new URLSearchParams({
+      limit: String(params.limit),
+      offset: String(params.offset),
+    });
+    if (params.status) {
+      query.set("status", params.status);
+    }
+    if (params.search) {
+      query.set("search", params.search);
+    }
+    const response = await http.get(`/bookings?${query.toString()}`);
+    const totalHeader = response.headers["x-total-count"];
+    const total = Number(totalHeader ?? response.data.length ?? 0);
+    return {
+      items: response.data,
+      total: Number.isFinite(total) ? total : 0,
+    };
   },
 
   getById: async (id: number): Promise<Booking | null> => {
@@ -243,6 +312,71 @@ export const stripeApi = {
     const response = await http.get(
       `/stripe/confirm-and-get-booking?session_id=${encodeURIComponent(sessionId)}`
     );
+    return response.data;
+  },
+};
+
+export interface ReportsOverviewResponse {
+  companyCode: string | null;
+  days: number;
+  kpis: {
+    totalRevenue: number;
+    bookingsCount: number;
+    avgOccupancyRate: number;
+    avgAdr: number;
+    avgRevpar: number;
+  };
+  revparTrend: Array<{
+    company_code: string;
+    date_day: string;
+    total_revenue: number;
+    revpar: number;
+    occupancy_rate: number;
+  }>;
+  roomTypeRevenue: Array<{
+    company_code: string;
+    room_type: string;
+    total_revenue: number;
+    bookings_count: number;
+    avg_adr: number;
+  }>;
+  tasksTrend: Array<{
+    company_code: string;
+    date_day: string;
+    tasks_created: number;
+    tasks_completed: number;
+    completion_rate: number;
+  }>;
+  loyalty: Array<{
+    company_code: string;
+    loyalty_tier: string;
+    customers: number;
+  }>;
+}
+
+export const reportsApi = {
+  getOverview: async (companyCode?: string, days = 30): Promise<ReportsOverviewResponse> => {
+    if (USE_MOCK_API) {
+      return {
+        companyCode: companyCode || null,
+        days,
+        kpis: {
+          totalRevenue: 124500,
+          bookingsCount: 680,
+          avgOccupancyRate: 72.4,
+          avgAdr: 183.1,
+          avgRevpar: 132.6,
+        },
+        revparTrend: [],
+        roomTypeRevenue: [],
+        tasksTrend: [],
+        loyalty: [],
+      };
+    }
+
+    const params = new URLSearchParams({ days: String(days) });
+    if (companyCode) params.append("companyCode", companyCode);
+    const response = await http.get(`/reports/overview?${params.toString()}`);
     return response.data;
   },
 };

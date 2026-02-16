@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../store/authStore";
 import { authApi } from "../api/api";
-import Button from "../ui/Button";
 
 export default function Header() {
   const navigate = useNavigate();

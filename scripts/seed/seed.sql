@@ -4,14 +4,14 @@
 BEGIN;
 
 TRUNCATE TABLE
-  guest_tokens,
-  cleaning_tasks,
-  bookings,
-  rooms
+  oltp.guest_tokens,
+  oltp.cleaning_tasks,
+  oltp.bookings,
+  oltp.rooms
 RESTART IDENTITY CASCADE;
 
 -- Rooms
-INSERT INTO rooms (number, category, status, price, capacity, description, amenities)
+INSERT INTO oltp.rooms (number, category, status, price, capacity, description, amenities)
 VALUES
   ('101', 'Standard', 'Available', 89.00, 2, 'Standard room, courtyard view', '{"wifi": true, "tv": true}'),
   ('102', 'Standard', 'Available', 95.00, 2, 'Standard room, city view', '{"wifi": true, "tv": true}'),
@@ -20,7 +20,7 @@ VALUES
   ('301', 'Suite', 'Available', 220.00, 4, 'Suite with balcony', '{"wifi": true, "tv": true, "balcony": true}');
 
 -- Bookings (one pending, one upcoming, one checked-in)
-INSERT INTO bookings (
+INSERT INTO oltp.bookings (
   guest_name,
   guest_email,
   room_id,
@@ -36,7 +36,7 @@ VALUES
   ('John Kim', 'john@example.com', 3, '201', '2026-02-10T14:00:00Z', '2026-02-12T12:00:00Z', 'Checked-in', 'VIP guest');
 
 -- Guest tokens for each booking
-INSERT INTO guest_tokens (
+INSERT INTO oltp.guest_tokens (
   token,
   booking_id,
   room_id,
@@ -103,7 +103,7 @@ VALUES
   );
 
 -- Cleaning task seed (for staff view)
-INSERT INTO cleaning_tasks (
+INSERT INTO oltp.cleaning_tasks (
   room_id,
   room_number,
   status,

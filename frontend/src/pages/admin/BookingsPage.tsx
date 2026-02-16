@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { bookingsApi } from "../../api/api";
 import type { Booking } from "../../mocks/bookings";
 import PageHeader from "../../ui/PageHeader";
@@ -13,7 +13,10 @@ import toast from "react-hot-toast";
 type StatusFilter = Booking["status"] | "All";
 
 export default function BookingsPage() {
+  const [pageSize, setPageSize] = useState(20);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -23,14 +26,25 @@ export default function BookingsPage() {
 
   useEffect(() => {
     loadBookings();
-  }, []);
+  }, [page, statusFilter, searchQuery]);
 
   const loadBookings = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await bookingsApi.getAll();
-      setBookings(data);
+      const offset = (page - 1) * pageSize;
+      const result = await bookingsApi.getPage({
+        limit: pageSize,
+        offset,
+        status: statusFilter === "All" ? undefined : statusFilter,
+        search: searchQuery.trim() || undefined,
+      });
+      if (result.total > 0 && result.items.length === 0 && page > 1) {
+        setPage((p) => p - 1);
+        return;
+      }
+      setBookings(result.items);
+      setTotalCount(result.total);
     } catch (err) {
       setError("Failed to load bookings");
       console.error(err);
@@ -39,17 +53,19 @@ export default function BookingsPage() {
     }
   };
 
-  const filteredBookings = useMemo(() => {
-    return bookings.filter((booking) => {
-      const matchesStatus =
-        statusFilter === "All" || booking.status === statusFilter;
-      const matchesSearch =
-        searchQuery === "" ||
-        booking.guestName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        booking.roomNumber.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesStatus && matchesSearch;
-    });
-  }, [bookings, statusFilter, searchQuery]);
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+  const showingFrom = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = totalCount === 0 ? 0 : Math.min(page * pageSize, totalCount);
+  const visiblePageNumbers = (() => {
+    const maxButtons = 7;
+    if (pageCount <= maxButtons) {
+      return Array.from({ length: pageCount }, (_, i) => i + 1);
+    }
+    let start = Math.max(1, page - 3);
+    let end = Math.min(pageCount, start + maxButtons - 1);
+    start = Math.max(1, end - maxButtons + 1);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  })();
 
   const getStatusColor = (status: Booking["status"]) => {
     switch (status) {
@@ -116,14 +132,20 @@ export default function BookingsPage() {
               type="text"
               placeholder="Search by guest name or room number..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setPage(1);
+                setSearchQuery(e.target.value);
+              }}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             />
           </div>
           <div className="md:w-64">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+              onChange={(e) => {
+                setPage(1);
+                setStatusFilter(e.target.value as StatusFilter);
+              }}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
               <option value="All">All statuses</option>
@@ -138,7 +160,7 @@ export default function BookingsPage() {
       </Card>
 
       {/* Bookings Table */}
-      {filteredBookings.length === 0 ? (
+      {bookings.length === 0 ? (
         <Card>
           <EmptyState
             title="No bookings found"
@@ -172,7 +194,7 @@ export default function BookingsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredBookings.map((booking) => (
+                {bookings.map((booking) => (
                   <tr
                     key={booking.id}
                     className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -222,6 +244,62 @@ export default function BookingsPage() {
           </div>
         </Card>
       )}
+
+      <Card padding="md">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {showingFrom}-{showingTo} of {totalCount}
+          </p>
+          <div className="flex items-center gap-3">
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPage(1);
+                setPageSize(Number(e.target.value));
+              }}
+              className="px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value={20}>20 / page</option>
+              <option value={50}>50 / page</option>
+              <option value={100}>100 / page</option>
+            </select>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+            >
+              Prev
+            </Button>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              Page {page} / {pageCount}
+            </span>
+            <div className="flex items-center gap-1">
+              {visiblePageNumbers.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  className={`px-2 py-1 text-xs rounded border ${
+                    n === page
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              disabled={page >= pageCount || loading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       <Modal
         isOpen={!!deleteTarget}

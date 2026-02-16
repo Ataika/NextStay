@@ -5,132 +5,258 @@ import { useAuthStore } from "../store/authStore";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 
+type AuthMode = "password" | "otp" | "register";
+
 export default function LoginPage() {
+  const [mode, setMode] = useState<AuthMode>("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [registerRole, setRegisterRole] = useState<"OWNER" | "STAFF">("STAFF");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpStep, setOtpStep] = useState<"email" | "code">("email");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
 
-  const devLogin = (role: "OWNER" | "STAFF") => {
-    setAuth("dev-token", role);
+  const redirectByRole = (role: "OWNER" | "STAFF") => {
     navigate(role === "OWNER" ? "/admin" : "/staff");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const response = await authApi.login(email, password);
       setAuth(response.token, response.role);
-
-      // Redirect based on role
-      if (response.role === "OWNER") {
-        navigate("/admin");
-      } else if (response.role === "STAFF") {
-        navigate("/staff");
-      } else {
-        navigate("/login");
-      }
+      redirectByRole(response.role);
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.error ||
         err?.message ||
-        "Error logging in";
+        "Login failed";
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const response = await authApi.register({
+        email,
+        fullName,
+        password,
+        role: registerRole,
+      });
+      setAuth(response.token, response.role);
+      redirectByRole(response.role);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Registration failed";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const response = await authApi.requestOtp(email);
+      if (response.retryAfterSeconds) {
+        setError(`Please wait ${response.retryAfterSeconds}s before requesting another code.`);
+        return;
+      }
+      setOtpStep("code");
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to send OTP";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const response = await authApi.verifyOtp(email, otpCode);
+      setAuth(response.token, response.role);
+      redirectByRole(response.role);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to verify OTP";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = (next: AuthMode) => {
+    setMode(next);
+    setError("");
+    setLoading(false);
+    if (next !== "otp") {
+      setOtpStep("email");
+      setOtpCode("");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <Card className="w-full max-w-md lg:max-w-lg xl:max-w-xl space-y-8" padding="lg">
+      <Card className="w-full max-w-md lg:max-w-lg space-y-6" padding="lg">
         <div>
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white">
-            NextStay
-          </h2>
+          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white">NextStay</h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            Login to the system
+            Auth mode: {mode === "password" ? "Password login" : mode === "otp" ? "OTP login" : "Register"}
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email
-              </label>
+
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant={mode === "password" ? "primary" : "secondary"} onClick={() => switchMode("password")}>
+            Login
+          </Button>
+          <Button variant={mode === "otp" ? "primary" : "secondary"} onClick={() => switchMode("otp")}>
+            OTP
+          </Button>
+          <Button variant={mode === "register" ? "primary" : "secondary"} onClick={() => switchMode("register")}>
+            Register
+          </Button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
+
+        {mode === "password" && (
+          <form className="space-y-4" onSubmit={handlePasswordLogin}>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value.trim())}
+              placeholder="Email"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+        )}
+
+        {mode === "register" && (
+          <form className="space-y-4" onSubmit={handleRegister}>
+            <input
+              type="text"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Full name"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value.trim())}
+              placeholder="Email"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (min 8 chars)"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            <select
+              value={registerRole}
+              onChange={(e) => setRegisterRole(e.target.value as "OWNER" | "STAFF")}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="STAFF">STAFF</option>
+              <option value="OWNER">OWNER</option>
+            </select>
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? "Creating..." : "Create account"}
+            </Button>
+          </form>
+        )}
+
+        {mode === "otp" && (
+          <form className="space-y-4" onSubmit={otpStep === "email" ? handleRequestOtp : handleVerifyOtp}>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value.trim())}
+              placeholder="Email"
+              disabled={otpStep === "code"}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            />
+            {otpStep === "code" && (
               <input
-                id="email"
-                name="email"
-                type="email"
+                type="text"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                placeholder="admin@nextstay.com"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="6-digit OTP"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                placeholder="admin"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              fullWidth
-              disabled={loading}
-            >
-              {loading ? "Login..." : "Login"}
+            )}
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? "Please wait..." : otpStep === "email" ? "Send OTP" : "Verify OTP"}
             </Button>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => devLogin("OWNER")}
-            >
-              Dev: Owner
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => devLogin("STAFF")}
-            >
-              Dev: Staff
-            </Button>
-          </div>
-
-          <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 space-y-1">
-            <p className="font-semibold">Test accounts:</p>
-            <p>Admin: admin@nextstay.com / admin</p>
-            <p>Staff: staff@nextstay.com / staff</p>
-          </div>
-        </form>
+            {otpStep === "code" && (
+              <Button
+                type="button"
+                variant="secondary"
+                fullWidth
+                onClick={() => {
+                  setOtpStep("email");
+                  setOtpCode("");
+                  setError("");
+                }}
+              >
+                Change email
+              </Button>
+            )}
+          </form>
+        )}
       </Card>
     </div>
   );

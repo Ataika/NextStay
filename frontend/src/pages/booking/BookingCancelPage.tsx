@@ -1,11 +1,9 @@
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 
 export default function BookingCancelPage() {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const bookingId = searchParams.get("booking_id");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
