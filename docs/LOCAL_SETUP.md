@@ -19,7 +19,23 @@ DB_PASSWORD=nextstay
 SUPERSET_SECRET_KEY=dev
 ```
 
-### 2) Start all services
+### 2) Create `backend/.env`
+
+Use `backend/.env.example` as template and create `backend/.env`.
+
+Minimum required for OTP login:
+
+```env
+BREVO_API_KEY=your_brevo_api_key
+BREVO_SENDER_EMAIL=verified_sender@example.com
+BREVO_SENDER_NAME=NextStay
+OTP_SECRET=change-me
+AUTH_JWT_SECRET=change-me
+DEV_BYPASS_EMAILS=nextstay@yandex.com,staff.uborka@yandex.com
+DEV_BYPASS_PASSWORD=AtaiDairTurat
+```
+
+### 3) Start all services
 
 ```bash
 docker compose up -d
@@ -55,10 +71,15 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 docker compose down
 ```
 
-## Test credentials (auth stub)
+## Test credentials (OTP auth)
 
-- Admin: `admin@nextstay.com` / `admin`
-- Staff: `staff@nextstay.com` / `staff`
+- Admin: `admin@nextstay.com` (OTP by email)
+- Staff: `staff@nextstay.com` (OTP by email)
+- Dev bypass (password, no OTP): `nextstay@yandex.com`, `staff.uborka@yandex.com`
+
+Users are seeded by `scripts/init-db.sql` into `oltp.users`.
+Detailed matrix (roles, companies, OTP vs password): `docs/DEV_AUTH_ACCOUNTS.md`.
+Team synchronization (DB snapshot + DAG/Superset): `docs/TEAM_SYNC.md`.
 
 ## Useful commands
 

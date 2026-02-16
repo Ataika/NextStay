@@ -1,13 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.sql import func
 from app.db.base import Base
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.sql import func
 
 
 class CleaningTask(Base):
     __tablename__ = "cleaning_tasks"
+    __table_args__ = {"schema": "oltp"}
 
     id = Column(Integer, primary_key=True, index=True)
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
+    room_id = Column(Integer, ForeignKey("oltp.rooms.id"), nullable=False)
     room_number = Column(String(10), nullable=False)
     status = Column(String(20), nullable=False, default="Pending")
     priority = Column(String(20), nullable=False, default="Medium")
@@ -16,3 +17,4 @@ class CleaningTask(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
     notes = Column(String(500), nullable=True)
+    company_code = Column(String(10), ForeignKey("oltp.companies.company_code"), nullable=True, index=True)

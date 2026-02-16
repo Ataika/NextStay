@@ -1,0 +1,24 @@
+from app.db.base import Base
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.sql import func
+
+
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = {"schema": "oltp"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    full_name = Column(String(120), nullable=False)
+    role = Column(String(20), nullable=False)  # OWNER | STAFF
+    company_code = Column(String(10), ForeignKey("oltp.companies.company_code"), nullable=True, index=True)
+    password_hash = Column(String(255), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

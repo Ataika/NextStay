@@ -6,7 +6,9 @@ from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
 from app.models.room import Room as RoomModel
-from fastapi import APIRouter, Depends, HTTPException
+from app.models.user import User as UserModel
+from app.security.auth import get_user_company_scope, require_roles
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
@@ -94,16 +96,50 @@ class Booking(BookingBase):
 
 # CRUD operations
 @router.get("/bookings", response_model=List[Booking])
-def get_all_bookings(db: Annotated[Session, Depends(get_db)]):
-    """Get all bookings"""
-    bookings = db.query(BookingModel).all()
+def get_all_bookings(
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[Optional[int], Query(ge=1, le=200)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    status: Annotated[Optional[str], Query()] = None,
+    search: Annotated[Optional[str], Query(min_length=1)] = None,
+    current_user: UserModel = Depends(require_roles("OWNER", "STAFF")),
+):
+    """Get bookings with optional pagination and filters."""
+    company_code = get_user_company_scope(current_user)
+    query = db.query(BookingModel).filter(BookingModel.company_code == company_code)
+    if status:
+        query = query.filter(BookingModel.status == status)
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(
+                BookingModel.guest_name.ilike(like),
+                BookingModel.room_number.ilike(like),
+            )
+        )
+
+    total = query.count()
+    response.headers["X-Total-Count"] = str(total)
+
+    query = query.order_by(BookingModel.created_at.desc(), BookingModel.id.desc())
+    if limit is not None:
+        query = query.offset(offset).limit(limit)
+    bookings = query.all()
     return [Booking.from_orm_with_dates(booking, include_token=True, db=db) for booking in bookings]
 
 
 @router.get("/bookings/{booking_id}", response_model=Booking)
-def get_booking_by_id(booking_id: int, db: Annotated[Session, Depends(get_db)]):
+def get_booking_by_id(
+    booking_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: UserModel = Depends(require_roles("OWNER", "STAFF")),
+):
     """Get booking by ID"""
-    booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
+    company_code = get_user_company_scope(current_user)
+    booking = (
+        db.query(BookingModel).filter(BookingModel.id == booking_id, BookingModel.company_code == company_code).first()
+    )
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     return Booking.from_orm_with_dates(booking, include_token=True, db=db)
@@ -131,6 +167,8 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
     room = db.query(RoomModel).filter(RoomModel.id == booking.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
+    if not room.company_code:
+        raise HTTPException(status_code=409, detail="Room is not assigned to a company")
 
     # Check if room is available
     if room.status != "Available":
@@ -170,6 +208,7 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
         check_out=check_out,
         status=booking.status,
         notes=booking.notes,
+        company_code=room.company_code,
     )
     db.add(db_booking)
     db.flush()  # Get booking ID
@@ -211,6 +250,7 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
             "checkOutTime": "12:00",
             "smokingPolicy": "No smoking in rooms. Designated smoking areas available.",
         },
+        company_code=room.company_code,
     )
     db.add(guest_token)
 
@@ -231,9 +271,13 @@ def update_booking(
     booking_id: int,
     booking_update: BookingUpdate,
     db: Annotated[Session, Depends(get_db)],
+    current_user: UserModel = Depends(require_roles("OWNER", "STAFF")),
 ):
     """Update booking"""
-    db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
+    company_code = get_user_company_scope(current_user)
+    db_booking = (
+        db.query(BookingModel).filter(BookingModel.id == booking_id, BookingModel.company_code == company_code).first()
+    )
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
@@ -269,9 +313,16 @@ def update_booking(
 
 
 @router.delete("/bookings/{booking_id}", status_code=204)
-def delete_booking(booking_id: int, db: Annotated[Session, Depends(get_db)]):
+def delete_booking(
+    booking_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: UserModel = Depends(require_roles("OWNER", "STAFF")),
+):
     """Delete booking and related guest tokens"""
-    db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
+    company_code = get_user_company_scope(current_user)
+    db_booking = (
+        db.query(BookingModel).filter(BookingModel.id == booking_id, BookingModel.company_code == company_code).first()
+    )
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     # First delete related guest tokens (FK on bookings.id)

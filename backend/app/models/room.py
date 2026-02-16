@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, Float, Text, JSON
 from app.db.base import Base
+from sqlalchemy import JSON, Column, Float, ForeignKey, Integer, String, Text
 
 
 class Room(Base):
     __tablename__ = "rooms"
+    __table_args__ = {"schema": "oltp"}
 
     id = Column(Integer, primary_key=True, index=True)
     number = Column(String(10), unique=True, nullable=False, index=True)
@@ -13,3 +14,4 @@ class Room(Base):
     capacity = Column(Integer, nullable=False, default=2)
     description = Column(Text, nullable=True)
     amenities = Column(JSON, nullable=True)  # Use JSON instead of ARRAY for compatibility
+    company_code = Column(String(10), ForeignKey("oltp.companies.company_code"), nullable=True, index=True)
