@@ -72,10 +72,33 @@ export default function RoomCard({
             <span>👥</span>
             <span>{room.capacity}</span>
           </div>
-          <div className="font-semibold text-gray-900 dark:text-white">
-            {room.price.toLocaleString("en-US")} $<span className="text-xs font-normal text-gray-500 dark:text-gray-400">/night</span>
+          <div className="text-right">
+            {room.dynamicPrice !== null && room.dynamicPrice !== undefined ? (
+              <>
+                <div className="font-semibold text-blue-700 dark:text-blue-300">
+                  {room.dynamicPrice.toLocaleString("en-US")} $
+                  <span className="text-xs font-normal text-blue-500 dark:text-blue-400"> predicted</span>
+                </div>
+                <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                  Base {room.price.toLocaleString("en-US")} $/night
+                </div>
+              </>
+            ) : (
+              <div className="font-semibold text-gray-900 dark:text-white">
+                {room.price.toLocaleString("en-US")} $
+                <span className="text-xs font-normal text-gray-500 dark:text-gray-400">/night</span>
+              </div>
+            )}
           </div>
         </div>
+
+        {room.dynamicPrice !== null &&
+          room.dynamicPrice !== undefined &&
+          room.pricingStayDate && (
+            <div className="mb-2 text-[11px] text-blue-600 dark:text-blue-400">
+              Pricing batch for stay date {room.pricingStayDate}
+            </div>
+          )}
 
         {/* Amenities (текстом) */}
         {room.amenities && room.amenities.length > 0 && (

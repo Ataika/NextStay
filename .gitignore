@@ -33,3 +33,12 @@ scripts/data/dumps/
 
 .cache/
 pip/
+
+analytics/superset/.cache/
+
+# --- PriceEngine generated artifacts ---
+backend/priceengine/outputs/
+backend/priceengine/artifacts/*.pkl
+backend/priceengine/artifacts/hotel_*/
+backend/priceengine/data/*.db
+backend/priceengine/synthetic_hotel_pricing.csv

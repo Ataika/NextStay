@@ -11,6 +11,9 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { path: "/admin", label: "Rooms", roles: ["OWNER"] },
   { path: "/bookings", label: "Bookings", roles: ["OWNER"] },
+  { path: "/pricing-lab", label: "Pricing Lab", roles: ["OWNER"] },
+  { path: "/model-training", label: "Model Training", roles: ["OWNER"] },
+  { path: "/engine-tuning", label: "Engine Tuning", roles: ["OWNER"] },
   { path: "/staff", label: "Tasks", roles: ["STAFF"] },
   { path: "/reports", label: "Reports", roles: ["OWNER"] },
 ];

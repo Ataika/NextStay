@@ -2,9 +2,12 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.bookings import router as bookings_router
 from app.api.v1.guest import router as guest_router
 from app.api.v1.health import router as health_router
+from app.api.v1.pricing_config import router as pricing_config_router
+from app.api.v1.pricing_lab import router as pricing_lab_router
 from app.api.v1.rooms import router as rooms_router
 from app.api.v1.stripe import router as stripe_router
 from app.api.v1.tasks import router as tasks_router
+from app.api.v1.training import router as training_router
 from app.exceptions import register_exception_handlers
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,5 +42,8 @@ app.include_router(bookings_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(guest_router, prefix="/api/v1")
 app.include_router(stripe_router, prefix="/api/v1")
+app.include_router(pricing_lab_router, prefix="/api/v1")
+app.include_router(training_router, prefix="/api/v1")
+app.include_router(pricing_config_router, prefix="/api/v1")
 
 register_exception_handlers(app)

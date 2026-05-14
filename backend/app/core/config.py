@@ -47,3 +47,13 @@ OTP_RESEND_SECONDS = int(os.getenv("OTP_RESEND_SECONDS", "60"))
 OTP_SECRET = os.getenv("OTP_SECRET", "change-me-in-production")
 AUTH_JWT_SECRET = os.getenv("AUTH_JWT_SECRET", "change-me-in-production")
 AUTH_TOKEN_EXPIRES_MINUTES = int(os.getenv("AUTH_TOKEN_EXPIRES_MINUTES", "720"))
+
+# Local dev owner token bridge
+DEV_OWNER_TOKEN_ENABLED = (
+    os.getenv("DEV_OWNER_TOKEN_ENABLED", os.getenv("PRICING_LAB_ALLOW_DEV_TOKEN", "true")).strip().lower() == "true"
+)
+DEV_OWNER_TOKEN = os.getenv("DEV_OWNER_TOKEN", os.getenv("PRICING_LAB_DEV_TOKEN", "mock-admin-token"))
+
+# Pricing lab dev access remains aliased to the shared dev owner token
+PRICING_LAB_ALLOW_DEV_TOKEN = DEV_OWNER_TOKEN_ENABLED
+PRICING_LAB_DEV_TOKEN = DEV_OWNER_TOKEN

@@ -1,21 +1,58 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { authApi } from "../api/api";
+import { authApi, devLoginConfig } from "../api/api";
 import { useAuthStore } from "../store/authStore";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(devLoginConfig.email);
+  const [password, setPassword] = useState(devLoginConfig.password);
   const [otpCode, setOtpCode] = useState("");
   const [error, setError] = useState("");
   const [step, setStep] = useState<"email" | "otp">("email");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const token = useAuthStore((s) => s.token);
+  const role = useAuthStore((s) => s.role);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const autoLoginAttemptedRef = useRef(false);
 
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const redirectAfterLogin = (userRole: "OWNER" | "STAFF") => {
+    if (userRole === "OWNER") {
+      navigate("/admin");
+      return;
+    }
+
+    if (userRole === "STAFF") {
+      navigate("/staff");
+      return;
+    }
+
+    navigate("/login");
+  };
+
+  const handleDevLogin = async (loginEmail = email, loginPassword = password) => {
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await authApi.devLogin(loginEmail, loginPassword);
+      setAuth(response.token, response.role);
+      redirectAfterLogin(response.role);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        err?.message ||
+        "Failed to login with password";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestOtp = async () => {
     setError("");
     setLoading(true);
 
@@ -38,23 +75,14 @@ export default function LoginPage() {
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleVerifyOtp = async () => {
     setError("");
     setLoading(true);
 
     try {
       const response = await authApi.verifyOtp(email, otpCode);
       setAuth(response.token, response.role);
-
-      // Redirect based on role
-      if (response.role === "OWNER") {
-        navigate("/admin");
-      } else if (response.role === "STAFF") {
-        navigate("/staff");
-      } else {
-        navigate("/login");
-      }
+      redirectAfterLogin(response.role);
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
@@ -67,6 +95,15 @@ export default function LoginPage() {
     }
   };
 
+  useEffect(() => {
+    if (!devLoginConfig.autoLoginEnabled || autoLoginAttemptedRef.current || token || role) {
+      return;
+    }
+
+    autoLoginAttemptedRef.current = true;
+    void handleDevLogin(devLoginConfig.email, devLoginConfig.password);
+  }, [role, token]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
       <Card className="w-full max-w-md lg:max-w-lg xl:max-w-xl space-y-8" padding="lg">
@@ -75,10 +112,30 @@ export default function LoginPage() {
             NextStay
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            {step === "email" ? "Enter your email to receive OTP" : "Enter the 6-digit OTP sent to your email"}
+            {step === "email"
+              ? devLoginConfig.enabled
+                ? "Use your saved dev password or request OTP"
+                : "Enter your email to receive OTP"
+              : "Enter the 6-digit OTP sent to your email"}
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={step === "email" ? handleRequestOtp : handleVerifyOtp}>
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (step === "otp") {
+              void handleVerifyOtp();
+              return;
+            }
+
+            if (devLoginConfig.enabled) {
+              void handleDevLogin();
+              return;
+            }
+
+            void handleRequestOtp();
+          }}
+        >
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
               {error}
@@ -101,6 +158,23 @@ export default function LoginPage() {
                 disabled={step === "otp"}
               />
             </div>
+            {step === "email" && devLoginConfig.enabled && (
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
+                  placeholder="Enter password"
+                />
+              </div>
+            )}
             {step === "otp" && (
               <div>
                 <label htmlFor="otp" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -129,10 +203,32 @@ export default function LoginPage() {
               disabled={loading}
             >
               {loading
-                ? step === "email" ? "Sending OTP..." : "Verifying..."
-                : step === "email" ? "Send OTP" : "Verify OTP"}
+                ? step === "email"
+                  ? devLoginConfig.enabled
+                    ? "Signing in..."
+                    : "Sending OTP..."
+                  : "Verifying..."
+                : step === "email"
+                  ? devLoginConfig.enabled
+                    ? "Login with Password"
+                    : "Send OTP"
+                  : "Verify OTP"}
             </Button>
           </div>
+
+          {step === "email" && devLoginConfig.enabled && (
+            <Button
+              type="button"
+              variant="secondary"
+              fullWidth
+              disabled={loading}
+              onClick={() => {
+                void handleRequestOtp();
+              }}
+            >
+              Send OTP Instead
+            </Button>
+          )}
 
           {step === "otp" && (
             <Button
