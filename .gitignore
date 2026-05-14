@@ -27,3 +27,20 @@ docker-compose.override.yml
 .env
 analytics/logs/
 analytics/target/
+
+# --- Data migration ---
+scripts/data/dumps/
+
+.cache/
+pip/
+
+analytics/superset/.cache/
+
+# --- PriceEngine generated artifacts ---
+backend/priceengine/outputs/
+backend/priceengine/artifacts/*.pkl
+backend/priceengine/artifacts/hotel_*/
+backend/priceengine/data/*.db
+backend/priceengine/data/*.db-shm
+backend/priceengine/data/*.db-wal
+backend/priceengine/synthetic_hotel_pricing.csv

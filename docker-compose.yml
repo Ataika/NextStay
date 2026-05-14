@@ -20,18 +20,37 @@ services:
 
   backend:
     build:
-      context: ./backend # Docker заглянет в папку backend и найдет там Dockerfile
+      context: ./backend # Docker will look in the backend folder and find the Dockerfile there
     container_name: nextstay_backend
     restart: always
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
         condition: service_healthy
+
+  frontend:
+    image: node:20-alpine
+    container_name: nextstay_frontend
+    working_dir: /app
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    environment:
+      VITE_USE_MOCK_API: ${VITE_USE_MOCK_API:-false}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api/v1}
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    depends_on:
+      - backend
 
   airflow:
     image: apache/airflow:2.7.1-python3.10
@@ -43,7 +62,7 @@ services:
     volumes:
       - ./analytics/dags:/opt/airflow/dags
       - ./analytics/dbt:/opt/airflow/dbt
-      - ./analytics/profiles.yml:/opt/airflow/dbt/profiles.yml # Пробрасываем профиль из analytics
+      - ./analytics/profiles.yml:/opt/airflow/dbt/profiles.yml # Pass the profile from analytics
       - ./scripts:/opt/airflow/scripts
     ports:
       - "8080:8080"
@@ -72,7 +91,7 @@ services:
     container_name: nextstay_dbt
     tty: true
     stdin_open: true
-    # Мы убираем упоминание dbt из команды, чтобы запускался чистый Bash/Sleep
+    # We remove the dbt mention from the command so that the clean Bash/Sleep is run
     entrypoint: /bin/bash
     command: -c "sleep infinity"
     volumes:
@@ -85,4 +104,6 @@ services:
         condition: service_healthy
 volumes:
   nextstay_data_v2:
+    external: false
+  frontend_node_modules:
     external: false

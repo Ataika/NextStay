@@ -1,0 +1,21 @@
+{
+  "config_version": "serving_config_v1",
+  "champion_model": {
+    "model_path": "artifacts/champion_model.pkl",
+    "metadata_path": "artifacts/champion_model_metadata.json",
+    "fallback_model_path": "artifacts/logistic_regression.pkl",
+    "fallback_metadata_path": "artifacts/logistic_regression_metadata.json"
+  },
+  "fallback": {
+    "enabled": true,
+    "strategy": "previous_price_then_base",
+    "apply_rules": true
+  },
+  "rollout": {
+    "enabled": true,
+    "traffic_fraction": 0.5,
+    "hotel_allowlist": [1, 2],
+    "segment_allowlist": ["budget_city", "business"],
+    "seed": 42
+  }
+}

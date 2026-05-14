@@ -1,0 +1,68 @@
+{
+  "model_name": "global_booking_model_v1",
+  "schema_version": "feature_schema_v1",
+  "trained_at_utc": "2026-03-25T15:00:59.310384",
+  "target_column": "booking_made",
+  "feature_columns": [
+    "hotel_id",
+    "hotel_segment",
+    "room_type_id",
+    "room_type_name",
+    "day_of_week",
+    "season",
+    "lead_time",
+    "occupancy_rate",
+    "available_rooms",
+    "month",
+    "is_weekend",
+    "is_holiday",
+    "base_price",
+    "offered_price",
+    "total_inventory",
+    "booked_rooms",
+    "max_occupancy",
+    "refundable_rate_flag",
+    "breakfast_included_flag",
+    "competitor_price",
+    "event_score",
+    "search_volume",
+    "sea_view_flag",
+    "balcony_flag",
+    "amenity_score",
+    "location_demand_index",
+    "competitor_price_missing_flag",
+    "event_score_missing_flag",
+    "search_volume_missing_flag",
+    "sea_view_flag_missing_flag",
+    "balcony_flag_missing_flag",
+    "amenity_score_missing_flag",
+    "location_demand_index_missing_flag"
+  ],
+  "row_counts": {
+    "total": 131760,
+    "train": 91500,
+    "validation": 20496,
+    "test": 19764
+  },
+  "date_ranges": {
+    "train_start": "2026-01-01 00:00:00",
+    "train_end": "2026-05-05 00:00:00",
+    "validation_start": "2026-05-06 00:00:00",
+    "validation_end": "2026-06-02 00:00:00",
+    "test_start": "2026-06-03 00:00:00",
+    "test_end": "2026-06-29 00:00:00"
+  },
+  "metrics": {
+    "validation": {
+      "log_loss": 0.628913180127419,
+      "brier_score": 0.21965906066889224,
+      "roc_auc": 0.6679539417144474
+    },
+    "test": {
+      "log_loss": 0.6468793492244472,
+      "brier_score": 0.22786319913802155,
+      "roc_auc": 0.6402241176671847
+    }
+  },
+  "notes": "Optional features are handled with NaN imputation + missing flags so one global schema works across heterogeneous hotels."
+}

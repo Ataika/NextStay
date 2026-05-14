@@ -1,0 +1,52 @@
+{
+  "model_name": "random_forest",
+  "schema_version": "feature_schema_v1",
+  "trained_at_utc": "2026-03-25T15:28:53.409201",
+  "feature_columns": [
+    "hotel_id",
+    "hotel_segment",
+    "room_type_id",
+    "room_type_name",
+    "day_of_week",
+    "season",
+    "lead_time",
+    "occupancy_rate",
+    "available_rooms",
+    "month",
+    "is_weekend",
+    "is_holiday",
+    "base_price",
+    "offered_price",
+    "total_inventory",
+    "booked_rooms",
+    "max_occupancy",
+    "refundable_rate_flag",
+    "breakfast_included_flag",
+    "competitor_price",
+    "event_score",
+    "search_volume",
+    "sea_view_flag",
+    "balcony_flag",
+    "amenity_score",
+    "location_demand_index",
+    "competitor_price_missing_flag",
+    "event_score_missing_flag",
+    "search_volume_missing_flag",
+    "sea_view_flag_missing_flag",
+    "balcony_flag_missing_flag",
+    "amenity_score_missing_flag",
+    "location_demand_index_missing_flag"
+  ],
+  "metrics": {
+    "validation": {
+      "log_loss": 0.6298236968122802,
+      "brier_score": 0.22126206028211978,
+      "roc_auc": 0.6584250918518089
+    },
+    "test": {
+      "log_loss": 0.6452730435149532,
+      "brier_score": 0.228771173378412,
+      "roc_auc": 0.6281287802709616
+    }
+  }
+}

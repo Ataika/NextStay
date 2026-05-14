@@ -1,0 +1,63 @@
+{
+  "schema_version": "feature_schema_v1",
+  "target_column": "booking_made",
+  "date_columns": [
+    "snapshot_date",
+    "stay_date"
+  ],
+  "required_identifier_columns": [
+    "hotel_id",
+    "hotel_segment",
+    "room_type_id",
+    "room_type_name"
+  ],
+  "required_feature_columns": [
+    "lead_time",
+    "occupancy_rate",
+    "available_rooms",
+    "day_of_week",
+    "month",
+    "season",
+    "is_weekend",
+    "is_holiday",
+    "base_price",
+    "offered_price",
+    "total_inventory",
+    "booked_rooms",
+    "max_occupancy",
+    "refundable_rate_flag",
+    "breakfast_included_flag"
+  ],
+  "optional_feature_columns": [
+    "competitor_price",
+    "event_score",
+    "search_volume",
+    "sea_view_flag",
+    "balcony_flag",
+    "amenity_score",
+    "location_demand_index"
+  ],
+  "categorical_feature_columns": [
+    "hotel_id",
+    "hotel_segment",
+    "room_type_id",
+    "room_type_name",
+    "day_of_week",
+    "season"
+  ],
+  "numeric_feature_columns": [
+    "lead_time",
+    "occupancy_rate",
+    "available_rooms",
+    "month",
+    "is_weekend",
+    "is_holiday",
+    "base_price",
+    "offered_price",
+    "total_inventory",
+    "booked_rooms",
+    "max_occupancy",
+    "refundable_rate_flag",
+    "breakfast_included_flag"
+  ]
+}
