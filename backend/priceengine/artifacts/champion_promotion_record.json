@@ -1,0 +1,8 @@
+{
+  "promoted_model": "logistic_regression",
+  "source_model": "artifacts/logistic_regression.pkl",
+  "source_metadata": "artifacts/logistic_regression_metadata.json",
+  "champion_model": "artifacts/champion_model.pkl",
+  "champion_metadata": "artifacts/champion_model_metadata.json",
+  "selection_metric": "best_average_rank_across_log_loss_brier_roc_auc"
+}

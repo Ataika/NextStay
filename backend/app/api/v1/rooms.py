@@ -6,7 +6,7 @@ from app.models.room import Room as RoomModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["rooms"])
@@ -48,6 +48,11 @@ class RoomUpdate(BaseModel):
 
 class Room(RoomBase):
     id: int
+    dynamicPrice: float | None = None
+    priceSource: str | None = None
+    pricingStayDate: str | None = None
+    pricingSnapshotDate: str | None = None
+    pricingStatus: str | None = None
 
     class Config:
         from_attributes = True
@@ -73,6 +78,74 @@ class AvailabilityResponse(BaseModel):
     availableRooms: list[AvailableRoomResponse]
     checkIn: str
     checkOut: str
+
+
+def normalize_room_type_name(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def load_latest_room_pricing(db: Session) -> dict[str, dict]:
+    rows = db.execute(
+        text(
+            """
+            WITH latest_room_type_prices AS (
+                SELECT DISTINCT ON (ctx.room_type_name)
+                    ctx.room_type_name,
+                    pub.final_price,
+                    pub.stay_date,
+                    pub.snapshot_date,
+                    pub.inference_status
+                FROM pricing.published_prices pub
+                INNER JOIN pricing.inventory_snapshots ctx
+                    ON ctx.hotel_id = pub.hotel_id
+                   AND ctx.room_type_id = pub.room_type_id
+                   AND ctx.stay_date = pub.stay_date
+                   AND ctx.snapshot_date = pub.snapshot_date
+                ORDER BY
+                    ctx.room_type_name,
+                    pub.updated_at DESC,
+                    pub.snapshot_date DESC
+            )
+            SELECT
+                room_type_name,
+                final_price,
+                stay_date,
+                snapshot_date,
+                inference_status
+            FROM latest_room_type_prices
+            """
+        )
+    ).mappings()
+
+    return {
+        normalize_room_type_name(str(row["room_type_name"])): {
+            "dynamicPrice": float(row["final_price"]) if row["final_price"] is not None else None,
+            "priceSource": "model_room_type",
+            "pricingStayDate": row["stay_date"].isoformat() if row["stay_date"] else None,
+            "pricingSnapshotDate": row["snapshot_date"].isoformat() if row["snapshot_date"] else None,
+            "pricingStatus": row["inference_status"],
+        }
+        for row in rows
+    }
+
+
+def serialize_room(room: RoomModel, pricing_map: dict[str, dict] | None = None) -> Room:
+    pricing_info = (pricing_map or {}).get(normalize_room_type_name(room.category), {})
+    return Room(
+        id=room.id,
+        number=room.number,
+        category=room.category,
+        status=room.status,
+        price=room.price,
+        capacity=room.capacity,
+        description=room.description,
+        amenities=room.amenities if room.amenities else [],
+        dynamicPrice=pricing_info.get("dynamicPrice"),
+        priceSource=pricing_info.get("priceSource"),
+        pricingStayDate=pricing_info.get("pricingStayDate"),
+        pricingSnapshotDate=pricing_info.get("pricingSnapshotDate"),
+        pricingStatus=pricing_info.get("pricingStatus"),
+    )
 
 
 @router.get("/rooms/available", response_model=AvailabilityResponse)
@@ -175,7 +248,8 @@ def get_all_rooms(
 ):
     """Get all rooms"""
     rooms = db.query(RoomModel).all()
-    return rooms
+    pricing_map = load_latest_room_pricing(db)
+    return [serialize_room(room, pricing_map) for room in rooms]
 
 
 @router.get("/rooms/{room_id}", response_model=Room)
@@ -188,7 +262,8 @@ def get_room_by_id(
     room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
-    return room
+    pricing_map = load_latest_room_pricing(db)
+    return serialize_room(room, pricing_map)
 
 
 @router.post("/rooms", response_model=Room, status_code=201)
@@ -215,7 +290,8 @@ def create_room(
     db.add(db_room)
     db.commit()
     db.refresh(db_room)
-    return db_room
+    pricing_map = load_latest_room_pricing(db)
+    return serialize_room(db_room, pricing_map)
 
 
 @router.patch("/rooms/{room_id}", response_model=Room)
@@ -243,7 +319,8 @@ def update_room(
 
     db.commit()
     db.refresh(db_room)
-    return db_room
+    pricing_map = load_latest_room_pricing(db)
+    return serialize_room(db_room, pricing_map)
 
 
 @router.delete("/rooms/{room_id}", status_code=204)

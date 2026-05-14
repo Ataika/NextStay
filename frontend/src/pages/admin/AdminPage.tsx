@@ -110,6 +110,19 @@ export default function AdminPage() {
     };
   }, [rooms, tasks]);
 
+  const pricingSummary = useMemo(() => {
+    const pricedRooms = rooms.filter((room) => room.dynamicPrice !== null && room.dynamicPrice !== undefined);
+    if (pricedRooms.length === 0) {
+      return null;
+    }
+
+    return {
+      pricedRooms: pricedRooms.length,
+      stayDate: pricedRooms[0].pricingStayDate ?? null,
+      snapshotDate: pricedRooms[0].pricingSnapshotDate ?? null,
+    };
+  }, [rooms]);
+
   // Filtering rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
@@ -396,6 +409,13 @@ export default function AdminPage() {
             <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Cannot be sold</p>
           </div>
         </div>
+        {pricingSummary && (
+          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+            Predicted pricing is active on {pricingSummary.pricedRooms} rooms.
+            {pricingSummary.stayDate ? ` Stay date: ${pricingSummary.stayDate}.` : ""}
+            {pricingSummary.snapshotDate ? ` Snapshot date: ${pricingSummary.snapshotDate}.` : ""}
+          </div>
+        )}
       </Card>
 
       {/* Filters */}

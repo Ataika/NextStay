@@ -1,0 +1,63 @@
+{
+  "rules_version": "pricing_rules_v1",
+  "hotel_metadata": {
+    "budget_city": {
+      "hotel_name": "NextStay Budget City",
+      "timezone": "Europe/Rome",
+      "city": "Rome",
+      "country_code": "IT"
+    },
+    "business": {
+      "hotel_name": "NextStay Business Hub",
+      "timezone": "Europe/Rome",
+      "city": "Milan",
+      "country_code": "IT"
+    },
+    "beach_resort": {
+      "hotel_name": "NextStay Beach Resort",
+      "timezone": "Europe/Rome",
+      "city": "Bari",
+      "country_code": "IT"
+    },
+    "premium_luxury": {
+      "hotel_name": "NextStay Grand Collection",
+      "timezone": "Europe/Rome",
+      "city": "Venice",
+      "country_code": "IT"
+    }
+  },
+  "global": {
+    "candidate_price_steps_pct": [-0.2, -0.15, -0.1, -0.05, 0.0, 0.05, 0.1, 0.15, 0.2, 0.25],
+    "price_rounding_decimals": 2
+  },
+  "segments": {
+    "budget_city": {
+      "min_price": 45.0,
+      "max_price": 260.0,
+      "max_daily_change_pct": 0.15,
+      "weekend_min_multiplier": 1.01,
+      "holiday_min_multiplier": 1.04
+    },
+    "business": {
+      "min_price": 70.0,
+      "max_price": 420.0,
+      "max_daily_change_pct": 0.13,
+      "weekend_min_multiplier": 1.0,
+      "holiday_min_multiplier": 1.05
+    },
+    "beach_resort": {
+      "min_price": 90.0,
+      "max_price": 620.0,
+      "max_daily_change_pct": 0.12,
+      "weekend_min_multiplier": 1.03,
+      "holiday_min_multiplier": 1.08
+    },
+    "premium_luxury": {
+      "min_price": 160.0,
+      "max_price": 1300.0,
+      "max_daily_change_pct": 0.1,
+      "weekend_min_multiplier": 1.04,
+      "holiday_min_multiplier": 1.1
+    }
+  }
+}

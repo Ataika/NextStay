@@ -4,6 +4,11 @@ export interface Room {
   category: string;
   status: "Available" | "Occupied" | "Dirty" | "Maintenance" | "Cleaning";
   price: number;
+  dynamicPrice?: number | null;
+  priceSource?: string | null;
+  pricingStayDate?: string | null;
+  pricingSnapshotDate?: string | null;
+  pricingStatus?: string | null;
   capacity: number;
   description?: string;
   amenities?: string[];

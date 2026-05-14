@@ -9,6 +9,7 @@ export default function AppLayout() {
 
   const mobileNavItems = [
     { path: "/admin", label: "Rooms", roles: ["OWNER"] },
+    { path: "/pricing-lab", label: "Pricing", roles: ["OWNER"] },
     { path: "/staff", label: "Tasks", roles: ["STAFF"] },
     { path: "/reports", label: "Reports", roles: ["OWNER"] },
   ].filter((item) => !role || item.roles.includes(role));

@@ -8,6 +8,9 @@ import BookingSuccessPage from "../pages/booking/BookingSuccessPage";
 import BookingCancelPage from "../pages/booking/BookingCancelPage";
 import ReportsPage from "../pages/reports/ReportsPage";
 import BookingsPage from "../pages/admin/BookingsPage";
+import PricingLabPage from "../pages/admin/PricingLabPage";
+import ModelTrainingPage from "../pages/admin/ModelTrainingPage";
+import PricingConfigPage from "../pages/admin/PricingConfigPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -54,6 +57,30 @@ export default function AppRouter() {
             element={
               <ProtectedRoute requiredRole="OWNER">
                 <BookingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pricing-lab"
+            element={
+              <ProtectedRoute requiredRole="OWNER">
+                <PricingLabPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/model-training"
+            element={
+              <ProtectedRoute requiredRole="OWNER">
+                <ModelTrainingPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/engine-tuning"
+            element={
+              <ProtectedRoute requiredRole="OWNER">
+                <PricingConfigPage />
               </ProtectedRoute>
             }
           />

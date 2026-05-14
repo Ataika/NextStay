@@ -12,6 +12,8 @@
 CREATE SCHEMA IF NOT EXISTS stg;
 CREATE SCHEMA IF NOT EXISTS core;
 CREATE SCHEMA IF NOT EXISTS mart;
+CREATE SCHEMA IF NOT EXISTS ml;
+CREATE SCHEMA IF NOT EXISTS pricing;
 
 -- ------------------------------------------
 -- 1) Service & Developer Roles
@@ -36,12 +38,16 @@ GRANT USAGE ON SCHEMA public TO superset_ro;
 GRANT USAGE ON SCHEMA stg TO superset_ro;
 GRANT USAGE ON SCHEMA core TO superset_ro;
 GRANT USAGE ON SCHEMA mart TO superset_ro;
+GRANT USAGE ON SCHEMA ml TO superset_ro;
+GRANT USAGE ON SCHEMA pricing TO superset_ro;
 
 -- Default read access for Superset on all schemas
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO superset_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA stg GRANT SELECT ON TABLES TO superset_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA core GRANT SELECT ON TABLES TO superset_ro;
 ALTER DEFAULT PRIVILEGES IN SCHEMA mart GRANT SELECT ON TABLES TO superset_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA ml GRANT SELECT ON TABLES TO superset_ro;
+ALTER DEFAULT PRIVILEGES IN SCHEMA pricing GRANT SELECT ON TABLES TO superset_ro;
 
 -- ------------------------------------------
 -- 2) OLTP LAYER (Application Source of Truth)
@@ -317,6 +323,213 @@ CREATE TABLE IF NOT EXISTS core.fact_bookings (
     total_amount DECIMAL(12, 2)
 );
 
+CREATE TABLE IF NOT EXISTS core.dim_hotels (
+    hotel_sk SERIAL PRIMARY KEY,
+    hotel_id INT NOT NULL,
+    hotel_name VARCHAR(120) NOT NULL,
+    hotel_segment VARCHAR(50) NOT NULL,
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Rome',
+    city VARCHAR(100),
+    country_code VARCHAR(2) NOT NULL DEFAULT 'IT',
+    valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    valid_to TIMESTAMPTZ,
+    is_current BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dim_hotels_hotel_id_current
+    ON core.dim_hotels(hotel_id, is_current);
+
+CREATE TABLE IF NOT EXISTS core.dim_room_types (
+    room_type_sk SERIAL PRIMARY KEY,
+    room_type_id INT NOT NULL,
+    hotel_sk INT NOT NULL REFERENCES core.dim_hotels(hotel_sk) ON DELETE CASCADE,
+    room_type_name VARCHAR(100) NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    max_occupancy INT NOT NULL,
+    base_price_default DECIMAL(10, 2) NOT NULL,
+    sea_view_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    balcony_flag BOOLEAN NOT NULL DEFAULT FALSE,
+    amenity_score DECIMAL(10, 2),
+    is_current BOOLEAN NOT NULL DEFAULT TRUE,
+    valid_from TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    valid_to TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_dim_room_types_hotel_room_type
+    ON core.dim_room_types(hotel_sk, room_type_id, is_current);
+
+CREATE TABLE IF NOT EXISTS core.fact_pricing_snapshots (
+    snapshot_sk BIGSERIAL PRIMARY KEY,
+    hotel_sk INT NOT NULL REFERENCES core.dim_hotels(hotel_sk),
+    room_type_sk INT NOT NULL REFERENCES core.dim_room_types(room_type_sk),
+    snapshot_date_sk INT NOT NULL REFERENCES core.dim_dates(date_sk),
+    stay_date_sk INT NOT NULL REFERENCES core.dim_dates(date_sk),
+    lead_time INT NOT NULL,
+    total_inventory INT NOT NULL,
+    booked_rooms INT NOT NULL,
+    available_rooms INT NOT NULL,
+    occupancy_rate DECIMAL(8, 4) NOT NULL,
+    base_price DECIMAL(10, 2) NOT NULL,
+    offered_price DECIMAL(10, 2) NOT NULL,
+    final_price DECIMAL(10, 2),
+    booking_made SMALLINT NOT NULL DEFAULT 0,
+    rooms_booked INT NOT NULL DEFAULT 0,
+    cancellation SMALLINT NOT NULL DEFAULT 0,
+    refundable_rate_flag SMALLINT NOT NULL DEFAULT 0,
+    breakfast_included_flag SMALLINT NOT NULL DEFAULT 0,
+    competitor_price DECIMAL(10, 2),
+    event_score DECIMAL(10, 2),
+    search_volume DECIMAL(12, 2),
+    location_demand_index DECIMAL(12, 2),
+    is_holiday SMALLINT NOT NULL DEFAULT 0,
+    source_batch_id VARCHAR(80) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_fact_pricing_snapshots_lookup
+    ON core.fact_pricing_snapshots(hotel_sk, room_type_sk, stay_date_sk, snapshot_date_sk);
+
+CREATE INDEX IF NOT EXISTS idx_fact_pricing_snapshots_batch
+    ON core.fact_pricing_snapshots(source_batch_id);
+
+CREATE TABLE IF NOT EXISTS ml.pricingdata (
+    hotel_id INT NOT NULL,
+    hotel_segment VARCHAR(50) NOT NULL,
+    room_type_id INT NOT NULL,
+    room_type_name VARCHAR(100) NOT NULL,
+    snapshot_date DATE NOT NULL,
+    stay_date DATE NOT NULL,
+    lead_time INT NOT NULL,
+    day_of_week VARCHAR(20) NOT NULL,
+    week_of_year INT NOT NULL,
+    month INT NOT NULL,
+    year INT NOT NULL,
+    season VARCHAR(20) NOT NULL,
+    is_weekend SMALLINT NOT NULL,
+    is_holiday SMALLINT NOT NULL,
+    total_inventory INT NOT NULL,
+    booked_rooms INT NOT NULL,
+    available_rooms INT NOT NULL,
+    occupancy_rate DECIMAL(8, 4) NOT NULL,
+    base_price DECIMAL(10, 2) NOT NULL,
+    offered_price DECIMAL(10, 2) NOT NULL,
+    final_price DECIMAL(10, 2),
+    booking_made SMALLINT NOT NULL DEFAULT 0,
+    rooms_booked INT NOT NULL DEFAULT 0,
+    cancellation SMALLINT NOT NULL DEFAULT 0,
+    max_occupancy INT NOT NULL,
+    refundable_rate_flag SMALLINT NOT NULL DEFAULT 0,
+    breakfast_included_flag SMALLINT NOT NULL DEFAULT 0,
+    competitor_price DECIMAL(10, 2),
+    event_score DECIMAL(10, 2),
+    search_volume DECIMAL(12, 2),
+    sea_view_flag SMALLINT,
+    balcony_flag SMALLINT,
+    amenity_score DECIMAL(10, 2),
+    location_demand_index DECIMAL(12, 2),
+    feature_schema_version VARCHAR(50) NOT NULL,
+    source_batch_id VARCHAR(80) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_pricingdata_lookup
+    ON ml.pricingdata(hotel_id, room_type_id, stay_date, snapshot_date);
+
+CREATE INDEX IF NOT EXISTS idx_ml_pricingdata_batch
+    ON ml.pricingdata(source_batch_id);
+
+CREATE TABLE IF NOT EXISTS pricing.inventory_snapshots (
+    hotel_id INT NOT NULL,
+    hotel_segment VARCHAR(50) NOT NULL,
+    room_type_id INT NOT NULL,
+    room_type_name VARCHAR(100) NOT NULL,
+    snapshot_date DATE NOT NULL,
+    stay_date DATE NOT NULL,
+    lead_time INT NOT NULL,
+    day_of_week VARCHAR(20),
+    month INT,
+    season VARCHAR(20),
+    is_weekend SMALLINT,
+    is_holiday SMALLINT,
+    total_inventory INT,
+    booked_rooms INT,
+    available_rooms INT,
+    occupancy_rate DECIMAL(8, 4),
+    base_price DECIMAL(10, 2),
+    offered_price DECIMAL(10, 2),
+    final_price DECIMAL(10, 2),
+    booking_made SMALLINT,
+    rooms_booked INT,
+    cancellation SMALLINT,
+    max_occupancy INT,
+    refundable_rate_flag SMALLINT,
+    breakfast_included_flag SMALLINT,
+    competitor_price DECIMAL(10, 2),
+    event_score DECIMAL(10, 2),
+    search_volume DECIMAL(12, 2),
+    sea_view_flag DECIMAL(10, 2),
+    balcony_flag DECIMAL(10, 2),
+    amenity_score DECIMAL(10, 2),
+    location_demand_index DECIMAL(12, 2),
+    source_batch_id VARCHAR(80) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_lookup
+    ON pricing.inventory_snapshots(hotel_id, room_type_id, stay_date, snapshot_date);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_snapshots_batch
+    ON pricing.inventory_snapshots(source_batch_id);
+
+CREATE TABLE IF NOT EXISTS pricing.price_decisions (
+    hotel_id INT NOT NULL,
+    room_type_id INT NOT NULL,
+    stay_date DATE NOT NULL,
+    snapshot_date DATE NOT NULL,
+    offered_price DECIMAL(10, 2) NOT NULL,
+    predicted_probability DECIMAL(10, 6) NOT NULL,
+    expected_revenue DECIMAL(12, 4) NOT NULL,
+    booking_made SMALLINT,
+    cancellation SMALLINT,
+    optimized_price DECIMAL(10, 2) NOT NULL,
+    optimized_probability DECIMAL(10, 6) NOT NULL,
+    optimized_expected_revenue DECIMAL(12, 4) NOT NULL,
+    rule_adjustments TEXT,
+    model_version VARCHAR(120) NOT NULL,
+    rules_version VARCHAR(120) NOT NULL,
+    in_rollout SMALLINT,
+    inference_status VARCHAR(40),
+    fallback_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    source_batch_id VARCHAR(80)
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_decisions_lookup
+    ON pricing.price_decisions(hotel_id, room_type_id, stay_date, snapshot_date);
+
+CREATE INDEX IF NOT EXISTS idx_price_decisions_batch
+    ON pricing.price_decisions(source_batch_id);
+
+CREATE TABLE IF NOT EXISTS pricing.published_prices (
+    hotel_id INT NOT NULL,
+    room_type_id INT NOT NULL,
+    stay_date DATE NOT NULL,
+    snapshot_date DATE NOT NULL,
+    final_price DECIMAL(10, 2) NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    in_rollout SMALLINT,
+    inference_status VARCHAR(40),
+    model_version VARCHAR(120),
+    rules_version VARCHAR(120),
+    source_batch_id VARCHAR(80)
+);
+
+CREATE INDEX IF NOT EXISTS idx_published_prices_lookup
+    ON pricing.published_prices(hotel_id, room_type_id, stay_date, snapshot_date);
+
+CREATE INDEX IF NOT EXISTS idx_published_prices_batch
+    ON pricing.published_prices(source_batch_id);
+
 -- ------------------------------------------
 -- 6) MART (Analytical / BI)
 -- ------------------------------------------
@@ -345,8 +558,63 @@ CREATE TABLE IF NOT EXISTS mart.revpar_daily (
 );
 
 -- ------------------------------------------
+-- 7) PER-HOTEL ML TRAINING TABLES
+-- ------------------------------------------
+
+-- Registry of trained per-hotel model artifacts.
+-- The batch runner queries this to find the active model for each hotel.
+CREATE TABLE IF NOT EXISTS pricing.hotel_model_registry (
+    id SERIAL PRIMARY KEY,
+    hotel_id INT NOT NULL,
+    model_version VARCHAR(120) NOT NULL,
+    model_path TEXT NOT NULL,
+    metadata_path TEXT,
+    schema_version VARCHAR(50),
+    metrics_json JSONB,
+    is_active BOOLEAN NOT NULL DEFAULT FALSE,
+    row_count INT,
+    notes TEXT,
+    trained_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_hotel_model_registry_hotel
+    ON pricing.hotel_model_registry(hotel_id, is_active);
+
+-- Async training job tracker — frontend polls this for status.
+CREATE TABLE IF NOT EXISTS pricing.training_jobs (
+    id SERIAL PRIMARY KEY,
+    hotel_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    triggered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    error_message TEXT,
+    dataset_row_count INT,
+    model_version VARCHAR(120),
+    model_registry_id INT REFERENCES pricing.hotel_model_registry(id),
+    config_json JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT training_jobs_status_chk CHECK (status IN ('pending', 'running', 'completed', 'failed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_training_jobs_hotel
+    ON pricing.training_jobs(hotel_id, status);
+
+-- Per-hotel business rule overrides (min/max price, multipliers, rollout fraction).
+-- Falls back to global defaults when no row exists for a hotel.
+CREATE TABLE IF NOT EXISTS pricing.hotel_pricing_config (
+    hotel_id INT PRIMARY KEY,
+    config_json JSONB NOT NULL,
+    config_version VARCHAR(50) NOT NULL DEFAULT 'v1',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by VARCHAR(120)
+);
+
+-- ------------------------------------------
 -- Notes:
 -- - init-db.sql runs only on the first DB container start (volume creation).
 -- - Re-apply manually if you need to refresh schemas:
 --   docker exec -i nextstay_db_clean psql -U nextstay -d nextstay < scripts/init-db.sql
+-- - For existing DBs, run: scripts/migrate_add_training_tables.sql
 -- ------------------------------------------
