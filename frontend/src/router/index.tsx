@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import AdminPage from "../pages/admin/AdminPage";
 import StaffPage from "../pages/staff/StaffPage";
+import ShiftStartPage from "../pages/staff/ShiftStartPage";
 import GuestPage from "../pages/guest/GuestPage";
 import BookingPage from "../pages/booking/BookingPage";
 import BookingSuccessPage from "../pages/booking/BookingSuccessPage";
@@ -11,6 +12,10 @@ import BookingsPage from "../pages/admin/BookingsPage";
 import PricingLabPage from "../pages/admin/PricingLabPage";
 import ModelTrainingPage from "../pages/admin/ModelTrainingPage";
 import PricingConfigPage from "../pages/admin/PricingConfigPage";
+import InventorySetupPage from "../pages/admin/InventorySetupPage";
+import EngineHubPage from "../pages/admin/EngineHubPage";
+import StaffPlannerPage from "../pages/admin/StaffPlannerPage";
+import SettingsPage from "../pages/SettingsPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -31,7 +36,7 @@ export default function AppRouter() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
                 <AdminPage />
               </ProtectedRoute>
             }
@@ -39,15 +44,23 @@ export default function AppRouter() {
           <Route
             path="/staff"
             element={
-              <ProtectedRoute requiredRole="STAFF">
+              <ProtectedRoute allowedRoles={["STAFF"]}>
                 <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/shift-start"
+            element={
+              <ProtectedRoute allowedRoles={["STAFF"]}>
+                <ShiftStartPage />
               </ProtectedRoute>
             }
           />
           <Route
             path="/reports"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
                 <ReportsPage />
               </ProtectedRoute>
             }
@@ -55,7 +68,7 @@ export default function AppRouter() {
           <Route
             path="/bookings"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
                 <BookingsPage />
               </ProtectedRoute>
             }
@@ -63,7 +76,7 @@ export default function AppRouter() {
           <Route
             path="/pricing-lab"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
                 <PricingLabPage />
               </ProtectedRoute>
             }
@@ -71,7 +84,7 @@ export default function AppRouter() {
           <Route
             path="/model-training"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN"]}>
                 <ModelTrainingPage />
               </ProtectedRoute>
             }
@@ -79,8 +92,40 @@ export default function AppRouter() {
           <Route
             path="/engine-tuning"
             element={
-              <ProtectedRoute requiredRole="OWNER">
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN"]}>
                 <PricingConfigPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory-setup"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
+                <InventorySetupPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/engine"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
+                <EngineHubPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff-planner"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
+                <StaffPlannerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"]}>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />

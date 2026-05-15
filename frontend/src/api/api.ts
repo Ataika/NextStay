@@ -223,6 +223,11 @@ export const authApi = {
     };
   },
 
+  passwordLogin: async (email: string, password: string) => {
+    const response = await http.post("/auth/login", { email, password });
+    return response.data as { token: string; role: string; user: { id: number; email: string; name: string } };
+  },
+
   requestOtp: async (email: string) => {
     if (USE_MOCK_API) {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -258,6 +263,15 @@ export const authApi = {
       return;
     }
     await http.post("/auth/logout");
+  },
+
+  updateProfile: async (name: string) => {
+    const response = await http.patch("/auth/me", { name });
+    return response.data as { name: string; email: string };
+  },
+
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    await http.post("/auth/change-password", { currentPassword, newPassword });
   },
 };
 
@@ -467,6 +481,166 @@ export const pricingConfigApi = {
 // Pricing Lab API
 // This intentionally always uses the real backend so the owner can inspect
 // the Postgres-backed pricing pipeline even while other screens stay in mock mode.
+export interface SnapshotSummary {
+  snapshot_date: string;
+  days_ahead: number;
+  rooms_processed: number;
+  snapshots_written: number;
+  decisions_written: number;
+  model_used: string;
+  rows_by_category: Record<string, number>;
+}
+
+export const pricingPipelineApi = {
+  runSnapshot: async (daysAhead = 30): Promise<SnapshotSummary> => {
+    const response = await http.post("/pricing/run-snapshot", null, {
+      params: { days_ahead: daysAhead },
+    });
+    return response.data;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Staff API
+// ---------------------------------------------------------------------------
+
+export interface StaffMember {
+  id: number;
+  name: string;
+  role: string;
+  email: string | null;
+  phone: string | null;
+  hire_date: string | null;
+  is_active: boolean;
+  annual_days_off: number;
+  hours_this_month: number;
+  days_off_this_year: number;
+}
+
+export interface ShiftResponse {
+  id: number;
+  staff_id: number;
+  shift_date: string;
+  shift_type: string;
+  hours: number;
+  notes: string | null;
+}
+
+export const staffApi = {
+  list: async (): Promise<StaffMember[]> => {
+    const res = await http.get("/staff");
+    return res.data;
+  },
+
+  create: async (data: {
+    name: string;
+    role: string;
+    email?: string;
+    phone?: string;
+    hire_date?: string;
+    annual_days_off?: number;
+  }): Promise<StaffMember> => {
+    const res = await http.post("/staff", data);
+    return res.data;
+  },
+
+  update: async (id: number, data: {
+    name?: string;
+    role?: string;
+    email?: string;
+    phone?: string;
+    is_active?: boolean;
+    annual_days_off?: number;
+  }): Promise<StaffMember> => {
+    const res = await http.patch(`/staff/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await http.delete(`/staff/${id}`);
+  },
+
+  getSchedule: async (weekStart: string): Promise<ShiftResponse[]> => {
+    const res = await http.get("/staff/schedule", { params: { week_start: weekStart } });
+    return res.data;
+  },
+
+  upsertShift: async (staffId: number, shiftDate: string, shiftType: string): Promise<ShiftResponse> => {
+    const res = await http.put("/staff/schedule", {
+      staff_id: staffId,
+      shift_date: shiftDate,
+      shift_type: shiftType,
+    });
+    return res.data;
+  },
+
+  deleteShift: async (shiftId: number): Promise<void> => {
+    await http.delete(`/staff/schedule/${shiftId}`);
+  },
+
+  getMe: async (): Promise<StaffMember | null> => {
+    try {
+      const res = await http.get("/staff/me");
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  getMySchedule: async (weekStart: string): Promise<ShiftResponse[]> => {
+    const res = await http.get("/staff/my-schedule", { params: { week_start: weekStart } });
+    return res.data;
+  },
+
+  heartbeat: async (): Promise<void> => {
+    await http.post("/staff/heartbeat");
+  },
+
+  getShiftCode: async (): Promise<{ code: string; expires_in: number }> => {
+    const res = await http.get("/staff/shift-code");
+    return res.data;
+  },
+
+  startShift: async (code: string): Promise<{ started_at: string }> => {
+    const res = await http.post("/staff/shift-start", { code });
+    return res.data;
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Reservation Holds API
+// ---------------------------------------------------------------------------
+
+export interface HoldResponse {
+  id: number;
+  room_id: number;
+  check_in: string;
+  check_out: string;
+  session_id: string;
+  expires_at: string;
+}
+
+export const holdsApi = {
+  create: async (
+    roomId: number,
+    checkIn: string,
+    checkOut: string,
+    sessionId: string,
+  ): Promise<HoldResponse> => {
+    const response = await http.post("/holds", {
+      room_id: roomId,
+      check_in: checkIn,
+      check_out: checkOut,
+      session_id: sessionId,
+    });
+    return response.data;
+  },
+
+  release: async (holdId: number, sessionId: string): Promise<void> => {
+    await http.delete(`/holds/${holdId}?session_id=${encodeURIComponent(sessionId)}`);
+  },
+};
+
 export const pricingLabApi = {
   getPublished: async (hotelId?: number, stayDate?: string, limit = 50): Promise<PricingLabPublishedResponse> => {
     const response = await http.get("/pricing-lab/published", {
