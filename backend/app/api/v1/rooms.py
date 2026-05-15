@@ -218,8 +218,24 @@ def get_available_rooms(
     # Get IDs of rooms with conflicts
     conflicting_room_ids = {booking.room_id for booking in conflicting_bookings}
 
+    # Also exclude rooms currently held by any session
+    held_rows = db.execute(
+        text(
+            """
+            SELECT DISTINCT room_id FROM room_holds
+            WHERE expires_at > :now
+              AND check_in < :check_out
+              AND check_out > :check_in
+            """
+        ),
+        {"now": datetime.now(), "check_in": check_in_date, "check_out": check_out_date},
+    ).fetchall()
+    held_room_ids = {row[0] for row in held_rows}
+
     # Filter available rooms
-    available_rooms = [room for room in all_rooms if room.id not in conflicting_room_ids]
+    available_rooms = [
+        room for room in all_rooms if room.id not in conflicting_room_ids and room.id not in held_room_ids
+    ]
 
     # Form response
     available_rooms_response = [
@@ -244,7 +260,7 @@ def get_available_rooms(
 @router.get("/rooms", response_model=list[Room])
 def get_all_rooms(
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Get all rooms"""
     rooms = db.query(RoomModel).all()
@@ -256,7 +272,7 @@ def get_all_rooms(
 def get_room_by_id(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Get room by ID"""
     room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
@@ -270,7 +286,7 @@ def get_room_by_id(
 def create_room(
     room: RoomCreate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
     """Create a new room"""
     # Check if number is unique
@@ -299,7 +315,7 @@ def update_room(
     room_id: int,
     room_update: RoomUpdate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Update room"""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
@@ -327,7 +343,7 @@ def update_room(
 def delete_room(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
     """Delete room"""
     db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()

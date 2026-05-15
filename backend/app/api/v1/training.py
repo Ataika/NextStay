@@ -52,7 +52,7 @@ def _require_owner(
     if DEV_OWNER_TOKEN_ENABLED and credentials is not None and credentials.credentials == DEV_OWNER_TOKEN:
         return {"role": "OWNER"}
     user = get_current_user(credentials=credentials, db=db)
-    if user.role.upper() != "OWNER":
+    if user.role.upper() not in ("OWNER", "SYS_ADMIN"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
     return user
 
@@ -245,7 +245,7 @@ def _run_training(job_id: int, hotel_id: int, config: dict[str, Any], db_url: st
                     "INSERT INTO pricing.hotel_model_registry "
                     "    (hotel_id, model_version, model_path, metadata_path, "
                     "     schema_version, metrics_json, is_active, row_count) "
-                    "VALUES (:hid, :mv, :mp, :mtp, :sv, :mj::jsonb, FALSE, :rc) "
+                    "VALUES (:hid, :mv, :mp, :mtp, :sv, cast(:mj AS jsonb), FALSE, :rc) "
                     "RETURNING id"
                 ),
                 {
@@ -389,7 +389,7 @@ async def upload_and_train(
     result = db.execute(
         text(
             "INSERT INTO pricing.training_jobs (hotel_id, status, config_json) "
-            "VALUES (:hid, 'pending', :cfg::jsonb) "
+            "VALUES (:hid, 'pending', cast(:cfg AS jsonb)) "
             "RETURNING id, hotel_id, status, triggered_at, started_at, completed_at, "
             "          error_message, dataset_row_count, model_version, config_json"
         ),

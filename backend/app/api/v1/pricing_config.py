@@ -41,7 +41,7 @@ def _require_owner(
     if DEV_OWNER_TOKEN_ENABLED and credentials is not None and credentials.credentials == DEV_OWNER_TOKEN:
         return {"role": "OWNER"}
     user = get_current_user(credentials=credentials, db=db)
-    if user.role.upper() != "OWNER":
+    if user.role.upper() not in ("OWNER", "SYS_ADMIN"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
     return user
 
@@ -190,7 +190,7 @@ def update_hotel_config(
         text(
             "INSERT INTO pricing.hotel_pricing_config "
             "    (hotel_id, config_json, config_version, updated_at) "
-            "VALUES (:hid, :cfg::jsonb, 'v1', NOW()) "
+            "VALUES (:hid, cast(:cfg AS jsonb), 'v1', NOW()) "
             "ON CONFLICT (hotel_id) DO UPDATE "
             "SET config_json = EXCLUDED.config_json, updated_at = NOW()"
         ),
