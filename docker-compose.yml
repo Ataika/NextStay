@@ -4,16 +4,16 @@ services:
     container_name: nextstay_db_clean
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-nextstay}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-nextstay}
+      POSTGRES_DB: ${DB_NAME:-nextstay}
     ports:
       - "5433:5432"
     volumes:
       - nextstay_data_v2:/var/lib/postgresql/data
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nextstay} -d ${DB_NAME:-nextstay}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,7 +30,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      DATABASE_URL: postgresql://${DB_USER:-nextstay}:${DB_PASSWORD:-nextstay}@db:5432/${DB_NAME:-nextstay}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       db:
@@ -57,7 +57,7 @@ services:
     container_name: nextstay_airflow
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER:-nextstay}:${DB_PASSWORD:-nextstay}@db:5432/${DB_NAME:-nextstay}
       - DBT_PROFILES_DIR=/opt/airflow/dbt
     volumes:
       - ./analytics/dags:/opt/airflow/dags
@@ -80,7 +80,7 @@ services:
     volumes:
       - ./analytics/superset:/app/superset_home
     environment:
-      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-change-me-in-production}
     depends_on:
       db:
         condition: service_healthy
