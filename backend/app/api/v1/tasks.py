@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
 from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
@@ -10,8 +11,9 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["tasks"])
 
+ALL_ROLES = ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF")
 
-# Dependency to get the DB session
+
 def get_db():
     db = SessionLocal()
     try:
@@ -20,7 +22,6 @@ def get_db():
         db.close()
 
 
-# Pydantic models
 class TaskBase(BaseModel):
     roomId: int
     roomNumber: str
@@ -53,7 +54,6 @@ class Task(TaskBase):
 
     @classmethod
     def from_orm_with_dates(cls, obj: TaskModel):
-        """Converts ORM object to Pydantic model with correct date format"""
         return cls(
             id=obj.id,
             roomId=obj.room_id,
@@ -68,28 +68,24 @@ class Task(TaskBase):
         )
 
 
-# CRUD operations
 @router.get("/tasks", response_model=list[Task])
 def get_all_tasks(
     room_id: int | None = Query(None, alias="room_id"),
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Get all tasks or tasks by room"""
     query = db.query(TaskModel)
     if room_id:
         query = query.filter(TaskModel.room_id == room_id)
-    tasks = query.all()
-    return [Task.from_orm_with_dates(task) for task in tasks]
+    return [Task.from_orm_with_dates(t) for t in query.all()]
 
 
 @router.get("/tasks/{task_id}", response_model=Task)
 def get_task_by_id(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Get task by ID"""
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -100,23 +96,26 @@ def get_task_by_id(
 def create_task(
     task: TaskCreate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Create a new task and automatically change room status to Cleaning"""
-    # Check if room exists
+    """Create a cleaning task, change room to Cleaning, and auto-assign via round-robin."""
     room = db.query(RoomModel).filter(RoomModel.id == task.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    # Create task
+    staff_id, staff_name = round_robin_assign(db)
+
     db_task = TaskModel(
-        room_id=task.roomId, room_number=task.roomNumber, status="Pending", priority=task.priority, notes=task.notes
+        room_id=task.roomId,
+        room_number=task.roomNumber,
+        status="In Progress" if staff_id else "Pending",
+        priority=task.priority,
+        notes=task.notes,
+        assigned_to=staff_id,
+        assigned_to_name=staff_name,
     )
     db.add(db_task)
-
-    # Automatically change room status to "Cleaning"
     room.status = "Cleaning"
-
     db.commit()
     db.refresh(db_task)
     return Task.from_orm_with_dates(db_task)
@@ -127,9 +126,8 @@ def assign_task(
     task_id: int,
     assign_data: TaskAssign,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Assign task to staff"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -137,7 +135,6 @@ def assign_task(
     db_task.assigned_to = assign_data.staffId
     db_task.assigned_to_name = assign_data.staffName
     db_task.status = "In Progress"
-
     db.commit()
     db.refresh(db_task)
     return Task.from_orm_with_dates(db_task)
@@ -147,9 +144,9 @@ def assign_task(
 def complete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Complete cleaning task and automatically change room status to Available"""
+    """Complete cleaning task and set room back to Available."""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -157,10 +154,8 @@ def complete_task(
     db_task.status = "Completed"
     db_task.completed_at = datetime.now()
 
-    # Get room and change it to Available after cleaning is completed
     room = db.query(RoomModel).filter(RoomModel.id == db_task.room_id).first()
     if room:
-        # After cleaning is completed, room always goes to Available status
         room.status = "Available"
 
     db.commit()
@@ -172,9 +167,8 @@ def complete_task(
 def delete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "STAFF")),
+    _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Delete cleaning task"""
     db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")

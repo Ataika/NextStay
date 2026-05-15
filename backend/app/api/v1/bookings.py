@@ -1,15 +1,17 @@
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
+from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
 from app.models.room import Room as RoomModel
+from app.models.task import CleaningTask as TaskModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["bookings"])
@@ -42,9 +44,11 @@ class BookingCreate(BaseModel):
     roomNumber: str
     checkIn: str
     checkOut: str
-    status: str = "Pending"  # Changed default to Pending
+    status: str = "Pending"
     notes: str | None = None
     email: str | None = None
+    holdId: int | None = None
+    sessionId: str | None = None
 
 
 class BookingUpdate(BaseModel):
@@ -97,7 +101,7 @@ class Booking(BookingBase):
 @router.get("/bookings", response_model=list[Booking])
 def get_all_bookings(
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Get all bookings"""
     bookings = db.query(BookingModel).all()
@@ -108,7 +112,7 @@ def get_all_bookings(
 def get_booking_by_id(
     booking_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Get booking by ID"""
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
@@ -167,6 +171,34 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
 
     if conflicting_booking:
         raise HTTPException(status_code=400, detail="Room is already booked for the selected dates")
+
+    # Check for an active hold from a different session
+    now_utc = datetime.now(timezone.utc)
+    blocking_hold = db.execute(
+        text(
+            """
+            SELECT id FROM room_holds
+            WHERE room_id = :room_id
+              AND expires_at > :now
+              AND check_in < :check_out
+              AND check_out > :check_in
+              AND (:session_id IS NULL OR session_id != :session_id)
+            LIMIT 1
+            """
+        ),
+        {
+            "room_id": booking.roomId,
+            "now": now_utc,
+            "check_in": check_in,
+            "check_out": check_out,
+            "session_id": booking.sessionId,
+        },
+    ).fetchone()
+    if blocking_hold:
+        raise HTTPException(
+            status_code=409,
+            detail="Room is temporarily held by another user. Please try again in a few minutes.",
+        )
 
     # Create booking
     db_booking = BookingModel(
@@ -227,6 +259,13 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
     if check_in.date() <= datetime.now(check_in.tzinfo).date():
         room.status = "Occupied"
 
+    # Release the hold owned by this session (if any)
+    if booking.holdId and booking.sessionId:
+        db.execute(
+            text("DELETE FROM room_holds WHERE id = :id AND session_id = :session_id"),
+            {"id": booking.holdId, "session_id": booking.sessionId},
+        )
+
     db.commit()
     db.refresh(db_booking)
 
@@ -239,7 +278,7 @@ def update_booking(
     booking_id: int,
     booking_update: BookingUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Update booking"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
@@ -248,9 +287,9 @@ def update_booking(
 
     # Update fields
     update_data = booking_update.dict(exclude_unset=True)
+    status_changing_to = None
     for field, value in update_data.items():
         if field in ["checkIn", "checkOut"]:
-            # Convert strings to datetime
             try:
                 if field == "checkIn" and value:
                     value = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -269,8 +308,28 @@ def update_booking(
             db_booking.room_id = value
         elif field == "roomNumber":
             db_booking.room_number = value
+        elif field == "status":
+            status_changing_to = value
+            db_booking.status = value
         else:
             setattr(db_booking, field, value)
+
+    # On checkout: create cleaning task and auto-assign via round-robin
+    if status_changing_to == "Checked-out":
+        room = db.query(RoomModel).filter(RoomModel.id == db_booking.room_id).first()
+        staff_id, staff_name = round_robin_assign(db)
+        cleaning_task = TaskModel(
+            room_id=db_booking.room_id,
+            room_number=db_booking.room_number,
+            status="In Progress" if staff_id else "Pending",
+            priority="High",
+            notes=f"Post-checkout cleaning — room {db_booking.room_number}",
+            assigned_to=staff_id,
+            assigned_to_name=staff_name,
+        )
+        db.add(cleaning_task)
+        if room:
+            room.status = "Cleaning"
 
     db.commit()
     db.refresh(db_booking)
@@ -281,7 +340,7 @@ def update_booking(
 def delete_booking(
     booking_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER")),
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     """Delete booking and related guest tokens"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()

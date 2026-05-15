@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { roomsApi, bookingsApi, stripeApi } from "../../api/api";
+import { roomsApi, bookingsApi, stripeApi, holdsApi } from "../../api/api";
+import type { HoldResponse } from "../../api/api";
 import type { Room } from "../../mocks/rooms";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
@@ -8,6 +9,17 @@ import Modal from "../../ui/Modal";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import ErrorState from "../../ui/ErrorState";
 import toast from "react-hot-toast";
+
+function getOrCreateSessionId(): string {
+  let id = sessionStorage.getItem("nextstay_session_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    sessionStorage.setItem("nextstay_session_id", id);
+  }
+  return id;
+}
+
+const HOLD_SECONDS = 10 * 60; // 10 minutes
 
 interface AvailableRoom {
   id: number;
@@ -39,6 +51,34 @@ export default function BookingPage() {
   const [bookingComplete, setBookingComplete] = useState(false);
   const [guestToken, setGuestToken] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+
+  const [activeHold, setActiveHold] = useState<HoldResponse | null>(null);
+  const [holdSecondsLeft, setHoldSecondsLeft] = useState(0);
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearHoldTimer = useCallback(() => {
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+
+  const releaseHold = useCallback(async (hold: HoldResponse) => {
+    clearHoldTimer();
+    try {
+      await holdsApi.release(hold.id, hold.session_id);
+    } catch {
+      // Best-effort — hold will expire on its own
+    }
+    setActiveHold(null);
+    setHoldSecondsLeft(0);
+  }, [clearHoldTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearHoldTimer();
+    };
+  }, [clearHoldTimer]);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -78,9 +118,44 @@ export default function BookingPage() {
     }
   };
 
-  const handleBookRoom = (room: AvailableRoom) => {
+  const handleBookRoom = async (room: AvailableRoom) => {
     setSelectedRoom(room);
+
+    const sessionId = getOrCreateSessionId();
+    const checkInISO = `${checkIn}T14:00:00Z`;
+    const checkOutISO = `${checkOut}T12:00:00Z`;
+
+    try {
+      const hold = await holdsApi.create(room.id, checkInISO, checkOutISO, sessionId);
+      setActiveHold(hold);
+
+      const expiresAt = new Date(hold.expires_at).getTime();
+      clearHoldTimer();
+      holdTimerRef.current = setInterval(() => {
+        const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+        setHoldSecondsLeft(left);
+        if (left === 0) {
+          clearHoldTimer();
+          setActiveHold(null);
+          setShowBookingForm(false);
+          toast.error("Your hold expired. Please select the room again.");
+        }
+      }, 1000);
+      setHoldSecondsLeft(HOLD_SECONDS);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Could not hold this room. Please try again.";
+      toast.error(msg);
+      return;
+    }
+
     setShowBookingForm(true);
+  };
+
+  const handleCloseBookingForm = async () => {
+    if (activeHold) {
+      await releaseHold(activeHold);
+    }
+    setShowBookingForm(false);
   };
 
   const handleSubmitBooking = async (e: React.FormEvent) => {
@@ -112,7 +187,7 @@ export default function BookingPage() {
       const checkInDateTime = `${checkIn}T14:00:00Z`;
       const checkOutDateTime = `${checkOut}T12:00:00Z`;
 
-      // Step 1: Create booking with Pending status
+      // Step 1: Create booking with Pending status (backend will release the hold)
       const booking = await bookingsApi.create({
         guestName: bookingData.guestName,
         roomId: selectedRoom.id,
@@ -122,7 +197,11 @@ export default function BookingPage() {
         status: "Pending",
         notes: bookingData.specialRequests || undefined,
         email: bookingData.email,
+        holdId: activeHold?.id,
+        sessionId: activeHold?.session_id,
       });
+      clearHoldTimer();
+      setActiveHold(null);
 
       // Step 2: Create Stripe Checkout session
       const checkoutSession = await stripeApi.createCheckoutSession(booking.id);
@@ -436,12 +515,26 @@ export default function BookingPage() {
       {/* Booking Form Modal */}
       <Modal
         isOpen={showBookingForm}
-        onClose={() => setShowBookingForm(false)}
+        onClose={() => void handleCloseBookingForm()}
         title="Complete Your Booking"
         size="lg"
       >
         {selectedRoom && (
           <form onSubmit={handleSubmitBooking} className="space-y-4">
+            {/* Hold countdown banner */}
+            {activeHold && holdSecondsLeft > 0 && (
+              <div className={`flex items-center justify-between rounded-lg px-4 py-2 text-sm font-medium ${
+                holdSecondsLeft <= 60
+                  ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                  : "bg-amber-50 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+              }`}>
+                <span>Room held for you</span>
+                <span className="tabular-nums">
+                  {Math.floor(holdSecondsLeft / 60)}:{String(holdSecondsLeft % 60).padStart(2, "0")} left
+                </span>
+              </div>
+            )}
+
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-gray-900 dark:text-white">
@@ -524,7 +617,7 @@ export default function BookingPage() {
                 type="button"
                 variant="secondary"
                 fullWidth
-                onClick={() => setShowBookingForm(false)}
+                onClick={() => void handleCloseBookingForm()}
                 disabled={submitting}
               >
                 Cancel
