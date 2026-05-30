@@ -139,14 +139,41 @@ def assign_task(
     db: Session = Depends(get_db),
     current_user: UserModel = Depends(require_roles("OWNER", "STAFF")),
 ):
-    """Assign task to staff"""
+    """Assign task to staff.
+
+    Only users with role STAFF from the same company can be assigned.
+    """
     company_code = get_user_company_scope(current_user)
-    db_task = db.query(TaskModel).filter(TaskModel.id == task_id, TaskModel.company_code == company_code).first()
+
+    # Ensure task exists in current company
+    db_task = (
+        db.query(TaskModel)
+        .filter(TaskModel.id == task_id, TaskModel.company_code == company_code)
+        .first()
+    )
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    db_task.assigned_to = assign_data.staffId
-    db_task.assigned_to_name = assign_data.staffName
+    # Validate that staff user exists, is active, has STAFF role and belongs to same company
+    staff_user = (
+        db.query(UserModel)
+        .filter(
+            UserModel.id == assign_data.staffId,
+            UserModel.is_active.is_(True),
+            UserModel.role == "STAFF",
+            UserModel.company_code == company_code,
+        )
+        .first()
+    )
+    if not staff_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Staff user not found in this company.",
+        )
+
+    # Trust data from DB, not from request body
+    db_task.assigned_to = staff_user.id
+    db_task.assigned_to_name = staff_user.full_name
     db_task.status = "In Progress"
 
     db.commit()

@@ -9,6 +9,7 @@ import BookingCancelPage from "../pages/booking/BookingCancelPage";
 import ReportsPage from "../pages/reports/ReportsPage";
 import BookingsPage from "../pages/admin/BookingsPage";
 import NotFoundPage from "../pages/NotFoundPage";
+import ProfilePage from "../pages/ProfilePage";
 import AppLayout from "../layouts/AppLayout";
 import ProtectedRoute from "../components/ProtectedRoute";
 import IndexRedirect from "./IndexRedirect";
@@ -25,6 +26,14 @@ export default function AppRouter() {
         <Route path="/guest/:token" element={<GuestPage />} />
 
         <Route element={<AppLayout />}>
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin"
             element={

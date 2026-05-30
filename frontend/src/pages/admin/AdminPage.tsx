@@ -1,19 +1,27 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import type { Room } from "../../mocks/rooms";
 import { tasksApi, roomsApi, bookingsApi } from "../../api/api";
 import type { CleaningTask } from "../../mocks/tasks";
 import type { Booking } from "../../mocks/bookings";
 import RoomCard from "../../components/RoomCard";
 import EmptyState from "../../ui/EmptyState";
-import PageHeader from "../../ui/PageHeader";
 import Card from "../../ui/Card";
 import Button from "../../ui/Button";
+import Popover from "../../ui/Popover";
 import Modal from "../../ui/Modal";
 import LoadingSpinner from "../../ui/LoadingSpinner";
-import { layout, colors } from "../../constants/designTokens";
+import { layout } from "../../constants/designTokens";
 import toast from "react-hot-toast";
 
 type StatusFilter = Room["status"] | "All";
+
+const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: "All", label: "All" },
+  { value: "Available", label: "Available" },
+  { value: "Occupied", label: "Occupied" },
+  { value: "Cleaning", label: "Cleaning" },
+  { value: "Maintenance", label: "Maintenance" },
+];
 
 const statusColors = {
   Available: "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700",
@@ -28,10 +36,15 @@ export default function AdminPage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+  const [statusFilters, setStatusFilters] = useState<Set<StatusFilter>>(new Set(["All"]));
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [selectedTask, setSelectedTask] = useState<CleaningTask | null>(null);
+  const [showAssignStaffModal, setShowAssignStaffModal] = useState(false);
+  const [assignStaffId, setAssignStaffId] = useState<string>("");
+  const [assignStaffName, setAssignStaffName] = useState("");
   const [showCreateTaskForm, setShowCreateTaskForm] = useState(false);
   const [showTaskDetailsModal, setShowTaskDetailsModal] = useState(false);
   const [taskPriority, setTaskPriority] = useState<"Low" | "Medium" | "High">("Medium");
@@ -94,34 +107,45 @@ export default function AdminPage() {
     }
   };
 
-  // Analytics
-  const stats = useMemo(() => {
-    return {
-      total: rooms.length,
-      available: rooms.filter((r) => r.status === "Available").length,
-      occupied: rooms.filter((r) => r.status === "Occupied").length,
-      cleaning: rooms.filter((r) => r.status === "Cleaning").length,
-      maintenance: rooms.filter((r) => r.status === "Maintenance").length,
-      // Rooms needing cleaning (have pending/in-progress tasks)
-      needsCleaning: rooms.filter((r) => {
-        const roomTasks = tasks.filter((t) => t.roomId === r.id);
-        return roomTasks.some((t) => t.status === "Pending" || t.status === "In Progress");
-      }).length,
-    };
-  }, [rooms, tasks]);
+  const stats = useMemo(() => ({
+    total: rooms.length,
+    available: rooms.filter((r) => r.status === "Available").length,
+    occupied: rooms.filter((r) => r.status === "Occupied").length,
+    cleaning: rooms.filter((r) => r.status === "Cleaning").length,
+    maintenance: rooms.filter((r) => r.status === "Maintenance").length,
+  }), [rooms]);
+
+  const toggleStatusFilter = (value: StatusFilter) => {
+    setStatusFilters((prev) => {
+      if (value === "All") {
+        return prev.has("All") ? new Set() : new Set(["All"]);
+      }
+      const next = new Set(prev);
+      next.delete("All");
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      if (next.size === 0) return new Set(["All"]);
+      return next;
+    });
+  };
 
   // Filtering rooms
   const filteredRooms = useMemo(() => {
     return rooms.filter((room) => {
       const matchesStatus =
-        statusFilter === "All" || room.status === statusFilter;
+        statusFilters.size === 0 ||
+        statusFilters.has("All") ||
+        statusFilters.has(room.status);
       const matchesSearch =
         searchQuery === "" ||
         room.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
         room.category.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesStatus && matchesSearch;
     });
-  }, [rooms, statusFilter, searchQuery]);
+  }, [rooms, statusFilters, searchQuery]);
 
   const confirmMaintenanceChange = async () => {
     if (!pendingStatusChange) return;
@@ -198,7 +222,7 @@ export default function AdminPage() {
 
 
   const handleSaveRoom = async () => {
-    // Валидация обязательных полей
+    // Validation of required fields
     if (!roomForm.number.trim()) {
       toast.error("Please fill in the Room Number field");
       return;
@@ -353,88 +377,152 @@ export default function AdminPage() {
     return <LoadingSpinner message="Loading rooms..." />;
   }
 
+  const statsCards = [
+    {
+      label: "Total rooms",
+      value: stats.total,
+      sub: null,
+      className:
+        "bg-slate-100 dark:bg-gray-800/80 border border-slate-200 dark:border-gray-600 text-slate-900 dark:text-gray-200",
+    },
+    {
+      label: "Available",
+      value: stats.available,
+      sub: "Ready to sell",
+      className:
+        "bg-slate-100 dark:bg-gray-800/80 border border-emerald-300 dark:border-green-600/60 text-slate-900 dark:text-gray-200",
+    },
+    {
+      label: "Occupied",
+      value: stats.occupied,
+      sub: "Currently occupied",
+      className:
+        "bg-slate-100 dark:bg-gray-800/80 border border-blue-300 dark:border-blue-600/60 text-slate-900 dark:text-gray-200",
+    },
+    {
+      label: "Cleaning",
+      value: stats.cleaning,
+      sub: "Being cleaned",
+      className:
+        "bg-slate-100 dark:bg-gray-800/80 border border-amber-300 dark:border-amber-500/60 text-slate-900 dark:text-gray-200",
+    },
+    {
+      label: "Maintenance",
+      value: stats.maintenance,
+      sub: "Cannot be sold",
+      className:
+        "bg-slate-100 dark:bg-gray-800/80 border border-rose-300 dark:border-red-600/60 text-slate-900 dark:text-gray-200",
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title="Administration Panel"
-        subtitle="Management of rooms and statuses"
-        action={
-          <Button variant="primary" size="sm" onClick={handleAddRoom}>
+    <div className="space-y-5">
+      {/* Page title */}
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Rooms</h1>
+
+      {/* Room Availability - stats row */}
+      <div>
+        <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Room Availability</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {statsCards.map((card) => (
+            <div key={card.label} className={`p-3 rounded-lg ${card.className}`}>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{card.label}</div>
+              <div className="text-xl font-bold text-slate-900 dark:text-white">{card.value}</div>
+              {card.sub && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{card.sub}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Search and Filter - one line */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[200px] relative h-[42px]">
+          <input
+            type="text"
+            placeholder="Search by number or category"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-full pl-4 pr-11 text-sm rounded-lg bg-slate-200 dark:bg-gray-800 border border-slate-300 dark:border-gray-600 text-slate-900 dark:text-gray-100 placeholder-slate-500 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-gray-200 rounded transition-colors"
+            aria-label="Search"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
+        </div>
+        <div className="relative flex items-center gap-3 h-[42px]">
+          <button
+            ref={filterButtonRef}
+            type="button"
+            onClick={() => setFilterOpen(!filterOpen)}
+            className="h-full flex items-center gap-2 px-5 rounded-lg bg-slate-200 dark:bg-gray-700 border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-300 hover:bg-slate-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            Filter
+          </button>
+          <button
+            type="button"
+            onClick={handleAddRoom}
+            className="h-full px-5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
+          >
             Add room
-          </Button>
-        }
-      />
-
-      {/* Room Availability */}
-      <Card padding="sm">
-        <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-          Room Availability
-        </h3>
-        <div className={layout.grid.stats}>
-          <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Total rooms</div>
-            <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
-          </div>
-          <div className={`p-3 rounded-lg border ${colors.success.light}`}>
-            <div className="text-xs text-green-700 dark:text-green-400 mb-0.5">Available</div>
-            <div className="text-xl font-bold text-green-800 dark:text-green-300">{stats.available}</div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">Ready to sell</p>
-          </div>
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="text-xs text-blue-700 dark:text-blue-400 mb-0.5">Occupied</div>
-            <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.occupied}</div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Currently occupied</p>
-          </div>
-          <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-0.5">Cleaning</div>
-            <div className="text-xl font-bold text-yellow-800 dark:text-yellow-300">{stats.cleaning}</div>
-            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">Being cleaned</p>
-          </div>
-          <div className={`p-3 rounded-lg border ${colors.danger.light}`}>
-            <div className="text-xs text-red-700 dark:text-red-400 mb-0.5">Maintenance</div>
-            <div className="text-xl font-bold text-red-800 dark:text-red-300">{stats.maintenance}</div>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Cannot be sold</p>
-          </div>
+          </button>
         </div>
-      </Card>
+      </div>
 
-      {/* Filters */}
-      <Card padding="sm">
-        <div className="flex flex-col md:flex-row gap-2">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search by number or category..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-            />
-          </div>
-          <div className="md:w-48">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
-            >
-              <option value="All">All statuses</option>
-              <option value="Available">Available</option>
-              <option value="Occupied">Occupied</option>
-              <option value="Cleaning">Cleaning</option>
-              <option value="Maintenance">Maintenance</option>
-            </select>
-          </div>
+      <Popover
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        anchorRef={filterButtonRef}
+        placement="bottom-start"
+        gap={0}
+        className="w-56 p-4 pt-3"
+      >
+        <div className="space-y-2">
+          {FILTER_OPTIONS.map((opt) => {
+            const checked =
+              opt.value === "All"
+                ? statusFilters.has("All")
+                : statusFilters.has("All") || statusFilters.has(opt.value as Room["status"]);
+            return (
+              <label
+                key={opt.value}
+                className="flex items-center gap-3 cursor-pointer group"
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleStatusFilter(opt.value)}
+                  className="w-4 h-4 rounded border-gray-500 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 focus:ring-offset-gray-800"
+                />
+                <span
+                  className={`text-sm ${opt.value === "All" && checked ? "text-blue-400" : "text-gray-300 group-hover:text-white"}`}
+                >
+                  {opt.label}
+                </span>
+              </label>
+            );
+          })}
         </div>
-      </Card>
+      </Popover>
 
       {/* Rooms Grid */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-sm font-semibold text-gray-400">
             Rooms ({filteredRooms.length})
           </h2>
         </div>
         {filteredRooms.length === 0 ? (
-          <Card>
+          <Card className="bg-gray-800/80 border-gray-600">
             <EmptyState
               title="No rooms found"
               message="Try changing the search filters to see more rooms."
@@ -459,6 +547,7 @@ export default function AdminPage() {
         onClose={() => {
           setShowRoomDetailsModal(false);
           setSelectedRoom(null);
+          setSelectedTask(null);
           setRoomDetailsView("details");
           setShowCreateTaskForm(false);
           setTaskNotes("");
@@ -591,9 +680,9 @@ export default function AdminPage() {
                       if (value === "") {
                         setRoomForm({ ...roomForm, price: null as any });
                       } else {
-                        // Разрешаем только цифры и точку
+                        // Allow only numbers and dot
                         const cleanedValue = value.replace(/[^0-9.]/g, '');
-                        // Проверяем, что точка только одна
+                        // Check that the dot is only one
                         const parts = cleanedValue.split('.');
                         const finalValue = parts.length > 2 
                           ? parts[0] + '.' + parts.slice(1).join('')
@@ -680,9 +769,9 @@ export default function AdminPage() {
                                 await tasksApi.complete(currentTask.id);
                                 toast.success("Task marked as completed");
                                 await loadTasks();
-                                // Обновить список комнат, чтобы увидеть новый статус (Available)
+                                // Update the list of rooms to see the new status (Available)
                                 await loadRooms();
-                                // Обновить selectedRoom, если он был выбран
+                                // Update selectedRoom, if it was selected
                                 if (selectedRoom) {
                                   const updatedRooms = await roomsApi.getAll();
                                   const updatedRoom = updatedRooms.find((r) => r.id === selectedRoom.id);
@@ -881,7 +970,7 @@ export default function AdminPage() {
                 </div>
               </Card>
 
-              {/* Booking (если есть) */}
+              {/* Booking (if there is one) */}
               {currentBooking && (
                 <Card padding="sm">
                   <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
@@ -988,7 +1077,10 @@ export default function AdminPage() {
                           size="sm"
                           className="sm:flex-1"
                           onClick={() => {
-                            toast("Assign staff functionality coming soon", { icon: "ℹ️" });
+                            setSelectedTask(currentTask);
+                            setAssignStaffId("");
+                            setAssignStaffName("");
+                            setShowAssignStaffModal(true);
                           }}
                         >
                           Assign Staff
@@ -1266,9 +1358,9 @@ export default function AdminPage() {
                 if (value === "") {
                   setRoomForm({ ...roomForm, price: null as any });
                 } else {
-                  // Разрешаем только цифры и точку
+                  // Allow only numbers and dot
                   const cleanedValue = value.replace(/[^0-9.]/g, '');
-                  // Проверяем, что точка только одна
+                  // Check that the dot is only one
                   const parts = cleanedValue.split('.');
                   const finalValue = parts.length > 2 
                     ? parts[0] + '.' + parts.slice(1).join('')
@@ -1400,6 +1492,112 @@ export default function AdminPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Assign Staff Modal */}
+      <Modal
+        isOpen={showAssignStaffModal}
+        onClose={() => {
+          setShowAssignStaffModal(false);
+          setAssignStaffId("");
+          setAssignStaffName("");
+          setSelectedTask(null);
+        }}
+        title={selectedTask ? `Assign Staff - Task #${selectedTask.id}` : "Assign Staff"}
+        size="sm"
+        footer={
+          <div className="flex gap-2 w-full">
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              onClick={() => {
+                setShowAssignStaffModal(false);
+                setAssignStaffId("");
+                setAssignStaffName("");
+                setSelectedTask(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              onClick={async () => {
+                if (!selectedTask) return;
+                const trimmedName = assignStaffName.trim();
+                const idNumber = Number(assignStaffId);
+                if (!trimmedName) {
+                  toast.error("Please enter staff name");
+                  return;
+                }
+                if (!assignStaffId || Number.isNaN(idNumber) || idNumber <= 0) {
+                  toast.error("Please enter valid staff ID (number)");
+                  return;
+                }
+                try {
+                  await tasksApi.assign(selectedTask.id, idNumber, trimmedName);
+                  toast.success("Staff assigned to task");
+                  setShowAssignStaffModal(false);
+                  setAssignStaffId("");
+                  setAssignStaffName("");
+                  setSelectedTask(null);
+                  await loadTasks();
+                } catch (error) {
+                  toast.error("Error assigning staff");
+                  console.error(error);
+                }
+              }}
+            >
+              Assign
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {selectedTask && (
+            <div className="p-3 bg-gray-50 dark:bg-gray-700/40 rounded-lg border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300">
+              <div className="font-semibold mb-1">
+                Task #{selectedTask.id} · Room #{selectedTask.roomNumber}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 text-[11px] font-semibold rounded ${getTaskStatusColor(selectedTask.status)}`}>
+                  {selectedTask.status}
+                </span>
+                <span className="text-[11px]">
+                  {getPriorityIcon(selectedTask.priority)} {selectedTask.priority}
+                </span>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Staff ID
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={assignStaffId}
+              onChange={(e) => setAssignStaffId(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="Enter staff internal ID"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+              Staff Name
+            </label>
+            <input
+              type="text"
+              value={assignStaffName}
+              onChange={(e) => setAssignStaffName(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              placeholder="e.g., Maria Ivanova"
+            />
+          </div>
+        </div>
       </Modal>
 
       {/* Maintenance Confirmation Modal */}

@@ -63,10 +63,16 @@ http.interceptors.response.use(
 function getErrorMessage(error: AxiosError): string {
   // If there is a message from the server
   if (error.response?.data) {
-    const data = error.response.data as { message?: string; detail?: string; error?: string };
-    
+    const data = error.response.data as {
+      message?: string;
+      detail?: string | { msg?: string }[];
+      error?: string;
+    };
     if (data.message) return data.message;
-    if (data.detail) return data.detail;
+    if (data.detail) {
+      const d = data.detail;
+      return Array.isArray(d) ? d.map((x) => x.msg ?? String(x)).join(", ") : String(d);
+    }
     if (data.error) return data.error;
   }
 

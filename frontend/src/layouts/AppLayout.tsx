@@ -14,7 +14,7 @@ export default function AppLayout() {
   ].filter((item) => !role || item.roles.includes(role));
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#1A202C] flex">
       {/* Sidebar */}
       <div className="hidden md:block shrink-0">
         <Sidebar />
@@ -25,14 +25,14 @@ export default function AppLayout() {
         <Header />
 
         {/* Main content area */}
-        <main className="flex-1 p-3 sm:p-4 lg:p-5 pb-20 md:pb-3 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-20 md:pb-6 overflow-y-auto bg-slate-100 dark:bg-[#1A202C]">
           <Outlet />
         </main>
       </div>
 
       {/* Mobile bottom nav */}
       {mobileNavItems.length > 0 && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 z-40">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 z-40">
           <div className="flex items-center justify-around text-sm">
             {mobileNavItems.map((item) => {
               const isActive = location.pathname.startsWith(item.path);
@@ -42,8 +42,8 @@ export default function AppLayout() {
                   to={item.path}
                   className={`px-3 py-2 rounded-md transition-colors ${
                     isActive
-                      ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      ? "bg-blue-600/20 text-blue-400 font-medium"
+                      : "text-gray-400 hover:text-gray-200 hover:bg-gray-700/50"
                   }`}
                 >
                   {item.label}

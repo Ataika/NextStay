@@ -12,10 +12,20 @@ Single source of truth for local dev/test logins.
 
 ## Recommended `backend/.env` settings
 
+**Option A — password login (no OTP):**
+
 ```env
 DEV_BYPASS_EMAILS=admin@nextstay.com,owner.c2@nextstay.com,staff.uborka@yandex.com,uborka.staff@yandex.com,nextstay@yandex.com
 DEV_BYPASS_PASSWORD=AtaiDairTurat
 ```
+
+**Option B — OTP login without Brevo (OTP in backend console):**
+
+```env
+DEV_OTP_LOG_TO_CONSOLE=true
+```
+
+Then request OTP in the app; the code will appear in the terminal where the backend is running. Use that code to log in.
 
 ## Seeded accounts (local DB)
 

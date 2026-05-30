@@ -10,27 +10,43 @@ function ThemeManager() {
     // Automatic detection of the system theme
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     
-    const updateTheme = (e: MediaQueryList | MediaQueryListEvent) => {
-      if (e.matches) {
-        document.documentElement.classList.add('dark');
+    type ThemeMode = 'system' | 'dark' | 'light';
+
+    const applyTheme = (mode: ThemeMode, source: MediaQueryList | MediaQueryListEvent) => {
+      const prefersDark = source.matches;
+      const root = document.documentElement;
+      const shouldDark = mode === 'dark' || (mode === 'system' && prefersDark);
+      if (shouldDark) {
+        root.classList.add('dark');
       } else {
-        document.documentElement.classList.remove('dark');
+        root.classList.remove('dark');
       }
     };
 
-      // Set the initial theme
-    updateTheme(mediaQuery);
+    const stored = (localStorage.getItem('theme') as ThemeMode | null) || 'system';
+    applyTheme(stored, mediaQuery);
 
-    // Listen for changes in the system theme
+    // Listen for changes in the system theme only when mode === 'system'
     // Use addEventListener if available, otherwise fallback to addListener for older browsers
     if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', updateTheme);
+      const handler = (e: MediaQueryListEvent) => {
+        const current = (localStorage.getItem('theme') as ThemeMode | null) || 'system';
+        if (current === 'system') {
+          applyTheme('system', e);
+        }
+      };
+      mediaQuery.addEventListener('change', handler);
       return () => {
-        mediaQuery.removeEventListener('change', updateTheme);
+        mediaQuery.removeEventListener('change', handler);
       };
     } else {
       // Fallback for older browsers
-      const listener = (e: MediaQueryListEvent) => updateTheme(e);
+      const listener = (e: MediaQueryListEvent) => {
+        const current = (localStorage.getItem('theme') as ThemeMode | null) || 'system';
+        if (current === 'system') {
+          applyTheme('system', e);
+        }
+      };
       mediaQuery.addListener(listener);
       return () => {
         mediaQuery.removeListener(listener);

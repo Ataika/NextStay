@@ -142,6 +142,20 @@ export const guestApi = {
 };
 
 // Auth API
+export interface MeResponse {
+  id: number;
+  email: string;
+  name: string;
+  role: "OWNER" | "STAFF";
+  companyCode: string | null;
+}
+
+export interface StaffUserSummary {
+  id: number;
+  fullName: string;
+  email: string;
+}
+
 export const authApi = {
   login: async (email: string, password: string) => {
     if (USE_MOCK_API) {
@@ -216,6 +230,23 @@ export const authApi = {
       return;
     }
     await http.post("/auth/logout");
+  },
+
+  me: async (): Promise<MeResponse> => {
+    const response = await http.get("/auth/me");
+    return response.data;
+  },
+
+  updateMe: async (payload: { fullName: string }): Promise<MeResponse> => {
+    const response = await http.patch("/auth/me", payload);
+    return response.data;
+  },
+};
+
+export const usersApi = {
+  getStaffInCompany: async (): Promise<StaffUserSummary[]> => {
+    const response = await http.get("/users/staff");
+    return response.data;
   },
 };
 

@@ -9,6 +9,7 @@ from app.core.config import (
     BREVO_API_KEY,
     BREVO_SENDER_EMAIL,
     BREVO_SENDER_NAME,
+    DEV_OTP_LOG_TO_CONSOLE,
     FRONTEND_URL,
     SMTP_FROM_EMAIL,
     SMTP_FROM_NAME,
@@ -71,11 +72,14 @@ async def send_email(
 
 def send_otp_email(to_email: str, otp: str) -> bool:
     """Send OTP email via Brevo transactional API."""
-    if not BREVO_API_KEY:
-        print(f"[EMAIL] BREVO_API_KEY is missing. Cannot send OTP to {to_email}")
-        return False
-    if not BREVO_SENDER_EMAIL:
-        print(f"[EMAIL] BREVO_SENDER_EMAIL is missing. Cannot send OTP to {to_email}")
+    if not BREVO_API_KEY or not BREVO_SENDER_EMAIL:
+        if DEV_OTP_LOG_TO_CONSOLE:
+            print(f"[DEV] OTP for {to_email}: {otp}")
+            return True
+        if not BREVO_API_KEY:
+            print(f"[EMAIL] BREVO_API_KEY is missing. Cannot send OTP to {to_email}")
+        else:
+            print(f"[EMAIL] BREVO_SENDER_EMAIL is missing. Cannot send OTP to {to_email}")
         return False
 
     payload = {

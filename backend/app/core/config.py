@@ -67,3 +67,6 @@ DEV_BYPASS_PASSWORD = os.getenv("DEV_BYPASS_PASSWORD", "")
 
 # Registration settings
 ALLOW_OWNER_SELF_REGISTER = os.getenv("ALLOW_OWNER_SELF_REGISTER", "false").lower() == "true"
+
+# Dev: when Brevo is not configured, print OTP to backend console instead of failing (no real email sent)
+DEV_OTP_LOG_TO_CONSOLE = os.getenv("DEV_OTP_LOG_TO_CONSOLE", "false").lower() == "true"

@@ -8,6 +8,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.guest import router as guest_router
 from app.api.v1.stripe import router as stripe_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.users import router as users_router
 from app.exceptions import register_exception_handlers
 from app.db.base import Base
 from app.db.session import engine
@@ -45,5 +46,6 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(guest_router, prefix="/api/v1")
 app.include_router(stripe_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 register_exception_handlers(app)

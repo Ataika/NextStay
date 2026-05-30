@@ -56,12 +56,18 @@ class User(BaseModel):
     id: int
     email: str
     name: str
+    role: str
+    companyCode: str | None = None
 
 
 class LoginResponse(BaseModel):
     token: str
     role: str
     user: User
+
+
+class UpdateProfileRequest(BaseModel):
+    fullName: str | None = None
 
 
 class RequestOtpResponse(BaseModel):
@@ -105,7 +111,13 @@ def create_access_token(user: User, role: str) -> tuple[str, str, datetime, date
 def build_login_response(user_row: UserModel, db: Session) -> LoginResponse:
     now = datetime.now(timezone.utc)
     user_row.last_login_at = now
-    app_user = User(id=user_row.id, email=user_row.email, name=user_row.full_name)
+    app_user = User(
+        id=user_row.id,
+        email=user_row.email,
+        name=user_row.full_name,
+        role=user_row.role,
+        companyCode=user_row.company_code,
+    )
     token, jti, expires_at, issued_at = create_access_token(app_user, user_row.role)
     db.add(
         AuthSessionModel(
@@ -117,6 +129,20 @@ def build_login_response(user_row: UserModel, db: Session) -> LoginResponse:
     )
     db.commit()
     return LoginResponse(token=token, role=user_row.role, user=app_user)
+
+
+@router.get("/auth/me", response_model=User)
+def get_me(current_user: UserModel = Depends(get_current_user)) -> User:
+    """
+    Return current user's profile (for personal cabinet).
+    """
+    return User(
+        id=current_user.id,
+        email=current_user.email,
+        name=current_user.full_name,
+        role=current_user.role,
+        companyCode=current_user.company_code,
+    )
 
 
 @router.post("/auth/request-otp", response_model=RequestOtpResponse)
@@ -270,3 +296,34 @@ def logout(current_user: UserModel = Depends(get_current_user), db: Session = De
         session.revoked_at = now
     db.commit()
     return {"message": "Logged out successfully"}
+
+
+@router.patch("/auth/me", response_model=User)
+def update_me(
+    payload: UpdateProfileRequest,
+    current_user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """
+    Update current user's profile data (currently: full name).
+    """
+    updated = False
+
+    if payload.fullName is not None:
+        new_name = payload.fullName.strip()
+        if new_name and new_name != current_user.full_name:
+            current_user.full_name = new_name
+            updated = True
+
+    if updated:
+        db.add(current_user)
+        db.commit()
+        db.refresh(current_user)
+
+    return User(
+        id=current_user.id,
+        email=current_user.email,
+        name=current_user.full_name,
+        role=current_user.role,
+        companyCode=current_user.company_code,
+    )

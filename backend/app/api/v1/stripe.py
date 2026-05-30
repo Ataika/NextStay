@@ -143,6 +143,9 @@ async def create_checkout_session(
     """
     Create Stripe Checkout session for booking payment
     """
+    # Debug log to verify Stripe config at runtime
+    print(f"[STRIPE DEBUG] STRIPE_SECRET_KEY set: {bool(STRIPE_SECRET_KEY)}")
+
     if not STRIPE_SECRET_KEY:
         raise HTTPException(
             status_code=500,
