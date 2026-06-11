@@ -1,10 +1,12 @@
 import { useSearchParams, useNavigate } from "react-router-dom";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
+import { useI18n } from "../../i18n";
 
 export default function BookingCancelPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const bookingId = searchParams.get("booking_id");
 
   return (
@@ -27,17 +29,16 @@ export default function BookingCancelPage() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Payment Cancelled
+            {t("bookingCancel.title")}
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-            Your booking was not completed.
+            {t("bookingCancel.subtitle")}
           </p>
         </div>
 
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            No payment was processed. Your booking has been saved but is pending payment.
-            You can complete your booking anytime by selecting the same room and dates.
+            {t("bookingCancel.message")}
           </p>
         </div>
 
@@ -47,14 +48,14 @@ export default function BookingCancelPage() {
             fullWidth
             onClick={() => navigate("/book")}
           >
-            Try Again
+            {t("bookingCancel.tryAgain")}
           </Button>
           <Button
             variant="secondary"
             fullWidth
             onClick={() => navigate("/")}
           >
-            Go Home
+            {t("bookingCancel.goHome")}
           </Button>
         </div>
       </Card>

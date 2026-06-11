@@ -1,9 +1,21 @@
 import { useRef, useState } from "react";
 import { useAuthStore } from "../store/authStore";
 import { useSettingsStore } from "../store/settingsStore";
-import type { Theme } from "../store/settingsStore";
+import type { Language, Theme } from "../store/settingsStore";
 import { authApi } from "../api/api";
+import LanguageSelector from "../components/LanguageSelector";
+import { useI18n } from "../i18n";
 import toast from "react-hot-toast";
+
+function getErrorDetail(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const response = "response" in error ? error.response : undefined;
+  if (!response || typeof response !== "object") return undefined;
+  const data = "data" in response ? response.data : undefined;
+  if (!data || typeof data !== "object") return undefined;
+  const detail = "detail" in data ? data.detail : undefined;
+  return typeof detail === "string" ? detail : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // Section wrapper
@@ -28,6 +40,7 @@ function AvatarUpload() {
   const avatar    = useSettingsStore((s) => s.avatar);
   const setAvatar = useSettingsStore((s) => s.setAvatar);
   const fileRef   = useRef<HTMLInputElement>(null);
+  const { t } = useI18n();
 
   const initials = name
     ? name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2)
@@ -37,13 +50,13 @@ function AvatarUpload() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Image must be smaller than 2 MB.");
+      toast.error(t("settingsPage.avatarTooLarge"));
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       setAvatar(reader.result as string);
-      toast.success("Avatar updated.");
+      toast.success(t("settingsPage.avatarUpdated"));
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -62,7 +75,7 @@ function AvatarUpload() {
         <button
           onClick={() => fileRef.current?.click()}
           className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-          title="Change avatar"
+          title={t("settingsPage.changeAvatar")}
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -77,17 +90,17 @@ function AvatarUpload() {
           onClick={() => fileRef.current?.click()}
           className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
         >
-          Upload photo
+          {t("settingsPage.uploadPhoto")}
         </button>
         {avatar && (
           <button
-            onClick={() => { setAvatar(null); toast.success("Avatar removed."); }}
+            onClick={() => { setAvatar(null); toast.success(t("settingsPage.avatarRemoved")); }}
             className="px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 border border-gray-200 dark:border-gray-600 rounded-lg transition-colors"
           >
-            Remove
+            {t("settingsPage.removePhoto")}
           </button>
         )}
-        <p className="text-xs text-gray-400 dark:text-gray-500">JPG, PNG or GIF · max 2 MB</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">{t("settingsPage.avatarHelp")}</p>
       </div>
     </div>
   );
@@ -102,6 +115,7 @@ function ProfileSection() {
   const setName = useAuthStore((s) => s.setName);
   const [displayName, setDisplayName] = useState(name ?? "");
   const [saving, setSaving] = useState(false);
+  const { t } = useI18n();
 
   const dirty = displayName.trim() !== (name ?? "").trim();
 
@@ -112,20 +126,20 @@ function ProfileSection() {
     try {
       const res = await authApi.updateProfile(displayName.trim());
       setName(res.name);
-      toast.success("Profile updated.");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to save profile.");
+      toast.success(t("settingsPage.profileUpdated"));
+    } catch (err: unknown) {
+      toast.error(getErrorDetail(err) ?? t("settingsPage.profileSaveFailed"));
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Section title="Profile" description="Your public display name shown across the app.">
+    <Section title={t("settingsPage.profile")} description={t("settingsPage.profileDescription")}>
       <AvatarUpload />
       <form onSubmit={handleSave} className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Display name</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("settingsPage.displayName")}</label>
           <input
             type="text"
             required
@@ -136,21 +150,21 @@ function ProfileSection() {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email address</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("settingsPage.emailAddress")}</label>
           <input
             type="email"
             value={email ?? ""}
             disabled
             className="w-full max-w-sm px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-sm text-gray-500 dark:text-gray-400 cursor-not-allowed"
           />
-          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Email cannot be changed from here.</p>
+          <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">{t("settingsPage.emailCannotChange")}</p>
         </div>
         <button
           type="submit"
           disabled={!dirty || saving}
           className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
         >
-          {saving ? "Saving…" : "Save changes"}
+          {saving ? t("settingsPage.saving") : t("settingsPage.saveChanges")}
         </button>
       </form>
     </Section>
@@ -167,6 +181,7 @@ function PasswordSection() {
   const [saving, setSaving]       = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNext, setShowNext]   = useState(false);
+  const { t } = useI18n();
 
   const mismatch  = next !== confirm && confirm.length > 0;
   const tooShort  = next.length > 0 && next.length < 8;
@@ -178,10 +193,10 @@ function PasswordSection() {
     setSaving(true);
     try {
       await authApi.changePassword(current, next);
-      toast.success("Password changed successfully.");
+      toast.success(t("settingsPage.passwordChanged"));
       setCurrent(""); setNext(""); setConfirm("");
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to change password.");
+    } catch (err: unknown) {
+      toast.error(getErrorDetail(err) ?? t("settingsPage.passwordChangeFailed"));
     } finally {
       setSaving(false);
     }
@@ -205,10 +220,10 @@ function PasswordSection() {
   }
 
   return (
-    <Section title="Password" description="Use at least 8 characters. A strong password uses letters, numbers and symbols.">
+    <Section title={t("settingsPage.password")} description={t("settingsPage.passwordDescription")}>
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Current password</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("settingsPage.currentPassword")}</label>
           <div className="relative">
             <input
               type={showCurrent ? "text" : "password"}
@@ -222,7 +237,7 @@ function PasswordSection() {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">New password</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("settingsPage.newPassword")}</label>
           <div className="relative">
             <input
               type={showNext ? "text" : "password"}
@@ -233,11 +248,11 @@ function PasswordSection() {
             />
             <EyeToggle show={showNext} onToggle={() => setShowNext((s) => !s)} />
           </div>
-          {tooShort && <p className="mt-1 text-xs text-red-500">Must be at least 8 characters.</p>}
+          {tooShort && <p className="mt-1 text-xs text-red-500">{t("settingsPage.passwordTooShort")}</p>}
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm new password</label>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("settingsPage.confirmPassword")}</label>
           <div className="relative">
             <input
               type={showNext ? "text" : "password"}
@@ -247,7 +262,7 @@ function PasswordSection() {
               placeholder="••••••••"
             />
           </div>
-          {mismatch && <p className="mt-1 text-xs text-red-500">Passwords do not match.</p>}
+          {mismatch && <p className="mt-1 text-xs text-red-500">{t("settingsPage.passwordMismatch")}</p>}
         </div>
 
         {/* Strength indicator */}
@@ -262,7 +277,13 @@ function PasswordSection() {
               })}
             </div>
             <p className="text-xs text-gray-400 dark:text-gray-500">
-              {next.length < 8 ? "Too short" : next.length < 12 ? "Fair" : /[^a-zA-Z0-9]/.test(next) && /[0-9]/.test(next) ? "Strong" : "Good"}
+              {next.length < 8
+                ? t("settingsPage.strengthTooShort")
+                : next.length < 12
+                  ? t("settingsPage.strengthFair")
+                  : /[^a-zA-Z0-9]/.test(next) && /[0-9]/.test(next)
+                    ? t("settingsPage.strengthStrong")
+                    : t("settingsPage.strengthGood")}
             </p>
           </div>
         )}
@@ -272,7 +293,7 @@ function PasswordSection() {
           disabled={!canSubmit || saving}
           className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
         >
-          {saving ? "Changing…" : "Change password"}
+          {saving ? t("settingsPage.changingPassword") : t("settingsPage.changePassword")}
         </button>
       </form>
     </Section>
@@ -318,12 +339,28 @@ const THEMES: { value: Theme; label: string; icon: React.ReactNode; description:
 function AppearanceSection() {
   const theme    = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const { t } = useI18n();
+  const themeLabels: Record<Theme, { label: string; description: string }> = {
+    light: {
+      label: t("settingsPage.themeLight"),
+      description: t("settingsPage.themeLightDescription"),
+    },
+    dark: {
+      label: t("settingsPage.themeDark"),
+      description: t("settingsPage.themeDarkDescription"),
+    },
+    system: {
+      label: t("settingsPage.themeSystem"),
+      description: t("settingsPage.themeSystemDescription"),
+    },
+  };
 
   return (
-    <Section title="Appearance" description="Choose how the interface looks to you.">
+    <Section title={t("settingsPage.appearance")} description={t("settingsPage.appearanceDescription")}>
       <div className="flex gap-3 flex-wrap">
         {THEMES.map(({ value, label, description, icon }) => {
           const active = theme === value;
+          const currentTheme = themeLabels[value];
           return (
             <button
               key={value}
@@ -337,8 +374,8 @@ function AppearanceSection() {
               <span className={active ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}>
                 {icon}
               </span>
-              <span>{label}</span>
-              <span className="text-xs font-normal text-gray-400 dark:text-gray-500 text-center">{description}</span>
+              <span>{currentTheme.label ?? label}</span>
+              <span className="text-xs font-normal text-gray-400 dark:text-gray-500 text-center">{currentTheme.description ?? description}</span>
               {active && (
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
               )}
@@ -350,19 +387,44 @@ function AppearanceSection() {
   );
 }
 
+function LanguageSection() {
+  const setLanguage = useSettingsStore((state) => state.setLanguage);
+  const { t } = useI18n();
+
+  const handleLanguageChange = async (language: Language) => {
+    try {
+      await authApi.updatePreferences({ preferred_language: language });
+      setLanguage(language);
+      toast.success(t("settingsPage.languageSaved"));
+    } catch (err: unknown) {
+      toast.error(getErrorDetail(err) ?? t("settingsPage.languageSaveFailed"));
+      throw err;
+    }
+  };
+
+  return (
+    <Section title={t("settingsPage.language")} description={t("settingsPage.languageDescription")}>
+      <LanguageSelector onChange={handleLanguageChange} />
+    </Section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
+  const { t } = useI18n();
+
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-10">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Settings</h1>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Manage your account and preferences.</p>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t("settingsPage.title")}</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{t("settingsPage.description")}</p>
       </div>
 
       <ProfileSection />
       <PasswordSection />
+      <LanguageSection />
       <AppearanceSection />
     </div>
   );

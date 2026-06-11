@@ -3,23 +3,26 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 
+from app.core.limiter import limiter
+from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.models.user import User as UserModel
 from app.security.auth import get_current_user, require_roles
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["staff"])
+logger = get_logger(__name__)
 
 SHIFT_HOURS: dict[str, float] = {
     "morning": 8.0,
     "afternoon": 8.0,
     "night": 8.0,
     "off": 0.0,
-    "day_extended": 12.0,  # 08:00–20:00 hostess day shift
-    "night_extended": 12.0,  # 20:00–08:00 hostess night shift
+    "day_extended": 12.0,
+    "night_extended": 12.0,
 }
 VALID_ROLES = ["hostess", "cleaner", "manager", "director"]
 VALID_SHIFT_TYPES = list(SHIFT_HOURS.keys())
@@ -30,7 +33,7 @@ _SHIFT_CODE_SECRET = "nextstay-shift-2026"
 def _get_shift_code(bucket_offset: int = 0) -> str:
     bucket = int(time.time()) // 120 + bucket_offset
     digest = hashlib.sha256(f"{_SHIFT_CODE_SECRET}:{bucket}".encode()).hexdigest()
-    return str(int(digest[:8], 16) % 9000 + 1000)  # 1000–9999
+    return str(int(digest[:8], 16) % 900000 + 100000)  # 100000–999999
 
 
 def get_db():
@@ -152,7 +155,7 @@ def _to_member(r) -> StaffMember:
 
 
 # ---------------------------------------------------------------------------
-# Self-service endpoints (STAFF or OWNER, matched by login email)
+# Self-service endpoints (matched by login email)
 # NOTE: /staff/me and /staff/my-schedule must be defined BEFORE /staff/{staff_id}
 # ---------------------------------------------------------------------------
 
@@ -395,7 +398,6 @@ def delete_shift(
     if role not in ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"):
         raise HTTPException(status_code=403, detail="Insufficient permissions.")
 
-    # Directors/Managers may only clear "off" entries
     if role not in ("OWNER", "SYS_ADMIN"):
         row = db.execute(
             text("SELECT shift_type FROM staff_shifts WHERE id = :id"),
@@ -470,7 +472,7 @@ def update_staff_member(
 def get_shift_code(
     user: UserModel = Depends(get_current_user),
 ):
-    """Return the current 4-digit rotating shift code (rotates every 2 minutes)."""
+    """Return the current 6-digit rotating shift code (rotates every 2 minutes)."""
     _ = user
     code = _get_shift_code()
     expires_in = 120 - (int(time.time()) % 120)
@@ -478,17 +480,21 @@ def get_shift_code(
 
 
 @router.post("/staff/shift-start", response_model=ShiftStartResponse)
+@limiter.limit("10/minute")
 def start_shift(
+    request: Request,
     payload: ShiftStartRequest,
     user: UserModel = Depends(get_current_user),
 ):
-    """Verify the shift code and record the shift start time."""
+    """Verify the 6-digit shift code and record the shift start time."""
     _ = user
     current_code = _get_shift_code(0)
-    prev_code = _get_shift_code(-1)  # accept previous bucket (edge case at boundary)
+    prev_code = _get_shift_code(-1)
     if payload.code.strip() not in (current_code, prev_code):
+        logger.warning("Failed shift-start attempt by user %s.", user.email)
         raise HTTPException(status_code=401, detail="Invalid shift code. Please try again.")
     started_at = datetime.now(timezone.utc).isoformat()
+    logger.info("Shift started by user %s.", user.email)
     return ShiftStartResponse(started_at=started_at)
 
 

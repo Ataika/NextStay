@@ -1,3 +1,4 @@
+import json
 import secrets
 from datetime import datetime, timezone
 from typing import Annotated
@@ -6,18 +7,28 @@ from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
+from app.models.hotel_profile import HotelProfile as HotelProfileModel
 from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["bookings"])
 
+# Valid booking status transitions (state machine)
+VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
+    "Pending": {"Confirmed", "Upcoming", "Cancelled"},
+    "Confirmed": {"Upcoming", "Cancelled"},
+    "Upcoming": {"Checked-in", "Cancelled"},
+    "Checked-in": {"Checked-out"},
+    "Checked-out": set(),
+    "Cancelled": set(),
+}
 
-# Dependency to get the DB session
+
 def get_db():
     db = SessionLocal()
     try:
@@ -26,7 +37,6 @@ def get_db():
         db.close()
 
 
-# Pydantic models
 class BookingBase(BaseModel):
     guestName: str
     roomId: int
@@ -35,7 +45,7 @@ class BookingBase(BaseModel):
     checkOut: str
     status: str
     notes: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
 
 
 class BookingCreate(BaseModel):
@@ -46,7 +56,7 @@ class BookingCreate(BaseModel):
     checkOut: str
     status: str = "Pending"
     notes: str | None = None
-    email: str | None = None
+    email: EmailStr | None = None
     holdId: int | None = None
     sessionId: str | None = None
 
@@ -64,7 +74,7 @@ class BookingUpdate(BaseModel):
 class Booking(BookingBase):
     id: int
     createdAt: str
-    guestToken: str | None = None  # Guest token (if exists)
+    guestToken: str | None = None
 
     class Config:
         from_attributes = True
@@ -76,7 +86,6 @@ class Booking(BookingBase):
         include_token: bool = False,
         db: Session | None = None,
     ):
-        """Convert ORM object to Pydantic model with correct date format"""
         token = None
         if include_token and db:
             guest_token = db.query(GuestTokenModel).filter(GuestTokenModel.booking_id == obj.id).first()
@@ -97,13 +106,11 @@ class Booking(BookingBase):
         )
 
 
-# CRUD operations
 @router.get("/bookings", response_model=list[Booking])
 def get_all_bookings(
     db: Annotated[Session, Depends(get_db)],
     _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    """Get all bookings"""
     bookings = db.query(BookingModel).all()
     return [Booking.from_orm_with_dates(booking, include_token=True, db=db) for booking in bookings]
 
@@ -114,7 +121,6 @@ def get_booking_by_id(
     db: Annotated[Session, Depends(get_db)],
     _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    """Get booking by ID"""
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -123,15 +129,16 @@ def get_booking_by_id(
 
 @router.post("/bookings", response_model=Booking, status_code=201)
 def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db)]):
-    """Create new booking and automatically create token for guest"""
+    """Create a new booking with a guest token, using a row lock to prevent double-booking."""
     try:
         check_in = datetime.fromisoformat(booking.checkIn.replace("Z", "+00:00"))
         check_out = datetime.fromisoformat(booking.checkOut.replace("Z", "+00:00"))
     except (ValueError, AttributeError) as err:
-        message = "Invalid date format. Use ISO format (e.g., 2026-01-20T14:00:00Z)"
-        raise HTTPException(status_code=400, detail=message) from err
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format. Use ISO format (e.g., 2026-01-20T14:00:00Z)",
+        ) from err
 
-    # Validate dates
     now = datetime.now(check_in.tzinfo) if check_in.tzinfo else datetime.now()
     if check_in < now.replace(hour=0, minute=0, second=0, microsecond=0):
         raise HTTPException(status_code=400, detail="Check-in date cannot be in the past")
@@ -139,17 +146,14 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
     if check_out <= check_in:
         raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
 
-    # Check if room exists
-    room = db.query(RoomModel).filter(RoomModel.id == booking.roomId).first()
+    # Lock the room row to prevent concurrent double-bookings
+    room = db.query(RoomModel).filter(RoomModel.id == booking.roomId).with_for_update().first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    # Check if room is available
     if room.status != "Available":
-        message = f"Room is not available. Current status: {room.status}"
-        raise HTTPException(status_code=400, detail=message)
+        raise HTTPException(status_code=400, detail=f"Room is not available. Current status: {room.status}")
 
-    # Check for conflicting bookings
     conflicting_booking = (
         db.query(BookingModel)
         .filter(
@@ -157,11 +161,8 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
                 BookingModel.room_id == booking.roomId,
                 BookingModel.status.in_(["Confirmed", "Upcoming", "Checked-in"]),
                 or_(
-                    # Booking starts in our period
                     and_(BookingModel.check_in >= check_in, BookingModel.check_in < check_out),
-                    # Booking ends in our period
                     and_(BookingModel.check_out > check_in, BookingModel.check_out <= check_out),
-                    # Booking fully covers our period
                     and_(BookingModel.check_in <= check_in, BookingModel.check_out >= check_out),
                 ),
             )
@@ -172,7 +173,6 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
     if conflicting_booking:
         raise HTTPException(status_code=400, detail="Room is already booked for the selected dates")
 
-    # Check for an active hold from a different session
     now_utc = datetime.now(timezone.utc)
     blocking_hold = db.execute(
         text(
@@ -200,7 +200,20 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
             detail="Room is temporarily held by another user. Please try again in a few minutes.",
         )
 
-    # Create booking
+    # Pull operational info from hotel profile
+    hotel = db.query(HotelProfileModel).first()
+    check_out_time = (hotel.check_out_time if hotel and hotel.check_out_time else None) or "12:00"
+
+    # Try to use hotel profile house_rules (stored as JSON text) if valid
+    house_rules_from_profile: dict | None = None
+    if hotel and hotel.house_rules:
+        try:
+            parsed = json.loads(hotel.house_rules)
+            if isinstance(parsed, dict):
+                house_rules_from_profile = parsed
+        except (ValueError, TypeError):
+            pass  # Plain text field; fall back to default struct
+
     db_booking = BookingModel(
         guest_name=booking.guestName,
         guest_email=booking.email,
@@ -212,15 +225,13 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
         notes=booking.notes,
     )
     db.add(db_booking)
-    db.flush()  # Get booking ID
+    db.flush()
 
-    # Generate unique token for guest
     token = f"guest-token-{secrets.token_urlsafe(12)}"
 
-    # Create guest token
     contact_info = {
-        "phone": "+1 (555) 123-4567",
-        "whatsapp": "+1 (555) 123-4567",
+        "phone": hotel.phone if hotel and hotel.phone else "+1 (555) 123-4567",
+        "whatsapp": hotel.phone if hotel and hotel.phone else "+1 (555) 123-4567",
         "email": booking.email if booking.email else "support@nextstay.com",
     }
 
@@ -246,20 +257,18 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
                 "hold the QR code close to the scanner. Contact support if issues persist."
             ),
         },
-        house_rules={
+        house_rules=house_rules_from_profile
+        or {
             "quietHours": "22:00 - 08:00",
-            "checkOutTime": "12:00",
+            "checkOutTime": check_out_time,
             "smokingPolicy": "No smoking in rooms. Designated smoking areas available.",
         },
     )
     db.add(guest_token)
 
-    # Update room status to "Occupied" if check-in is today or in the past
-    # Otherwise keep "Available" until check-in date
     if check_in.date() <= datetime.now(check_in.tzinfo).date():
         room.status = "Occupied"
 
-    # Release the hold owned by this session (if any)
     if booking.holdId and booking.sessionId:
         db.execute(
             text("DELETE FROM room_holds WHERE id = :id AND session_id = :session_id"),
@@ -268,8 +277,6 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
 
     db.commit()
     db.refresh(db_booking)
-
-    # Return booking with token
     return Booking.from_orm_with_dates(db_booking, include_token=True, db=db)
 
 
@@ -280,20 +287,17 @@ def update_booking(
     db: Annotated[Session, Depends(get_db)],
     _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    """Update booking"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
 
-    # Update fields
     update_data = booking_update.dict(exclude_unset=True)
     status_changing_to = None
+
     for field, value in update_data.items():
         if field in ["checkIn", "checkOut"]:
             try:
-                if field == "checkIn" and value:
-                    value = datetime.fromisoformat(value.replace("Z", "+00:00"))
-                elif field == "checkOut" and value:
+                if value:
                     value = datetime.fromisoformat(value.replace("Z", "+00:00"))
             except (ValueError, AttributeError) as err:
                 raise HTTPException(status_code=400, detail=f"Invalid date format for {field}") from err
@@ -309,12 +313,20 @@ def update_booking(
         elif field == "roomNumber":
             db_booking.room_number = value
         elif field == "status":
+            # Enforce state machine
+            current = db_booking.status
+            allowed = VALID_STATUS_TRANSITIONS.get(current, set())
+            if value not in allowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot transition booking from '{current}' to '{value}'. "
+                    f"Allowed transitions: {sorted(allowed) or 'none (terminal state)'}.",
+                )
             status_changing_to = value
             db_booking.status = value
         else:
             setattr(db_booking, field, value)
 
-    # On checkout: create cleaning task and auto-assign via round-robin
     if status_changing_to == "Checked-out":
         room = db.query(RoomModel).filter(RoomModel.id == db_booking.room_id).first()
         staff_id, staff_name = round_robin_assign(db)
@@ -342,11 +354,9 @@ def delete_booking(
     db: Annotated[Session, Depends(get_db)],
     _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    """Delete booking and related guest tokens"""
     db_booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not db_booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    # First delete related guest tokens (FK on bookings.id)
     db.query(GuestTokenModel).filter(GuestTokenModel.booking_id == booking_id).delete()
     db.delete(db_booking)
     db.commit()

@@ -3,6 +3,7 @@ import type { Room } from "../../mocks/rooms";
 import { tasksApi, roomsApi, bookingsApi } from "../../api/api";
 import type { CleaningTask } from "../../mocks/tasks";
 import type { Booking } from "../../mocks/bookings";
+import { useAuthStore, canManageEngine } from "../../store/authStore";
 import RoomCard from "../../components/RoomCard";
 import EmptyState from "../../ui/EmptyState";
 import PageHeader from "../../ui/PageHeader";
@@ -12,6 +13,7 @@ import Modal from "../../ui/Modal";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import { layout, colors } from "../../constants/designTokens";
 import toast from "react-hot-toast";
+import { useI18n } from "../../i18n";
 
 type StatusFilter = Room["status"] | "All";
 
@@ -25,6 +27,9 @@ const statusColors = {
 };
 
 export default function AdminPage() {
+  const { t, locale } = useI18n();
+  const role     = useAuthStore((s) => s.role);
+  const canAdmin = canManageEngine(role); // OWNER + SYS_ADMIN can add/delete rooms
   const [rooms, setRooms] = useState<Room[]>([]);
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -67,7 +72,7 @@ export default function AdminPage() {
       const data = await roomsApi.getAll();
       setRooms(data);
     } catch (error) {
-      toast.error("Error loading rooms");
+      toast.error(t("admin.errorLoadRooms"));
       console.error(error);
     } finally {
       setLoading(false);
@@ -79,7 +84,7 @@ export default function AdminPage() {
       const data = await tasksApi.getAll();
       setTasks(data);
     } catch (error) {
-      toast.error("Error loading tasks");
+      toast.error(t("admin.errorLoadTasks"));
       console.error(error);
     }
   };
@@ -89,7 +94,7 @@ export default function AdminPage() {
       const data = await bookingsApi.getAll();
       setBookings(data);
     } catch (error) {
-      toast.error("Error loading bookings");
+      toast.error(t("admin.errorLoadBookings"));
       console.error(error);
     }
   };
@@ -144,7 +149,7 @@ export default function AdminPage() {
       await loadRooms();
       const updatedRooms = await roomsApi.getAll();
       const room = updatedRooms.find((r) => r.id === pendingStatusChange.roomId);
-      toast.success(`Room #${room?.number || pendingStatusChange.roomId} set to Maintenance`);
+      toast.success(t("admin.roomSetMaintenance", { number: room?.number || String(pendingStatusChange.roomId) }));
       setShowMaintenanceConfirmModal(false);
       setPendingStatusChange(null);
       // Update selectedRoom if it's the same room
@@ -159,7 +164,7 @@ export default function AdminPage() {
         }
       }, 100);
     } catch (error) {
-      toast.error("Error updating room status");
+      toast.error(t("admin.errorUpdateStatus"));
       console.error(error);
     }
   };
@@ -183,13 +188,13 @@ export default function AdminPage() {
         taskPriority,
         taskNotes || undefined
       );
-      toast.success(`Cleaning task created for Room #${selectedRoom.number}`);
+      toast.success(t("admin.taskCreated", { number: selectedRoom.number }));
       setShowCreateTaskForm(false);
       setTaskNotes("");
       setTaskPriority("Medium");
       await loadTasks();
     } catch (error) {
-      toast.error("Error creating task");
+      toast.error(t("admin.errorCreateTask"));
       console.error(error);
     }
   };
@@ -213,19 +218,19 @@ export default function AdminPage() {
   const handleSaveRoom = async () => {
     // Валидация обязательных полей
     if (!roomForm.number.trim()) {
-      toast.error("Please fill in the Room Number field");
+      toast.error(t("admin.roomNumberRequired"));
       return;
     }
     if (!roomForm.category.trim()) {
-      toast.error("Please fill in the Category field");
+      toast.error(t("admin.categoryRequired"));
       return;
     }
     if (roomForm.capacity === null || roomForm.capacity === undefined || roomForm.capacity <= 0) {
-      toast.error("Please fill in the Capacity field with a valid number");
+      toast.error(t("admin.capacityRequired"));
       return;
     }
     if (roomForm.price === null || roomForm.price === undefined || roomForm.price < 0) {
-      toast.error("Please fill in the Price per night field with a valid number");
+      toast.error(t("admin.priceRequired"));
       return;
     }
 
@@ -243,7 +248,7 @@ export default function AdminPage() {
 
       if (isEditingRoom && selectedRoom) {
         await roomsApi.update(selectedRoom.id, roomData);
-        toast.success(`Room #${roomForm.number} updated successfully`);
+        toast.success(t("admin.roomUpdated", { number: roomForm.number }));
         await loadRooms();
         // Reload and update selectedRoom with fresh data from API
         const updatedRooms = await roomsApi.getAll();
@@ -262,12 +267,12 @@ export default function AdminPage() {
         }, 100);
       } else {
         await roomsApi.create(roomData);
-        toast.success(`Room #${roomForm.number} created successfully`);
+        toast.success(t("admin.roomCreated", { number: roomForm.number }));
         setShowRoomFormModal(false);
         await loadRooms();
       }
     } catch (error) {
-      toast.error(`Error ${isEditingRoom ? "updating" : "creating"} room`);
+      toast.error(isEditingRoom ? t("admin.errorUpdateRoom") : t("admin.errorCreateRoom"));
       console.error(error);
     }
   };
@@ -277,7 +282,7 @@ export default function AdminPage() {
 
     try {
       await roomsApi.delete(selectedRoom.id);
-      toast.success(`Room #${selectedRoom.number} deleted successfully`);
+      toast.success(t("admin.roomDeleted", { number: selectedRoom.number }));
       setShowDeleteConfirmModal(false);
       setShowRoomDetailsModal(false);
       setSelectedRoom(null);
@@ -290,7 +295,7 @@ export default function AdminPage() {
         }
       }, 100);
     } catch (error) {
-      toast.error("Error deleting room");
+      toast.error(t("admin.errorDeleteRoom"));
       console.error(error);
     }
   };
@@ -352,7 +357,7 @@ export default function AdminPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -363,57 +368,59 @@ export default function AdminPage() {
 
 
   if (loading) {
-    return <LoadingSpinner message="Loading rooms..." />;
+    return <LoadingSpinner message={t("admin.loadingRooms")} />;
   }
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Administration Panel"
-        subtitle="Management of rooms and statuses"
+        title={t("admin.title")}
+        subtitle={t("admin.subtitle")}
         action={
-          <Button variant="primary" size="sm" onClick={handleAddRoom}>
-            Add room
-          </Button>
+          canAdmin ? (
+            <Button variant="primary" size="sm" onClick={handleAddRoom}>
+              {t("admin.addRoom")}
+            </Button>
+          ) : undefined
         }
       />
 
       {/* Room Availability */}
       <Card padding="sm">
         <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-          Room Availability
+          {t("admin.roomAvailability")}
         </h3>
         <div className={layout.grid.stats}>
           <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">Total rooms</div>
+            <div className="text-xs text-gray-600 dark:text-gray-400 mb-0.5">{t("admin.totalRooms")}</div>
             <div className="text-xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
           </div>
           <div className={`p-3 rounded-lg border ${colors.success.light}`}>
-            <div className="text-xs text-green-700 dark:text-green-400 mb-0.5">Available</div>
+            <div className="text-xs text-green-700 dark:text-green-400 mb-0.5">{t("admin.available")}</div>
             <div className="text-xl font-bold text-green-800 dark:text-green-300">{stats.available}</div>
-            <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">Ready to sell</p>
+            <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">{t("admin.readyToSell")}</p>
           </div>
           <div className="p-3 bg-blue-50 dark:bg-blue-900/20 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="text-xs text-blue-700 dark:text-blue-400 mb-0.5">Occupied</div>
+            <div className="text-xs text-blue-700 dark:text-blue-400 mb-0.5">{t("admin.occupied")}</div>
             <div className="text-xl font-bold text-blue-800 dark:text-blue-300">{stats.occupied}</div>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Currently occupied</p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{t("admin.currentlyOccupied")}</p>
           </div>
           <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-0.5">Cleaning</div>
+            <div className="text-xs text-yellow-700 dark:text-yellow-400 mb-0.5">{t("admin.cleaning")}</div>
             <div className="text-xl font-bold text-yellow-800 dark:text-yellow-300">{stats.cleaning}</div>
-            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">Being cleaned</p>
+            <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-0.5">{t("admin.beingCleaned")}</p>
           </div>
           <div className={`p-3 rounded-lg border ${colors.danger.light}`}>
-            <div className="text-xs text-red-700 dark:text-red-400 mb-0.5">Maintenance</div>
+            <div className="text-xs text-red-700 dark:text-red-400 mb-0.5">{t("admin.maintenance")}</div>
             <div className="text-xl font-bold text-red-800 dark:text-red-300">{stats.maintenance}</div>
-            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">Cannot be sold</p>
+            <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{t("admin.cannotBeSold")}</p>
           </div>
         </div>
         {pricingSummary && (
           <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-            Predicted pricing is active on {pricingSummary.pricedRooms} rooms.
-            {pricingSummary.stayDate ? ` Stay date: ${pricingSummary.stayDate}.` : ""}
-            {pricingSummary.snapshotDate ? ` Snapshot date: ${pricingSummary.snapshotDate}.` : ""}
+            {t("admin.pricingActive", { count: String(pricingSummary.pricedRooms) })}
+            {pricingSummary.stayDate ? ` ${t("admin.pricingStayDate", { date: pricingSummary.stayDate })}` : ""}
+            {pricingSummary.snapshotDate ? ` ${t("admin.pricingSnapshotDate", { date: pricingSummary.snapshotDate })}` : ""}
           </div>
         )}
       </Card>
@@ -424,7 +431,7 @@ export default function AdminPage() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search by number or category..."
+              placeholder={t("admin.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
@@ -436,11 +443,11 @@ export default function AdminPage() {
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
-              <option value="All">All statuses</option>
-              <option value="Available">Available</option>
-              <option value="Occupied">Occupied</option>
-              <option value="Cleaning">Cleaning</option>
-              <option value="Maintenance">Maintenance</option>
+              <option value="All">{t("admin.allStatuses")}</option>
+              <option value="Available">{t("admin.available")}</option>
+              <option value="Occupied">{t("admin.occupied")}</option>
+              <option value="Cleaning">{t("admin.cleaning")}</option>
+              <option value="Maintenance">{t("admin.maintenance")}</option>
             </select>
           </div>
         </div>
@@ -450,14 +457,14 @@ export default function AdminPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-gray-800 dark:text-white">
-            Rooms ({filteredRooms.length})
+            {t("admin.roomsCount", { count: String(filteredRooms.length) })}
           </h2>
         </div>
         {filteredRooms.length === 0 ? (
           <Card>
             <EmptyState
-              title="No rooms found"
-              message="Try changing the search filters to see more rooms."
+              title={t("admin.noRoomsFound")}
+              message={t("admin.noRoomsMessage")}
             />
           </Card>
         ) : (
@@ -486,7 +493,7 @@ export default function AdminPage() {
           setIsEditingRoom(false);
           setAmenitiesInput("");
         }}
-        title="Room Details"
+        title={t("admin.roomDetails")}
         size="xl"
         footer={
           roomDetailsView === "edit" ? (
@@ -504,10 +511,10 @@ export default function AdminPage() {
                   }
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button variant="primary" size="sm" fullWidth onClick={handleSaveRoom}>
-                Save Changes
+                {t("admin.saveChanges")}
               </Button>
             </div>
           ) : null
@@ -524,7 +531,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Room Number *
+                      {t("admin.roomNumber")} *
                     </label>
                     <input
                       type="text"
@@ -537,7 +544,7 @@ export default function AdminPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Category *
+                      {t("admin.category")} *
                     </label>
                     <input
                       type="text"
@@ -553,7 +560,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Status *
+                      {t("admin.status")} *
                     </label>
                     <select
                       value={roomForm.status}
@@ -565,15 +572,15 @@ export default function AdminPage() {
                       }
                       className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     >
-                      <option value="Available">Available</option>
-                      <option value="Occupied">Occupied</option>
-                      <option value="Cleaning">Cleaning</option>
-                      <option value="Maintenance">Maintenance</option>
+                      <option value="Available">{t("admin.available")}</option>
+                      <option value="Occupied">{t("admin.occupied")}</option>
+                      <option value="Cleaning">{t("admin.cleaning")}</option>
+                      <option value="Maintenance">{t("admin.maintenance")}</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Capacity *
+                      {t("admin.capacity")} *
                     </label>
                     <input
                       type="text"
@@ -599,7 +606,7 @@ export default function AdminPage() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Price per night ($) *
+                    {t("admin.pricePerNight")} *
                   </label>
                   <input
                     type="text"
@@ -611,9 +618,7 @@ export default function AdminPage() {
                       if (value === "") {
                         setRoomForm({ ...roomForm, price: null as any });
                       } else {
-                        // Разрешаем только цифры и точку
                         const cleanedValue = value.replace(/[^0-9.]/g, '');
-                        // Проверяем, что точка только одна
                         const parts = cleanedValue.split('.');
                         const finalValue = parts.length > 2
                           ? parts[0] + '.' + parts.slice(1).join('')
@@ -633,27 +638,27 @@ export default function AdminPage() {
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Description
+                    {t("admin.description")}
                   </label>
                   <textarea
                     value={roomForm.description}
                     onChange={(e) => setRoomForm({ ...roomForm, description: e.target.value })}
                     rows={3}
                     className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="Room description..."
+                    placeholder={t("admin.roomDescPlaceholder")}
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Amenities (comma-separated)
+                    {t("admin.amenities")}
                   </label>
                   <input
                     type="text"
                     value={amenitiesInput}
                     onChange={(e) => setAmenitiesInput(e.target.value)}
                     className="w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                    placeholder="e.g., Wi-Fi, TV, Air conditioner"
+                    placeholder={t("admin.amenitiesPlaceholder")}
                   />
                 </div>
               </div>
@@ -665,13 +670,13 @@ export default function AdminPage() {
               <div className="space-y-4">
                 <Card padding="sm">
                   <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-                    Cleaning
+                    {t("admin.cleaning")}
                   </h3>
                   {currentTask ? (
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5 block">
-                          Current Task
+                          {t("admin.currentTask")}
                         </label>
                         <div className="p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
                           <div className="flex items-center gap-2 mb-1.5">
@@ -698,11 +703,9 @@ export default function AdminPage() {
                             onClick={async () => {
                               try {
                                 await tasksApi.complete(currentTask.id);
-                                toast.success("Task marked as completed");
+                                toast.success(t("admin.taskCompleted"));
                                 await loadTasks();
-                                // Обновить список комнат, чтобы увидеть новый статус (Available)
                                 await loadRooms();
-                                // Обновить selectedRoom, если он был выбран
                                 if (selectedRoom) {
                                   const updatedRooms = await roomsApi.getAll();
                                   const updatedRoom = updatedRooms.find((r) => r.id === selectedRoom.id);
@@ -711,12 +714,12 @@ export default function AdminPage() {
                                   }
                                 }
                               } catch (error) {
-                                toast.error("Error completing task");
+                                toast.error(t("admin.errorCompleteTask"));
                                 console.error(error);
                               }
                             }}
                           >
-                            Mark Complete
+                            {t("admin.markComplete")}
                           </Button>
                         )}
                       </div>
@@ -727,28 +730,28 @@ export default function AdminPage() {
                         <div className="space-y-4">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
-                              Priority
+                              {t("admin.priority")}
                             </label>
                             <select
                               value={taskPriority}
                               onChange={(e) => setTaskPriority(e.target.value as "Low" | "Medium" | "High")}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
                             >
-                              <option value="Low">Low</option>
-                              <option value="Medium">Medium</option>
-                              <option value="High">High</option>
+                              <option value="Low">{t("priorities.Low")}</option>
+                              <option value="Medium">{t("priorities.Medium")}</option>
+                              <option value="High">{t("priorities.High")}</option>
                             </select>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 uppercase tracking-wide">
-                              Notes (optional)
+                              {t("admin.notesOptional")}
                             </label>
                             <textarea
                               value={taskNotes}
                               onChange={(e) => setTaskNotes(e.target.value)}
                               rows={3}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors resize-none"
-                              placeholder="Add any special instructions..."
+                              placeholder={t("admin.notesPlaceholder")}
                             />
                           </div>
                         </div>
@@ -764,7 +767,7 @@ export default function AdminPage() {
                             setTaskPriority("Medium");
                           }}
                         >
-                          Cancel
+                          {t("common.cancel")}
                         </Button>
                         <Button
                           variant="primary"
@@ -772,21 +775,21 @@ export default function AdminPage() {
                           className="sm:flex-1"
                           onClick={handleCreateTask}
                         >
-                          Create Task
+                          {t("admin.createTask")}
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-4">
                       <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                        No active cleaning task
+                        {t("admin.noActiveTask")}
                       </p>
                       <Button
                         variant="primary"
                         size="sm"
                         onClick={() => setShowCreateTaskForm(true)}
                       >
-                        Create Cleaning Task
+                        {t("admin.createCleaningTask")}
                       </Button>
                     </div>
                   )}
@@ -815,7 +818,7 @@ export default function AdminPage() {
                       }
                     }}
                   >
-                    Edit
+                    {t("admin.edit")}
                   </Button>
                   <Button
                     variant="danger"
@@ -828,7 +831,7 @@ export default function AdminPage() {
                       }
                     }}
                   >
-                    Danger Zone
+                    {t("admin.dangerZone")}
                   </Button>
                 </div>
               </div>
@@ -852,12 +855,12 @@ export default function AdminPage() {
               {/* Primary info */}
               <Card padding="sm">
                 <h3 className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">
-                  Primary Info
+                  {t("admin.primaryInfo")}
                 </h3>
                 <div className="space-y-3">
                   <div>
                     <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
-                      Room Type
+                      {t("admin.roomType")}
                     </label>
                     <p className="text-sm text-gray-900 dark:text-white">
                       {selectedRoom.category}
@@ -866,25 +869,25 @@ export default function AdminPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
-                        Capacity
+                        {t("admin.capacity")}
                       </label>
                       <p className="text-sm text-gray-900 dark:text-white">
-                        {selectedRoom.capacity} people
+                        {t("admin.people", { count: String(selectedRoom.capacity) })}
                       </p>
                     </div>
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1 block">
-                        Price
+                        {t("admin.price")}
                       </label>
                       <p className="text-sm text-gray-900 dark:text-white">
-                        {selectedRoom.price.toLocaleString("en-US")} $/night
+                        {selectedRoom.price.toLocaleString(locale)} {t("admin.perNight")}
                       </p>
                     </div>
                   </div>
                   {selectedRoom.amenities && selectedRoom.amenities.length > 0 && (
                     <div>
                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 block">
-                        Amenities
+                        {t("admin.amenities")}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {selectedRoom.amenities.map((amenity, idx) => (
@@ -1436,20 +1439,22 @@ export default function AdminPage() {
             <Button variant="danger" size="sm" fullWidth onClick={confirmMaintenanceChange}>
               Mark as Maintenance
             </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              fullWidth
-              onClick={() => {
-                setShowMaintenanceConfirmModal(false);
-                setPendingStatusChange(null);
-                if (selectedRoom) {
-                  setShowDeleteConfirmModal(true);
-                }
-              }}
-            >
-              Delete Room
-            </Button>
+            {canAdmin && (
+              <Button
+                variant="danger"
+                size="sm"
+                fullWidth
+                onClick={() => {
+                  setShowMaintenanceConfirmModal(false);
+                  setPendingStatusChange(null);
+                  if (selectedRoom) {
+                    setShowDeleteConfirmModal(true);
+                  }
+                }}
+              >
+                Delete Room
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
@@ -1495,9 +1500,11 @@ export default function AdminPage() {
             >
               Cancel
             </Button>
-            <Button variant="danger" size="sm" fullWidth onClick={handleDeleteRoom}>
-              Delete
-            </Button>
+            {canAdmin && (
+              <Button variant="danger" size="sm" fullWidth onClick={handleDeleteRoom}>
+                Delete
+              </Button>
+            )}
           </div>
         }
       >

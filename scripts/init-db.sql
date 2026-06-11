@@ -181,8 +181,10 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(255) NOT NULL UNIQUE,
     full_name VARCHAR(120) NOT NULL,
     role VARCHAR(20) NOT NULL,
+    password_hash VARCHAR(255),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     last_login_at TIMESTAMPTZ,
+    chat_wallpaper VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT users_role_chk CHECK (role IN ('OWNER', 'STAFF'))
@@ -220,10 +222,22 @@ CREATE INDEX IF NOT EXISTS idx_email_otps_email_created_at
 CREATE INDEX IF NOT EXISTS idx_email_otps_expires_at
     ON email_otps (expires_at);
 
-INSERT INTO users (email, full_name, role, is_active)
+INSERT INTO users (email, full_name, role, password_hash, is_active)
 VALUES
-    ('admin@nextstay.com', 'Admin User', 'OWNER', TRUE),
-    ('staff@nextstay.com', 'Staff User', 'STAFF', TRUE)
+    (
+        'admin@nextstay.com',
+        'Admin User',
+        'OWNER',
+        'ad86f7b12998e74610480a33cf5b63c65c7aa71806294ead8c1797b442f75302:48e4ba4a91cdc7623318d17ec51ad56c883f84c56ffdc00e19b09418c987e0f3',
+        TRUE
+    ),
+    (
+        'staff@nextstay.com',
+        'Staff User',
+        'STAFF',
+        'e1ebe27883cf319856064b6aca5d5c4d4cc6e90b1de3ef4f8f54a5cdc8e630ab:f396d335e4118707bcb1c242e247a30039efac0ad4c837be21b657ea052d6889',
+        TRUE
+    )
 ON CONFLICT (email) DO NOTHING;
 
 -- ------------------------------------------

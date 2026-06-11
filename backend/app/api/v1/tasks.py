@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
@@ -6,12 +6,14 @@ from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["tasks"])
 
 ALL_ROLES = ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF")
+VALID_PRIORITIES = {"Low", "Medium", "High", "Urgent"}
+VALID_STATUSES = {"Pending", "In Progress", "Completed"}
 
 
 def get_db():
@@ -36,10 +38,17 @@ class TaskCreate(BaseModel):
     priority: str = "Medium"
     notes: str | None = None
 
+    @field_validator("priority")
+    @classmethod
+    def validate_priority(cls, v: str) -> str:
+        if v not in VALID_PRIORITIES:
+            raise ValueError(f"priority must be one of: {sorted(VALID_PRIORITIES)}")
+        return v
+
 
 class TaskAssign(BaseModel):
     staffId: int
-    staffName: str
+    staffName: str = Field(..., min_length=1)
 
 
 class Task(TaskBase):
@@ -98,7 +107,7 @@ def create_task(
     db: Session = Depends(get_db),
     _auth=Depends(require_roles(*ALL_ROLES)),
 ):
-    """Create a cleaning task, change room to Cleaning, and auto-assign via round-robin."""
+    """Create a cleaning task, set room to Cleaning, and auto-assign via round-robin."""
     room = db.query(RoomModel).filter(RoomModel.id == task.roomId).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -151,8 +160,11 @@ def complete_task(
     if not db_task:
         raise HTTPException(status_code=404, detail="Task not found")
 
+    if db_task.status == "Completed":
+        raise HTTPException(status_code=400, detail="Task is already completed.")
+
     db_task.status = "Completed"
-    db_task.completed_at = datetime.now()
+    db_task.completed_at = datetime.now(timezone.utc)
 
     room = db.query(RoomModel).filter(RoomModel.id == db_task.room_id).first()
     if room:

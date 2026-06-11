@@ -65,8 +65,11 @@ def get_current_user(
     if not session:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is not valid.")
 
+    from app.core.utils import ensure_utc
+
     now = datetime.now(timezone.utc)
-    if session.expires_at and now > session.expires_at:
+    expires_at = ensure_utc(session.expires_at)
+    if expires_at and now > expires_at:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
     return user
