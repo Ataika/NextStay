@@ -168,3 +168,28 @@ flowchart LR
 
 ER-добавления, sequence-диаграммы (inbound/outbound), HMAC-безопасность, идемпотентность, анти-эхо,
 конфликты/овербукинг, витрина каналов в DWH. Раздел отчёта № 10 «Hotel Sync Simulator».
+
+## 12. Базис реализации — РАСШИРЯЕМ существующий код (решение 0002)
+
+В дереве уже есть рабочая **one-way single-hotel** реализация — её НЕ выбрасываем, а наращиваем до A.
+
+### Что уже есть и переиспользуем как есть
+- `backend/app/api/v1/hotel_sync.py`: `POST /api/v1/hotel-sync/events` (приём), `GET /hotel-sync/events`, `GET /hotel-sync/channel-bookings`.
+- Идемпотентность: `hotel_sync_events.external_event_id UNIQUE` + `ON CONFLICT DO NOTHING`.
+- Журнал событий `hotel_sync_events` + маппинг `hotel_channel_bookings` (UNIQUE `(hotel_id, external_booking_id)`).
+- Обработчики: `booking_created` (овербукинг-чек, guest token, статус номера), `booking_cancelled` (инвалидация токена, освобождение номера), `room_status_updated`.
+- Аутентификация: общий токен `X-Hotel-Sync-Token` (`HOTEL_SYNC_TOKEN`).
+- Скрипт `scripts/simulate_hotel_site_booking.py`, фронт `HotelSiteSimulatorPage.tsx`.
+
+> Примечание: в коде типы событий `booking_created/booking_cancelled/room_status_updated` (snake_case) — сохраняем эти имена ради совместимости (спека в §6 показывала dotted-нотацию как идею; **источник истины — текущий код**).
+
+### Дельта до варианта A (что добавляем)
+1. **Реестр отелей** — таблица `hotels` (code, name, webhook_url, hmac_secret, active). FK `hotel_sync_events.hotel_id` / `hotel_channel_bookings.hotel_id` → `hotels.id`; убрать `DEFAULT 1`, валидировать существование отеля.
+2. **Мульти-отель в поиске номеров** — `find_room` сейчас ищет `Room.number` глобально; добавить `hotel_id` в `rooms` и искать по `(hotel_id, number)`; уникальность `rooms.number` → `UNIQUE(hotel_id, number)`.
+3. **HMAC** — заголовок `X-NextStay-Signature: sha256=<HMAC(raw_body, hotel.hmac_secret)>`, constant-time сравнение; общий токен оставить как fallback для dev.
+4. **Обратная синхронизация PMS→отель** — `sync_publisher`: при изменениях с `origin=PMS` (отмена/чек-аут/смена статуса в админке) слать подписанный webhook на `hotels.webhook_url`. Анти-эхо: события, пришедшие как inbound (`origin=HOTEL`), не ре-публиковать; добавить колонку `origin` в `hotel_sync_events` и (опц.) `revision`.
+5. **Сервис `hotelsim/`** — отдельное FastAPI-приложение: мини-сайт (vanilla HTML/JS), свой SQLite-стор на N отелей, `POST /webhook` (приём PMS-событий), фоновый генератор трафика, исходящие подписанные вызовы на PMS `/hotel-sync/events`. Сервис в `docker-compose` (порт 8090).
+6. **Миграция** — расширить `scripts/migrate_add_hotel_sync.sql` (новые таблица `hotels`, колонки `origin`/`revision`, FK) и почистить sqlfluff-замечания (обходили `--no-verify`).
+
+### Совместимость
+- Все изменения аддитивны; существующие one-way вызовы продолжают работать (общий токен как fallback, `hotel_id` по умолчанию маппится на seed-отель).
