@@ -155,7 +155,7 @@ def create_booking(booking: BookingCreate, db: Annotated[Session, Depends(get_db
         .filter(
             and_(
                 BookingModel.room_id == booking.roomId,
-                BookingModel.status.in_(["Upcoming", "Checked-in"]),
+                BookingModel.status.in_(["Confirmed", "Upcoming", "Checked-in"]),
                 or_(
                     # Booking starts in our period
                     and_(BookingModel.check_in >= check_in, BookingModel.check_in < check_out),

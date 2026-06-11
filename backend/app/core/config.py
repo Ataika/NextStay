@@ -57,3 +57,7 @@ DEV_OWNER_TOKEN = os.getenv("DEV_OWNER_TOKEN", os.getenv("PRICING_LAB_DEV_TOKEN"
 # Pricing lab dev access remains aliased to the shared dev owner token
 PRICING_LAB_ALLOW_DEV_TOKEN = DEV_OWNER_TOKEN_ENABLED
 PRICING_LAB_DEV_TOKEN = DEV_OWNER_TOKEN
+
+# External hotel-site synchronization simulator
+HOTEL_SYNC_TOKEN_ENABLED = os.getenv("HOTEL_SYNC_TOKEN_ENABLED", "true").strip().lower() == "true"
+HOTEL_SYNC_TOKEN = os.getenv("HOTEL_SYNC_TOKEN", "dev-hotel-sync-token")

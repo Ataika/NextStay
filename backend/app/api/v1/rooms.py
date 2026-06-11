@@ -201,7 +201,7 @@ def get_available_rooms(
         db.query(BookingModel)
         .filter(
             and_(
-                BookingModel.status.in_(["Upcoming", "Checked-in"]),
+                BookingModel.status.in_(["Confirmed", "Upcoming", "Checked-in"]),
                 or_(
                     # Booking starts in our period
                     and_(BookingModel.check_in >= check_in_date, BookingModel.check_in < check_out_date),

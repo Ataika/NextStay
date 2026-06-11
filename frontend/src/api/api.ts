@@ -670,3 +670,106 @@ export const pricingLabApi = {
     return response.data;
   },
 };
+
+// ---------------------------------------------------------------------------
+// Hotel Sync Simulator API
+// ---------------------------------------------------------------------------
+
+export interface HotelSimulatorRoom {
+  id: number;
+  number: string;
+  category: string;
+  price: number;
+  capacity: number;
+  description: string | null;
+  amenities: string[] | null;
+  totalPrice: number;
+  nights: number;
+}
+
+export interface HotelSyncEventPayload {
+  eventId: string;
+  hotelId: number;
+  source: string;
+  type: "booking_created" | "booking_cancelled" | "room_status_updated";
+  externalBookingId?: string;
+  roomId?: number;
+  roomNumber?: string;
+  guestName?: string;
+  guestEmail?: string;
+  checkIn?: string;
+  checkOut?: string;
+  amountPaid?: number;
+  status?: string;
+}
+
+export interface HotelSyncResponse {
+  eventId: string;
+  eventStatus: string;
+  action: string;
+  bookingId: number | null;
+  roomId: number | null;
+  roomNumber: string | null;
+  externalBookingId: string | null;
+  bookingStatus: string | null;
+  guestToken: string | null;
+  message: string;
+}
+
+export interface HotelSyncEventLog {
+  id: number;
+  hotelId: number;
+  externalEventId: string;
+  source: string;
+  eventType: string;
+  status: string;
+  error: string | null;
+  bookingId: number | null;
+  receivedAt: string;
+  processedAt: string | null;
+}
+
+export interface HotelChannelBookingLog {
+  id: number;
+  hotelId: number;
+  externalBookingId: string;
+  bookingId: number | null;
+  roomId: number | null;
+  roomNumber: string;
+  source: string;
+  status: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  guestName: string | null;
+  guestEmail: string | null;
+  syncedAt: string;
+  cancelledAt: string | null;
+}
+
+const HOTEL_SYNC_TOKEN = import.meta.env.VITE_HOTEL_SYNC_TOKEN || "dev-hotel-sync-token";
+
+export const hotelSyncApi = {
+  searchAvailableRooms: async (checkIn: string, checkOut: string): Promise<HotelSimulatorRoom[]> => {
+    const response = await http.get("/rooms/available", {
+      params: { checkIn, checkOut },
+    });
+    return response.data.availableRooms || [];
+  },
+
+  sendEvent: async (payload: HotelSyncEventPayload): Promise<HotelSyncResponse> => {
+    const response = await http.post("/hotel-sync/events", payload, {
+      headers: { "X-Hotel-Sync-Token": HOTEL_SYNC_TOKEN },
+    });
+    return response.data;
+  },
+
+  listEvents: async (): Promise<HotelSyncEventLog[]> => {
+    const response = await http.get("/hotel-sync/events");
+    return response.data;
+  },
+
+  listChannelBookings: async (): Promise<HotelChannelBookingLog[]> => {
+    const response = await http.get("/hotel-sync/channel-bookings");
+    return response.data;
+  },
+};

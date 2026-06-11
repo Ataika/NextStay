@@ -3,6 +3,7 @@ from app.api.v1.bookings import router as bookings_router
 from app.api.v1.guest import router as guest_router
 from app.api.v1.health import router as health_router
 from app.api.v1.holds import router as holds_router
+from app.api.v1.hotel_sync import router as hotel_sync_router
 from app.api.v1.inventory_setup import router as inventory_setup_router
 from app.api.v1.pricing_config import router as pricing_config_router
 from app.api.v1.pricing_lab import router as pricing_lab_router
@@ -53,5 +54,6 @@ app.include_router(pricing_pipeline_router, prefix="/api/v1")
 app.include_router(inventory_setup_router, prefix="/api/v1")
 app.include_router(holds_router, prefix="/api/v1")
 app.include_router(staff_router, prefix="/api/v1")
+app.include_router(hotel_sync_router, prefix="/api/v1")
 
 register_exception_handlers(app)

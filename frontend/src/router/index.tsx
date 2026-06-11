@@ -15,6 +15,7 @@ import PricingConfigPage from "../pages/admin/PricingConfigPage";
 import InventorySetupPage from "../pages/admin/InventorySetupPage";
 import EngineHubPage from "../pages/admin/EngineHubPage";
 import StaffPlannerPage from "../pages/admin/StaffPlannerPage";
+import HotelSiteSimulatorPage from "../pages/admin/HotelSiteSimulatorPage";
 import SettingsPage from "../pages/SettingsPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import AppLayout from "../layouts/AppLayout";
@@ -118,6 +119,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
                 <StaffPlannerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/hotel-site-simulator"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
+                <HotelSiteSimulatorPage />
               </ProtectedRoute>
             }
           />
