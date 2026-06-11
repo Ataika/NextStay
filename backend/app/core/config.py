@@ -74,3 +74,4 @@ PRICING_LAB_DEV_TOKEN = DEV_OWNER_TOKEN
 # External hotel-site synchronization simulator
 HOTEL_SYNC_TOKEN_ENABLED = os.getenv("HOTEL_SYNC_TOKEN_ENABLED", "true").strip().lower() == "true"
 HOTEL_SYNC_TOKEN = os.getenv("HOTEL_SYNC_TOKEN", "dev-hotel-sync-token")
+HOTEL_SYNC_HMAC_ENABLED = os.getenv("HOTEL_SYNC_HMAC_ENABLED", "false").strip().lower() == "true"

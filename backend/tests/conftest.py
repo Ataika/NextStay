@@ -75,6 +75,25 @@ CREATE TABLE IF NOT EXISTS room_holds (
 )
 """
 
+_HOTEL_CHANNEL_BOOKINGS_DDL = """
+CREATE TABLE IF NOT EXISTS hotel_channel_bookings (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    hotel_id            INTEGER NOT NULL DEFAULT 1,
+    external_booking_id TEXT    NOT NULL,
+    booking_id          INTEGER,
+    room_id             INTEGER,
+    room_number         TEXT    NOT NULL,
+    source              TEXT    NOT NULL DEFAULT 'hotel_site_simulator',
+    status              TEXT    NOT NULL DEFAULT 'active',
+    check_in            TIMESTAMP,
+    check_out           TIMESTAMP,
+    guest_name          TEXT,
+    guest_email         TEXT,
+    synced_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at        TIMESTAMP
+)
+"""
+
 _STAFF_DDL = [
     """
     CREATE TABLE IF NOT EXISTS staff_members (
@@ -110,12 +129,14 @@ def fresh_db():
         conn.execute(text(_ROOM_HOLDS_DDL))
         for stmt in _STAFF_DDL:
             conn.execute(text(stmt))
+        conn.execute(text(_HOTEL_CHANNEL_BOOKINGS_DDL))
         conn.commit()
     yield
     with engine.connect() as conn:
         conn.execute(text("DROP TABLE IF EXISTS staff_shifts"))
         conn.execute(text("DROP TABLE IF EXISTS staff_members"))
         conn.execute(text("DROP TABLE IF EXISTS room_holds"))
+        conn.execute(text("DROP TABLE IF EXISTS hotel_channel_bookings"))
         conn.commit()
     Base.metadata.drop_all(bind=engine)
 

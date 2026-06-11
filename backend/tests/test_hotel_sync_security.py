@@ -1,5 +1,7 @@
+import pytest
 from app.api.v1.hotel_sync import should_publish_outbound
 from app.core.hotel_sync_security import sign_payload, verify_signature
+from fastapi import HTTPException
 
 
 def test_sign_payload_is_deterministic_and_prefixed():
@@ -36,3 +38,38 @@ def test_should_publish_outbound_only_for_pms_origin():
     assert should_publish_outbound("PMS") is True
     assert should_publish_outbound("HOTEL") is False
     assert should_publish_outbound(None) is False
+
+
+class _Hotel:
+    def __init__(self, secret):
+        self.hmac_secret = secret
+
+
+def test_authorize_inbound_hmac_ok(monkeypatch):
+    import app.api.v1.hotel_sync as hs
+
+    monkeypatch.setattr(hs, "HOTEL_SYNC_HMAC_ENABLED", True)
+    body = b'{"x":1}'
+    good = sign_payload(body, "secret")
+    hs.authorize_inbound(_Hotel("secret"), body, good, token=None)  # no raise
+
+
+def test_authorize_inbound_hmac_bad_sig_401(monkeypatch):
+    import app.api.v1.hotel_sync as hs
+
+    monkeypatch.setattr(hs, "HOTEL_SYNC_HMAC_ENABLED", True)
+    with pytest.raises(HTTPException) as exc:
+        hs.authorize_inbound(_Hotel("secret"), b'{"x":1}', "sha256=deadbeef", token=None)
+    assert exc.value.status_code == 401
+
+
+def test_authorize_inbound_token_fallback(monkeypatch):
+    import app.api.v1.hotel_sync as hs
+
+    monkeypatch.setattr(hs, "HOTEL_SYNC_HMAC_ENABLED", False)
+    monkeypatch.setattr(hs, "HOTEL_SYNC_TOKEN_ENABLED", True)
+    monkeypatch.setattr(hs, "HOTEL_SYNC_TOKEN", "tok")
+    with pytest.raises(HTTPException) as exc:
+        hs.authorize_inbound(None, b"{}", None, token="wrong")
+    assert exc.value.status_code == 401
+    hs.authorize_inbound(None, b"{}", None, token="tok")  # no raise

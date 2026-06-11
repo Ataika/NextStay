@@ -3,14 +3,15 @@ import secrets
 from datetime import datetime, timezone
 from typing import Annotated, Any
 
-from app.core.config import HOTEL_SYNC_TOKEN, HOTEL_SYNC_TOKEN_ENABLED
+from app.core.config import HOTEL_SYNC_HMAC_ENABLED, HOTEL_SYNC_TOKEN, HOTEL_SYNC_TOKEN_ENABLED
+from app.core.hotel_sync_security import verify_signature
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
 from app.models.hotel import Hotel as HotelModel
 from app.models.room import Room as RoomModel
 from app.security.auth import require_roles
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
@@ -39,14 +40,22 @@ def get_db():
         db.close()
 
 
-def require_hotel_sync_token(x_hotel_sync_token: str | None = Header(None)):
-    if not HOTEL_SYNC_TOKEN_ENABLED:
+def authorize_inbound(
+    hotel: "HotelModel | None",
+    raw_body: bytes,
+    signature: str | None,
+    token: str | None,
+) -> None:
+    """Authorize an inbound sync event. Prefers per-hotel HMAC when enabled.
+
+    Falls back to the shared dev token when HMAC is disabled. Raises 401 on failure.
+    """
+    if HOTEL_SYNC_HMAC_ENABLED:
+        if not hotel or not hotel.hmac_secret or not verify_signature(raw_body, hotel.hmac_secret, signature):
+            raise HTTPException(status_code=401, detail="Invalid or missing HMAC signature.")
         return
-    if not HOTEL_SYNC_TOKEN or x_hotel_sync_token != HOTEL_SYNC_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid hotel sync token.",
-        )
+    if HOTEL_SYNC_TOKEN_ENABLED and (not HOTEL_SYNC_TOKEN or token != HOTEL_SYNC_TOKEN):
+        raise HTTPException(status_code=401, detail="Invalid hotel sync token.")
 
 
 class HotelSyncEventRequest(BaseModel):
@@ -563,15 +572,25 @@ def mark_event_failed(db: Session, event_id: int, error: str) -> None:
 
 
 @router.post("/hotel-sync/events", response_model=HotelSyncResponse, status_code=202)
-def receive_hotel_sync_event(
-    event: HotelSyncEventRequest,
+async def receive_hotel_sync_event(
+    request: Request,
     db: Annotated[Session, Depends(get_db)],
-    _token=Depends(require_hotel_sync_token),
 ):
-    ensure_sync_tables(db)
+    raw_body = await request.body()
+    try:
+        event = HotelSyncEventRequest.model_validate_json(raw_body)
+    except Exception as err:
+        raise HTTPException(status_code=422, detail="Invalid event payload.") from err
 
     if event.type not in VALID_EVENT_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of: {sorted(VALID_EVENT_TYPES)}.")
+
+    hotel = db.query(HotelModel).filter(HotelModel.id == event.hotelId).first()
+    signature = request.headers.get("X-NextStay-Signature")
+    token = request.headers.get("X-Hotel-Sync-Token")
+    authorize_inbound(hotel, raw_body, signature, token)
+
+    ensure_sync_tables(db)
 
     event_id, duplicate = create_event_record(db, event)
     db.commit()

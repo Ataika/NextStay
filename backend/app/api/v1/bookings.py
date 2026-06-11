@@ -3,20 +3,24 @@ import secrets
 from datetime import datetime, timezone
 from typing import Annotated
 
+from app.core.logging import get_logger
 from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
+from app.models.hotel import Hotel as HotelModel
 from app.models.hotel_profile import HotelProfile as HotelProfileModel
 from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
 from app.security.auth import require_roles
+from app.services.sync_publisher import publish_to_hotel
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["bookings"])
+logger = get_logger(__name__)
 
 # Valid booking status transitions (state machine)
 VALID_STATUS_TRANSITIONS: dict[str, set[str]] = {
@@ -342,6 +346,36 @@ def update_booking(
         db.add(cleaning_task)
         if room:
             room.status = "Cleaning"
+
+    if status_changing_to in ("Cancelled", "Checked-out"):
+        try:
+            mapping = (
+                db.execute(
+                    text(
+                        "SELECT hotel_id, external_booking_id FROM hotel_channel_bookings "
+                        "WHERE booking_id = :bid AND status = 'active'"
+                    ),
+                    {"bid": db_booking.id},
+                )
+                .mappings()
+                .first()
+            )
+        except Exception:
+            logger.warning(
+                "hotel_channel_bookings lookup failed for booking %s; skipping outbound publish",
+                db_booking.id,
+                exc_info=True,
+            )
+            mapping = None
+        if mapping:
+            hotel = db.query(HotelModel).filter(HotelModel.id == mapping["hotel_id"]).first()
+            if hotel:
+                event_type = "booking_cancelled" if status_changing_to == "Cancelled" else "room_status_updated"
+                publish_to_hotel(
+                    hotel,
+                    event_type,
+                    {"externalBookingId": mapping["external_booking_id"], "status": status_changing_to},
+                )
 
     db.commit()
     db.refresh(db_booking)
