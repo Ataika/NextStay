@@ -2,6 +2,22 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Phase 2 РЕАЛИЗОВАНА (HMAC + двусторонняя синхронизация)
+
+**Сделано (subagent-driven, TDD, 5 задач + фиксы ревью), 101 тест проходит:**
+- **Task 1** `a7867b8` — `app/core/hotel_sync_security.py`: HMAC-SHA256 `sign_payload`/`verify_signature` (constant-time, над сырыми байтами).
+- **Task 2** `77a0a23` — hotel-scoping: `find_room` (по roomId И roomNumber скоупится по `hotel_id`), `rooms.py` create/update dedup по `(number, hotel_id)`; `hotel_id` номер неизменяем на PATCH; `.dict()`→`.model_dump()`.
+- **Task 3** `be1ca8c` — колонки `origin`/`revision` на `hotel_sync_events` (+ idempotent ALTER, миграция `migrate_add_sync_origin.sql`), helper `should_publish_outbound`.
+- **Task 4** `040502c` — `app/services/sync_publisher.py`: `build_outbound_event` + `publish_to_hotel` (подпись + POST на webhook отеля, инъектируемый `poster`, ошибки не пробрасываются).
+- **Task 5** `78b07bf` — inbound HMAC: `authorize_inbound` + рефактор `receive_hotel_sync_event` (async, raw body, авторизация ПЕРЕД DDL); outbound-хук в `bookings.py` (PMS-отмена/чек-аут брони-из-канала → publish, lookup в try/except); `HOTEL_SYNC_HMAC_ENABLED` (default false → fallback на токен).
+- Ревью поймало и починили: критичный незащищённый SQL (травил сессию на свежей БД), DDL до авторизации (security), мёртвый код.
+
+**Анти-эхо:** обеспечено разделением call-site — inbound (`hotel_sync.py`) НЕ публикует; publish только из PMS-эндпоинтов. `should_publish_outbound` готов к использованию в Phase 3.
+
+**⚠️ Перенесено в Phase 3 (из ревью):** отклонять пустой `hmac_secret` при регистрации отеля; publish→commit fire-and-forget (рассмотреть outbox); полный inbound-флоу (JSONB) проверить на Postgres/вручную (на SQLite не тестируется — покрыт на уровне `authorize_inbound`).
+
+**Дальше:** Phase 3 — отдельный сервис `hotelsim` (FastAPI + vanilla мини-сайт + SQLite-стор N отелей + `POST /webhook` приёмник + генератор трафика + подписанные исходящие вызовы на PMS) + docker-compose (порт 8090) + e2e-демо.
+
 ## 2026-06-12 — Phase 1 РЕАЛИЗОВАНА (мульти-отель: фундамент БД)
 
 **Сделано (subagent-driven, TDD, 4 задачи + фиксы ревью):**
