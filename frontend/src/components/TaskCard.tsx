@@ -1,4 +1,5 @@
 import type { CleaningTask } from "../mocks/tasks";
+import { useI18n } from "../i18n";
 import Button from "../ui/Button";
 
 interface TaskCardProps {
@@ -34,6 +35,7 @@ export default function TaskCard({
   onDelete,
   currentStaffId = 1,
 }: TaskCardProps) {
+  const { locale, priorityLabel, t } = useI18n();
   const priorityColor = priorityColors[task.priority];
   const statusColor = statusColors[task.status];
   const statusIcon = statusIcons[task.status];
@@ -52,23 +54,19 @@ export default function TaskCard({
           <div className="flex items-center gap-2 mb-1">
             <span className="text-lg">{statusIcon}</span>
             <h3 className="font-bold text-lg text-gray-900 dark:text-white">
-              Room #{task.roomNumber}
+              {t("taskCard.room", { room: task.roomNumber })}
             </h3>
           </div>
           {task.assignedToName && (
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Executor: {task.assignedToName}
+              {t("taskCard.executor", { name: task.assignedToName })}
             </p>
           )}
         </div>
         <span
           className={`px-2 py-1 text-xs font-semibold rounded border ${priorityColor}`}
         >
-          {task.priority === "High"
-            ? "High"
-            : task.priority === "Medium"
-            ? "Medium"
-            : "Low"}
+          {priorityLabel(task.priority)}
         </span>
       </div>
 
@@ -89,7 +87,7 @@ export default function TaskCard({
             className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
           <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            Cleaning room
+            {t("taskCard.cleaningRoom")}
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -100,7 +98,7 @@ export default function TaskCard({
             className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
           <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            Change bedding
+            {t("taskCard.changeBedding")}
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -111,7 +109,7 @@ export default function TaskCard({
             className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
           />
           <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            Refill mini bar
+            {t("taskCard.refillMiniBar")}
           </span>
         </div>
       </div>
@@ -124,7 +122,7 @@ export default function TaskCard({
             fullWidth
             onClick={() => onStart(task.id)}
           >
-            Start
+            {t("taskCard.start")}
           </Button>
         )}
         {canComplete && onComplete && (
@@ -134,17 +132,17 @@ export default function TaskCard({
             className="!bg-green-600 dark:!bg-green-500 hover:!bg-green-700 dark:hover:!bg-green-600 focus:!ring-green-500 dark:focus:!ring-green-400"
             onClick={() => onComplete(task.id)}
           >
-            Complete
+            {t("taskCard.complete")}
           </Button>
         )}
         {task.status === "Completed" && (
           <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
-            Completed
+            {t("taskCard.completed")}
           </div>
         )}
         {task.status === "Pending" && task.assignedTo && !isAssignedToMe && (
           <div className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-lg text-center">
-            Assigned to someone else
+            {t("taskCard.assignedElsewhere")}
           </div>
         )}
         {onDelete && (
@@ -153,16 +151,16 @@ export default function TaskCard({
             size="sm"
             onClick={() => onDelete(task.id)}
           >
-            Delete
+            {t("taskCard.delete")}
           </Button>
         )}
       </div>
 
       {/* Timestamp */}
       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-        Created: {new Date(task.createdAt).toLocaleString("en-US")}
+        {t("taskCard.created", { value: new Date(task.createdAt).toLocaleString(locale) })}
         {task.completedAt &&
-          ` • Completed: ${new Date(task.completedAt).toLocaleString("en-US")}`}
+          ` • ${t("taskCard.completedAt", { value: new Date(task.completedAt).toLocaleString(locale) })}`}
       </div>
     </div>
   );

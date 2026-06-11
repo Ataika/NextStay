@@ -16,23 +16,14 @@ from app.core.config import (
     SMTP_PORT,
     SMTP_USER,
 )
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 async def send_email(to_email: str, subject: str, body: str, html_body: str | None = None) -> bool:
-    """
-    Send email via SMTP
-
-    Args:
-        to_email: Email recipient
-        subject: Email subject
-        body: Email body (plain text)
-        html_body: HTML version of the email (optional)
-
-    Returns:
-        True if sent successfully, False otherwise
-    """
     if not SMTP_USER or not SMTP_PASSWORD:
-        print(f"[EMAIL] SMTP not configured. Would send to {to_email}: {subject}")
+        logger.warning("SMTP not configured. Would send to %s: %s", to_email, subject)
         return False
 
     try:
@@ -56,20 +47,20 @@ async def send_email(to_email: str, subject: str, body: str, html_body: str | No
             start_tls=True,
         )
 
-        print(f"[EMAIL] Sent successfully to {to_email}")
+        logger.info("Email sent to %s.", to_email)
         return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send to {to_email}: {str(e)}")
+    except Exception as e:  # noqa: BLE001
+        logger.error("Failed to send email to %s: %s", to_email, e)
         return False
 
 
 def send_otp_email(to_email: str, otp: str) -> bool:
     """Send OTP email via Brevo transactional API."""
     if not BREVO_API_KEY:
-        print(f"[EMAIL] BREVO_API_KEY is missing. Cannot send OTP to {to_email}")
+        logger.error("BREVO_API_KEY is missing. Cannot send OTP to %s.", to_email)
         return False
     if not BREVO_SENDER_EMAIL:
-        print(f"[EMAIL] BREVO_SENDER_EMAIL is missing. Cannot send OTP to {to_email}")
+        logger.error("BREVO_SENDER_EMAIL is missing. Cannot send OTP to %s.", to_email)
         return False
 
     payload = {
@@ -93,14 +84,14 @@ def send_otp_email(to_email: str, otp: str) -> bool:
         with urllib.request.urlopen(request, timeout=10) as response:
             if 200 <= response.status < 300:
                 return True
-            print(f"[EMAIL] Brevo non-success status {response.status} for {to_email}")
+            logger.warning("Brevo non-success status %d for %s.", response.status, to_email)
             return False
     except urllib.error.HTTPError as err:
         details = err.read().decode("utf-8", errors="ignore")
-        print(f"[EMAIL] Brevo HTTP error for {to_email}: {err.code} {details}")
+        logger.error("Brevo HTTP error for %s: %d %s", to_email, err.code, details)
         return False
-    except Exception as err:
-        print(f"[EMAIL] Brevo send failed for {to_email}: {err}")
+    except Exception as err:  # noqa: BLE001
+        logger.error("Brevo send failed for %s: %s", to_email, err)
         return False
 
 
@@ -113,11 +104,8 @@ async def send_booking_confirmation_to_guest(
     total_amount: float,
     guest_token: str,
 ) -> bool:
-    """Send booking confirmation to guest"""
     guest_link = f"{FRONTEND_URL}/guest/{guest_token}"
-
     subject = "Booking Confirmed - NextStay"
-
     body = f"""
 Hello {guest_name},
 
@@ -132,7 +120,6 @@ Access your room: {guest_link}
 
 Thank you for choosing NextStay!
 """
-
     html_body = f"""
 <!DOCTYPE html>
 <html>
@@ -151,22 +138,17 @@ Thank you for choosing NextStay!
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Booking Confirmed!</h1>
-        </div>
+        <div class="header"><h1>Booking Confirmed!</h1></div>
         <div class="content">
             <p>Hello {guest_name},</p>
             <p>Your booking has been confirmed!</p>
-
             <div class="details">
                 <p><strong>Room:</strong> {room_number}</p>
                 <p><strong>Check-in:</strong> {check_in}</p>
                 <p><strong>Check-out:</strong> {check_out}</p>
                 <p><strong>Total:</strong> ${total_amount:.2f}</p>
             </div>
-
             <a href="{guest_link}" class="button">Access Your Room</a>
-
             <p style="margin-top: 30px; font-size: 12px; color: #666;">
                 Thank you for choosing NextStay!
             </p>
@@ -175,7 +157,6 @@ Thank you for choosing NextStay!
 </body>
 </html>
 """
-
     return await send_email(guest_email, subject, body, html_body)
 
 
@@ -188,9 +169,7 @@ async def send_booking_notification_to_owner(
     check_out: str,
     total_amount: float,
 ) -> bool:
-    """Send notification about new booking to owner"""
     subject = "New Booking - NextStay"
-
     body = f"""
 New booking received!
 
@@ -202,7 +181,6 @@ Total: ${total_amount:.2f}
 
 Please check your dashboard for details.
 """
-
     html_body = f"""
 <!DOCTYPE html>
 <html>
@@ -217,12 +195,9 @@ Please check your dashboard for details.
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>New Booking Received</h1>
-        </div>
+        <div class="header"><h1>New Booking Received</h1></div>
         <div class="content">
             <p>A new booking has been confirmed!</p>
-
             <div class="details">
                 <p><strong>Guest:</strong> {guest_name}</p>
                 <p><strong>Email:</strong> {guest_email}</p>
@@ -231,12 +206,10 @@ Please check your dashboard for details.
                 <p><strong>Check-out:</strong> {check_out}</p>
                 <p><strong>Total:</strong> ${total_amount:.2f}</p>
             </div>
-
             <p>Please check your dashboard for details.</p>
         </div>
     </div>
 </body>
 </html>
 """
-
     return await send_email(owner_email, subject, body, html_body)

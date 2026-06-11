@@ -1,251 +1,232 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi, devLoginConfig } from "../api/api";
-import { useAuthStore } from "../store/authStore";
+import LanguageSelector from "../components/LanguageSelector";
+import { useI18n } from "../i18n";
+import { useAuthStore, isAdminRole } from "../store/authStore";
+import type { UserRole } from "../store/authStore";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
+import type { AxiosError } from "axios";
+
+type Mode = "password" | "otp-email" | "otp-code";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState(devLoginConfig.email);
-  const [password, setPassword] = useState(devLoginConfig.password);
+  const [email, setEmail]     = useState("");
+  const [password, setPassword] = useState("");
   const [otpCode, setOtpCode] = useState("");
-  const [error, setError] = useState("");
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const [mode, setMode]       = useState<Mode>("password");
+  const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
-  const token = useAuthStore((s) => s.token);
-  const role = useAuthStore((s) => s.role);
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const token    = useAuthStore((s) => s.token);
+  const role     = useAuthStore((s) => s.role);
+  const setAuth  = useAuthStore((s) => s.setAuth);
   const autoLoginAttemptedRef = useRef(false);
+  const { t } = useI18n();
 
-  const redirectAfterLogin = (userRole: "OWNER" | "STAFF") => {
-    if (userRole === "OWNER") {
-      navigate("/admin");
-      return;
-    }
+  const redirectAfterLogin = useCallback((userRole: UserRole) => {
+    navigate(isAdminRole(userRole) ? "/admin" : "/staff", { replace: true });
+  }, [navigate]);
 
-    if (userRole === "STAFF") {
-      navigate("/staff");
-      return;
-    }
-
-    navigate("/login");
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    const axiosError = error as AxiosError<{ detail?: string }>;
+    return axiosError.response?.data?.detail || axiosError.message || fallback;
   };
 
-  const handleDevLogin = async (loginEmail = email, loginPassword = password) => {
+  // Auto-login for dev owner account
+  useEffect(() => {
+    if (!devLoginConfig.autoLoginEnabled || autoLoginAttemptedRef.current || token || role) return;
+    autoLoginAttemptedRef.current = true;
+    void (async () => {
+      try {
+        const res = await authApi.devLogin(devLoginConfig.email, devLoginConfig.password);
+        setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
+        redirectAfterLogin(res.role as UserRole);
+      } catch { /* ignore */ }
+    })();
+  }, [redirectAfterLogin, role, setAuth, token]);
+
+  // Already logged in
+  useEffect(() => {
+    if (token && role) redirectAfterLogin(role);
+  }, [redirectAfterLogin, role, token]);
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const response = await authApi.devLogin(loginEmail, loginPassword);
-      setAuth(response.token, response.role);
-      redirectAfterLogin(response.role);
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to login with password";
-      setError(msg);
+      const res = await authApi.passwordLogin(email.trim(), password);
+      setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
+      redirectAfterLogin(res.role as UserRole);
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.invalidPassword")));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRequestOtp = async () => {
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const response = await authApi.requestOtp(email);
-      if (response.retryAfterSeconds) {
-        setError(`Please wait ${response.retryAfterSeconds}s before requesting another code.`);
+      const res = await authApi.requestOtp(email.trim());
+      if (res.retryAfterSeconds) {
+        setError(t("login.requestWait", { seconds: res.retryAfterSeconds }));
         return;
       }
-      setStep("otp");
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to send OTP";
-      setError(msg);
+      setMode("otp-code");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.failedSendCode")));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const response = await authApi.verifyOtp(email, otpCode);
-      setAuth(response.token, response.role);
-      redirectAfterLogin(response.role);
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.detail ||
-        err?.response?.data?.error ||
-        err?.message ||
-        "Failed to verify OTP";
-      setError(msg);
+      const res = await authApi.verifyOtp(email.trim(), otpCode);
+      setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
+      redirectAfterLogin(res.role as UserRole);
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.invalidCode")));
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (!devLoginConfig.autoLoginEnabled || autoLoginAttemptedRef.current || token || role) {
-      return;
-    }
-
-    autoLoginAttemptedRef.current = true;
-    void handleDevLogin(devLoginConfig.email, devLoginConfig.password);
-  }, [role, token]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <Card className="w-full max-w-md lg:max-w-lg xl:max-w-xl space-y-8" padding="lg">
-        <div>
-          <h2 className="text-3xl font-bold text-center text-gray-900 dark:text-white">
-            NextStay
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-            {step === "email"
-              ? devLoginConfig.enabled
-                ? "Use your saved dev password or request OTP"
-                : "Enter your email to receive OTP"
-              : "Enter the 6-digit OTP sent to your email"}
+      <Card className="w-full max-w-sm space-y-6" padding="lg">
+        <div className="flex justify-end">
+          <LanguageSelector compact />
+        </div>
+
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">NextStay</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {mode === "otp-code" ? t("login.promptCode") : t("login.promptSignIn")}
           </p>
         </div>
-        <form
-          className="mt-8 space-y-6"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (step === "otp") {
-              void handleVerifyOtp();
-              return;
-            }
 
-            if (devLoginConfig.enabled) {
-              void handleDevLogin();
-              return;
-            }
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-3 py-2 rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
-            void handleRequestOtp();
-          }}
-        >
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          <div className="space-y-4">
+        {/* ---- PASSWORD LOGIN (default) ---- */}
+        {mode === "password" && (
+          <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Email
-              </label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.email")}</label>
               <input
-                id="email"
-                name="email"
                 type="email"
                 required
+                autoFocus
                 value={email}
-                onChange={(e) => setEmail(e.target.value.trim())}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="you@example.com"
-                disabled={step === "otp"}
               />
             </div>
-            {step === "email" && devLoginConfig.enabled && (
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Password
-                </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                  placeholder="Enter password"
-                />
-              </div>
-            )}
-            {step === "otp" && (
-              <div>
-                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  OTP Code
-                </label>
-                <input
-                  id="otp"
-                  name="otp"
-                  type="text"
-                  required
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 dark:focus:border-blue-400"
-                  placeholder="123456"
-                  maxLength={6}
-                />
-              </div>
-            )}
-          </div>
-
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              fullWidth
-              disabled={loading}
-            >
-              {loading
-                ? step === "email"
-                  ? devLoginConfig.enabled
-                    ? "Signing in..."
-                    : "Sending OTP..."
-                  : "Verifying..."
-                : step === "email"
-                  ? devLoginConfig.enabled
-                    ? "Login with Password"
-                    : "Send OTP"
-                  : "Verify OTP"}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.password")}</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="••••••••"
+              />
+            </div>
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? t("login.signingIn") : t("login.signIn")}
             </Button>
-          </div>
+            <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+              {t("login.dontHavePassword")}{" "}
+              <button
+                type="button"
+                className="text-blue-500 hover:underline"
+                onClick={() => { setError(""); setMode("otp-email"); }}
+              >
+                {t("login.useEmailCode")}
+              </button>
+            </p>
+          </form>
+        )}
 
-          {step === "email" && devLoginConfig.enabled && (
-            <Button
-              type="button"
-              variant="secondary"
-              fullWidth
-              disabled={loading}
-              onClick={() => {
-                void handleRequestOtp();
-              }}
-            >
-              Send OTP Instead
+        {/* ---- OTP — enter email ---- */}
+        {mode === "otp-email" && (
+          <form onSubmit={handleRequestOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.email")}</label>
+              <input
+                type="email"
+                required
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="you@example.com"
+              />
+            </div>
+            <Button type="submit" variant="primary" fullWidth disabled={loading}>
+              {loading ? t("login.sending") : t("login.sendCode")}
             </Button>
-          )}
+            <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+              <button
+                type="button"
+                className="text-blue-500 hover:underline"
+                onClick={() => { setError(""); setMode("password"); }}
+              >
+                {`<- ${t("login.backToPassword")}`}
+              </button>
+            </p>
+          </form>
+        )}
 
-          {step === "otp" && (
-            <Button
-              type="button"
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                setStep("email");
-                setOtpCode("");
-                setError("");
-              }}
-            >
-              Change Email
+        {/* ---- OTP — enter code ---- */}
+        {mode === "otp-code" && (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t("login.codeSentTo", { email })}
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                required
+                autoFocus
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest text-center text-lg"
+                placeholder="123456"
+                maxLength={6}
+              />
+            </div>
+            <Button type="submit" variant="primary" fullWidth disabled={loading || otpCode.length !== 6}>
+              {loading ? t("login.verifying") : t("login.verifyCode")}
             </Button>
-          )}
-
-        </form>
+            <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+              <button
+                type="button"
+                className="text-blue-500 hover:underline"
+                onClick={() => { setError(""); setOtpCode(""); setMode("otp-email"); }}
+              >
+                {`<- ${t("login.useDifferentEmail")}`}
+              </button>
+            </p>
+          </form>
+        )}
       </Card>
     </div>
   );

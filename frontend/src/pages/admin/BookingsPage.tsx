@@ -9,10 +9,12 @@ import ErrorState from "../../ui/ErrorState";
 import EmptyState from "../../ui/EmptyState";
 import Modal from "../../ui/Modal";
 import toast from "react-hot-toast";
+import { useI18n } from "../../i18n";
 
 type StatusFilter = Booking["status"] | "All";
 
 export default function BookingsPage() {
+  const { t, locale } = useI18n();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,7 @@ export default function BookingsPage() {
       const data = await bookingsApi.getAll();
       setBookings(data);
     } catch (err) {
-      setError("Failed to load bookings");
+      setError(t("bookings.failedLoad"));
       console.error(err);
     } finally {
       setLoading(false);
@@ -70,7 +72,7 @@ export default function BookingsPage() {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleDateString(locale, {
       year: "numeric",
       month: "short",
       day: "numeric",
@@ -82,11 +84,11 @@ export default function BookingsPage() {
     try {
       setDeleting(true);
       await bookingsApi.delete(deleteTarget.id);
-      toast.success("Booking deleted");
+      toast.success(t("bookings.deleted"));
       setDeleteTarget(null);
       await loadBookings();
     } catch (err) {
-      toast.error("Failed to delete booking");
+      toast.error(t("bookings.deleteFailed"));
       console.error(err);
     } finally {
       setDeleting(false);
@@ -94,18 +96,18 @@ export default function BookingsPage() {
   };
 
   if (loading) {
-    return <LoadingSpinner message="Loading bookings..." />;
+    return <LoadingSpinner message={t("bookings.loading")} />;
   }
 
   if (error) {
-    return <ErrorState title="Error loading bookings" message={error} onRetry={loadBookings} />;
+    return <ErrorState title={t("bookings.errorTitle")} message={error} onRetry={loadBookings} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Bookings"
-        subtitle="Manage guest reservations and check-ins"
+        title={t("bookings.title")}
+        subtitle={t("bookings.subtitle")}
       />
 
       {/* Filters */}
@@ -114,7 +116,7 @@ export default function BookingsPage() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search by guest name or room number..."
+              placeholder={t("bookings.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
@@ -126,7 +128,7 @@ export default function BookingsPage() {
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
             >
-              <option value="All">All statuses</option>
+              <option value="All">{t("bookings.allStatuses")}</option>
               <option value="Pending">Pending</option>
               <option value="Confirmed">Confirmed</option>
               <option value="Upcoming">Upcoming</option>
@@ -141,8 +143,8 @@ export default function BookingsPage() {
       {filteredBookings.length === 0 ? (
         <Card>
           <EmptyState
-            title="No bookings found"
-            message="Try changing the search filters to see more bookings."
+            title={t("bookings.noBookingsFound")}
+            message={t("bookings.noBookingsMessage")}
           />
         </Card>
       ) : (
@@ -152,22 +154,22 @@ export default function BookingsPage() {
               <thead className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Guest Name
+                    {t("bookings.colGuest")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Room
+                    {t("bookings.colRoom")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Check-in
+                    {t("bookings.colCheckIn")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Check-out
+                    {t("bookings.colCheckOut")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Status
+                    {t("bookings.colStatus")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("bookings.colActions")}
                   </th>
                 </tr>
               </thead>
@@ -184,7 +186,7 @@ export default function BookingsPage() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        Room #{booking.roomNumber}
+                        {t("bookings.roomNumber", { number: booking.roomNumber })}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -212,7 +214,7 @@ export default function BookingsPage() {
                         size="sm"
                         onClick={() => setDeleteTarget(booking)}
                       >
-                        Delete
+                        {t("bookings.delete")}
                       </Button>
                     </td>
                   </tr>
@@ -226,7 +228,7 @@ export default function BookingsPage() {
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => !deleting && setDeleteTarget(null)}
-        title="Delete booking"
+        title={t("bookings.deleteTitle")}
         size="sm"
         footer={
           <div className="flex gap-3 w-full">
@@ -236,7 +238,7 @@ export default function BookingsPage() {
               onClick={() => setDeleteTarget(null)}
               disabled={deleting}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
@@ -244,14 +246,18 @@ export default function BookingsPage() {
               onClick={handleDeleteBooking}
               disabled={deleting}
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? t("bookings.deleting") : t("bookings.delete")}
             </Button>
           </div>
         }
       >
         {deleteTarget && (
           <p className="text-gray-700 dark:text-gray-300">
-            Delete booking #{deleteTarget.id} — {deleteTarget.guestName}, Room {deleteTarget.roomNumber}? This cannot be undone.
+            {t("bookings.deleteConfirm", {
+              id: String(deleteTarget.id),
+              name: deleteTarget.guestName,
+              room: deleteTarget.roomNumber,
+            })}
           </p>
         )}
       </Modal>

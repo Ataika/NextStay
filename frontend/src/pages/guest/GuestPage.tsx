@@ -1,7 +1,10 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Link, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
-import { guestApi } from "../../api/api";
+import { guestApi, hotelProfileApi, type HotelProfileData } from "../../api/api";
+import LanguageSelector from "../../components/LanguageSelector";
+import { useI18n } from "../../i18n";
+import { formatDuration } from "../../utils/format";
 import type { GuestToken } from "../../mocks/guest";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import ErrorState from "../../ui/ErrorState";
@@ -10,8 +13,38 @@ import Card from "../../ui/Card";
 import Modal from "../../ui/Modal";
 import toast from "react-hot-toast";
 
+const googleMapsEmbedApiKey = import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY?.trim() ?? "";
+
+function buildHotelLocationQuery(hotelProfile: HotelProfileData | null): string | null {
+  if (!hotelProfile) return null;
+
+  const address = hotelProfile.address?.trim();
+  if (address) {
+    return address;
+  }
+
+  if (hotelProfile.lat !== null && hotelProfile.lng !== null) {
+    return `${hotelProfile.lat},${hotelProfile.lng}`;
+  }
+
+  return null;
+}
+
+function buildGoogleMapsLink(query: string): string {
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}`;
+}
+
+function buildGoogleMapsEmbedUrl(query: string): string {
+  if (googleMapsEmbedApiKey) {
+    return `https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(googleMapsEmbedApiKey)}&q=${encodeURIComponent(query)}`;
+  }
+
+  return `https://www.google.com/maps?q=${encodeURIComponent(query)}&z=15&output=embed`;
+}
+
 export default function GuestPage() {
   const { token } = useParams<{ token: string }>();
+  const { locale, t } = useI18n();
   const [guest, setGuest] = useState<GuestToken | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
@@ -22,6 +55,20 @@ export default function GuestPage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [hotelProfile, setHotelProfile] = useState<HotelProfileData | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const checkoutCountdown = useMemo(() => {
+    if (!guest?.checkOut || guest.accessStatus !== "Active") return null;
+    const checkout = new Date(guest.checkOut);
+    if (checkout <= now) return null;
+    return formatDuration(now, checkout);
+  }, [guest, now]);
 
   useEffect(() => {
     if (token) {
@@ -30,7 +77,7 @@ export default function GuestPage() {
       setLoading(false);
       setGuest(null);
     }
-  }, [token]);
+  }, [loadGuestData, token]);
 
   useEffect(() => {
     const updateQrSize = () => {
@@ -41,25 +88,29 @@ export default function GuestPage() {
     return () => window.removeEventListener("resize", updateQrSize);
   }, []);
 
-  const loadGuestData = async (guestToken: string) => {
+  useEffect(() => {
+    hotelProfileApi.get().then(setHotelProfile).catch(() => {});
+  }, []);
+
+  const loadGuestData = useCallback(async (guestToken: string) => {
     try {
       setLoading(true);
       const data = await guestApi.getByToken(guestToken);
       if (!data) {
-        toast.error("Invalid token");
+        toast.error(t("guest.invalidToast"));
         return;
       }
       if (!data.isValid) {
-        toast.error("Token expired");
+        toast.error(t("guest.expiredToast"));
       }
       setGuest(data);
     } catch (error) {
-      toast.error("Error loading data");
+      toast.error(t("guest.loadError"));
       console.error(error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
 
   const handleCheckout = async () => {
     if (!token || !guest) return;
@@ -76,7 +127,7 @@ export default function GuestPage() {
       await guestApi.checkOut(token);
       setJustCheckedOut(true);
     } catch (error) {
-      toast.error("Error checking out");
+      toast.error(t("guest.checkoutError"));
       console.error(error);
     } finally {
       setCheckingOut(false);
@@ -86,44 +137,48 @@ export default function GuestPage() {
   const handleCopyPassword = () => {
     if (guest?.wifi.password) {
       navigator.clipboard.writeText(guest.wifi.password);
-      toast.success("Wi-Fi password copied to clipboard!");
+      toast.success(t("guest.wifiCopied"));
     }
   };
 
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactMessage.trim()) {
-      toast.error("Please enter a message");
+      toast.error(t("guest.messageRequired"));
       return;
     }
     // In real app, this would send to backend
-    toast.success("Message sent! We'll get back to you soon.");
+    toast.success(t("guest.messageSent"));
     setContactMessage("");
     setShowContactForm(false);
   };
 
   const handleQuickAction = (action: string) => {
-    toast.success(`${action} request sent! We'll process it shortly.`);
+    toast.success(
+      locale === "it-IT"
+        ? `Richiesta inviata: ${action}. La gestiremo a breve.`
+        : `${action} request sent! We'll process it shortly.`
+    );
   };
 
   const handleCopyGuestLink = () => {
     if (token) {
       const link = `${window.location.origin}/guest/${token}`;
       navigator.clipboard.writeText(link);
-      toast.success("Guest link copied to clipboard!");
+      toast.success(t("guest.guestLinkCopied"));
     }
   };
 
   const handleCopyBookingInfo = () => {
     if (guest) {
-      const bookingInfo = `Booking Details:
-Room: ${guest.roomNumber}
-Guest: ${guest.guestName}
-Check-in: ${new Date(guest.checkIn).toLocaleDateString("en-US")}
-Check-out: ${new Date(guest.checkOut).toLocaleDateString("en-US")}
-Booking ID: ${guest.bookingId}`;
+      const bookingInfo = `${t("guest.bookingDetails")}:
+${t("guest.roomLabel", { room: guest.roomNumber })}
+${locale === "it-IT" ? "Ospite" : "Guest"}: ${guest.guestName}
+${t("guest.checkIn")}: ${new Date(guest.checkIn).toLocaleDateString(locale)}
+${t("guest.checkOut")}: ${new Date(guest.checkOut).toLocaleDateString(locale)}
+${locale === "it-IT" ? "ID prenotazione" : "Booking ID"}: ${guest.bookingId}`;
       navigator.clipboard.writeText(bookingInfo);
-      toast.success("Booking info copied to clipboard!");
+      toast.success(t("guest.bookingInfoCopied"));
     }
   };
 
@@ -143,25 +198,27 @@ Booking ID: ${guest.bookingId}`;
   const getAccessStatusMessage = (status: GuestToken["accessStatus"]) => {
     switch (status) {
       case "Active":
-        return "Your access key is active and ready to use.";
+        return t("guest.accessMessageActive");
       case "Expired":
-        return "Your access key has expired. Please contact support if you need assistance.";
+        return t("guest.accessMessageExpired");
       case "Checked out":
-        return "You have checked out. Thank you for staying with us!";
+        return t("guest.accessMessageCheckedOut");
       default:
         return "";
     }
   };
 
   if (loading) {
-    return <LoadingSpinner message="Loading..." fullScreen={true} />;
+    return <LoadingSpinner message={t("guest.loading")} fullScreen={true} />;
   }
 
-  // Прощание — показываем сразу после успешного checkout (без повторной загрузки токена)
   if (justCheckedOut) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
         <Card className="max-w-md w-full text-center" padding="lg">
+          <div className="mb-4 flex justify-end">
+            <LanguageSelector compact />
+          </div>
           <div className="mb-6">
             <div className="inline-block bg-green-100 dark:bg-green-900/30 rounded-full p-4 mb-4">
               <svg
@@ -179,29 +236,29 @@ Booking ID: ${guest.bookingId}`;
               </svg>
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              Прощание
+              {t("guest.farewellTitle")}
             </h1>
             <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-              Спасибо, что были с нами!
+              {t("guest.farewellThanks")}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
-              Надеемся, вам понравилось в NextStay. Будем рады видеть вас снова!
+              {t("guest.farewellHope")}
             </p>
           </div>
           <div className="space-y-3">
             <Button
               variant="primary"
               fullWidth
-              onClick={() => toast.success("Спасибо! Ваш отзыв нам очень поможет.")}
+              onClick={() => toast.success(t("guest.reviewToast"))}
             >
-              Оставить отзыв
+              {t("guest.leaveReview")}
             </Button>
             <Button
               variant="secondary"
               fullWidth
               onClick={() => (window.location.href = "/book")}
             >
-              Забронировать снова
+              {t("guest.bookAgain")}
             </Button>
           </div>
         </Card>
@@ -212,8 +269,8 @@ Booking ID: ${guest.bookingId}`;
   if (!guest) {
     return (
       <ErrorState
-        title="Invalid or expired token"
-        message="The token you're using is invalid or has expired. Please contact support."
+        title={t("guest.invalidTitle")}
+        message={t("guest.invalidMessage")}
         fullScreen={true}
       />
     );
@@ -224,14 +281,35 @@ Booking ID: ${guest.bookingId}`;
   const checkOutDate = new Date(guest.checkOut);
   const activeFromDate = new Date(guest.instructions.activeFrom);
   const activeUntilDate = new Date(guest.instructions.activeUntil);
+  const hotelLocationQuery = buildHotelLocationQuery(hotelProfile);
+  const hotelMapLink = hotelLocationQuery ? buildGoogleMapsLink(hotelLocationQuery) : null;
+  const hotelMapEmbedUrl = hotelLocationQuery ? buildGoogleMapsEmbedUrl(hotelLocationQuery) : null;
+  const nextStayPromo = locale === "it-IT"
+    ? {
+        eyebrow: "Scopri NextStay",
+        title: "Vuoi vedere la piattaforma dietro il tuo soggiorno?",
+        text: "Apri la pagina pubblica di NextStay per conoscere il progetto, il modello di business e i modi per contattare il team.",
+        cta: "Visita la pagina NextStay",
+      }
+    : {
+        eyebrow: "Discover NextStay",
+        title: "Want to see the platform behind your stay?",
+        text: "Open the public NextStay page to explore the project, the business model, and a few ways to reach the team.",
+        cta: "Visit the NextStay page",
+      };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md lg:max-w-2xl space-y-4">
         {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">NextStay</h1>
-          <p className="text-gray-600 dark:text-gray-300">Welcome, {guest.guestName}!</p>
+        <div className="mb-6 sm:mb-8">
+          <div className="mb-4 flex justify-end">
+            <LanguageSelector compact />
+          </div>
+          <div className="text-center">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">NextStay</h1>
+            <p className="text-gray-600 dark:text-gray-300">{t("guest.welcome", { name: guest.guestName })}</p>
+          </div>
         </div>
 
         {/* Main Card - Status, Room Number and QR Code */}
@@ -241,12 +319,21 @@ Booking ID: ${guest.bookingId}`;
             <div className="mb-6">
               <div className="flex items-center justify-center gap-3 mb-2">
                 <span className={`px-3 py-1 text-sm font-semibold rounded-full border ${getAccessStatusColor(guest.accessStatus)}`}>
-                  {guest.accessStatus}
+                  {guest.accessStatus === "Active"
+                    ? t("guest.accessActive")
+                    : guest.accessStatus === "Expired"
+                      ? t("guest.accessExpired")
+                      : t("guest.accessCheckedOut")}
                 </span>
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {getAccessStatusMessage(guest.accessStatus)}
               </p>
+              {checkoutCountdown && (
+                <p className="mt-2 text-xs font-medium text-blue-600 dark:text-blue-400">
+                  {locale === "it-IT" ? "Tempo rimanente" : "Time remaining"}: {checkoutCountdown}
+                </p>
+              )}
             </div>
 
             {/* Room Number */}
@@ -257,7 +344,7 @@ Booking ID: ${guest.bookingId}`;
                 </span>
               </div>
               <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-2">
-                Room {guest.roomNumber}
+                {t("guest.roomLabel", { room: guest.roomNumber })}
               </h2>
             </div>
 
@@ -279,23 +366,23 @@ Booking ID: ${guest.bookingId}`;
                 fullWidth
                 onClick={() => setShowDetailsModal(true)}
               >
-                Details
+                {t("guest.details")}
               </Button>
               <Button
                 variant="secondary"
                 fullWidth
                 onClick={() => setShowAccessModal(true)}
               >
-                How to access
+                {t("guest.howToAccess")}
               </Button>
             </div>
 
             {/* Booking Info */}
             <div className="space-y-2 text-sm border-t border-gray-200 dark:border-gray-700 pt-4">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">Check-in</span>
+                <span className="text-gray-600 dark:text-gray-400">{t("guest.checkIn")}</span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  {checkInDate.toLocaleDateString("en-US", {
+                  {checkInDate.toLocaleDateString(locale, {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
@@ -303,9 +390,9 @@ Booking ID: ${guest.bookingId}`;
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600 dark:text-gray-400">Check-out</span>
+                <span className="text-gray-600 dark:text-gray-400">{t("guest.checkOut")}</span>
                 <span className="font-medium text-gray-900 dark:text-white">
-                  {checkOutDate.toLocaleDateString("en-US", {
+                  {checkOutDate.toLocaleDateString(locale, {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
@@ -323,7 +410,7 @@ Booking ID: ${guest.bookingId}`;
                 onClick={handleCheckout}
                 disabled={checkingOut || !guest.isValid}
               >
-                {checkingOut ? "Checking out..." : "Check out"}
+                {checkingOut ? t("guest.checkingOut") : t("guest.checkout")}
               </Button>
             </div>
           </div>
@@ -332,7 +419,7 @@ Booking ID: ${guest.bookingId}`;
         {/* Copy / Share */}
         <Card padding="md" className="mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-            Share & Copy
+            {t("guest.shareCopy")}
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Button
@@ -340,14 +427,14 @@ Booking ID: ${guest.bookingId}`;
               fullWidth
               onClick={handleCopyGuestLink}
             >
-              Copy guest link
+              {t("guest.copyGuestLink")}
             </Button>
             <Button
               variant="secondary"
               fullWidth
               onClick={handleCopyBookingInfo}
             >
-              Copy booking info
+              {t("guest.copyBookingInfo")}
             </Button>
           </div>
         </Card>
@@ -356,14 +443,14 @@ Booking ID: ${guest.bookingId}`;
         <Card padding="md" className="mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Need help?
+              {t("guest.needHelp")}
             </h3>
             <Button
               variant="secondary"
               size="sm"
               onClick={() => setShowContactForm(!showContactForm)}
             >
-              {showContactForm ? "Cancel" : "Contact hotel"}
+              {showContactForm ? t("common.cancel") : t("guest.contactHotel")}
             </Button>
           </div>
 
@@ -371,7 +458,7 @@ Booking ID: ${guest.bookingId}`;
             <div className="space-y-2 text-sm">
               {guest.contact.phone && (
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 dark:text-gray-400">Phone:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("guest.phone")}</span>
                   <a
                     href={`tel:${guest.contact.phone}`}
                     className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -382,7 +469,7 @@ Booking ID: ${guest.bookingId}`;
               )}
               {guest.contact.whatsapp && (
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 dark:text-gray-400">WhatsApp:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("guest.whatsapp")}</span>
                   <a
                     href={`https://wa.me/${guest.contact.whatsapp.replace(/\D/g, "")}`}
                     target="_blank"
@@ -395,7 +482,7 @@ Booking ID: ${guest.bookingId}`;
               )}
               {guest.contact.email && (
                 <div className="flex items-center gap-2">
-                  <span className="text-gray-600 dark:text-gray-400">Email:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("guest.email")}</span>
                   <a
                     href={`mailto:${guest.contact.email}`}
                     className="text-blue-600 dark:text-blue-400 hover:underline"
@@ -409,14 +496,14 @@ Booking ID: ${guest.bookingId}`;
             <form onSubmit={handleContactSubmit} className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Your message
+                  {t("guest.yourMessage")}
                 </label>
                 <textarea
                   value={contactMessage}
                   onChange={(e) => setContactMessage(e.target.value)}
                   rows={4}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                  placeholder="Describe your issue or question..."
+                  placeholder={t("guest.messagePlaceholder")}
                 />
               </div>
               <div className="flex gap-2">
@@ -425,24 +512,79 @@ Booking ID: ${guest.bookingId}`;
                   variant="primary"
                   fullWidth
                 >
-                  Send message
+                  {t("guest.sendMessage")}
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={() => setShowContactForm(false)}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
             </form>
           )}
         </Card>
 
+        {/* Hotel Location Map */}
+        {hotelProfile && hotelMapEmbedUrl && hotelMapLink && (
+          <Card className="rounded-2xl shadow-xl overflow-hidden" padding="sm">
+            <div className="px-2 pt-2 pb-1">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-0.5">{t("guest.hotelLocation")}</h3>
+              {hotelProfile.address && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{hotelProfile.address}</p>
+              )}
+            </div>
+            <div className="h-52 w-full rounded-xl overflow-hidden">
+              <iframe
+                title={`${hotelProfile.hotel_name} location`}
+                src={hotelMapEmbedUrl}
+                className="h-full w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
+            </div>
+            <div className="px-2 py-2">
+              <a
+                href={hotelMapLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {t("guest.openInGoogleMaps")}
+              </a>
+            </div>
+          </Card>
+        )}
+
+        <Link to="/nextstay" className="block group">
+          <Card className="overflow-hidden rounded-3xl border border-amber-200 bg-transparent shadow-xl transition-transform duration-200 group-hover:-translate-y-0.5" padding="none">
+            <div className="relative bg-[linear-gradient(135deg,#fef3c7_0%,#fff7ed_55%,#ffffff_100%)] px-5 py-5 sm:px-6">
+              <div className="absolute right-0 top-0 h-24 w-24 rounded-full bg-amber-300/30 blur-2xl" />
+              <div className="relative">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700">
+                  {nextStayPromo.eyebrow}
+                </p>
+                <h3 className="mt-2 text-lg font-bold text-gray-900">
+                  {nextStayPromo.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  {nextStayPromo.text}
+                </p>
+                <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <span>{nextStayPromo.cta}</span>
+                  <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </Link>
+
         {/* Info */}
         <div className="text-center">
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            Show the QR code to the staff for quick access
+            {t("guest.showQrHint")}
           </p>
         </div>
       </div>
@@ -451,23 +593,23 @@ Booking ID: ${guest.bookingId}`;
       <Modal
         isOpen={showDetailsModal}
         onClose={() => setShowDetailsModal(false)}
-        title="Details"
+        title={t("guest.details")}
         size="lg"
       >
         <div className="space-y-6">
           {/* Wi-Fi Information */}
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-              Wi-Fi Information
+              {t("guest.wifiInfo")}
             </h3>
             <div className="space-y-3">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Network name (SSID)</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{t("guest.networkName")}</p>
                 <p className="text-base font-medium text-gray-900 dark:text-white">{guest.wifi.ssid}</p>
               </div>
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Password</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{t("guest.password")}</p>
                   <p className="text-base font-mono font-medium text-gray-900 dark:text-white break-all">
                     {guest.wifi.password}
                   </p>
@@ -477,7 +619,7 @@ Booking ID: ${guest.bookingId}`;
                   size="sm"
                   onClick={handleCopyPassword}
                 >
-                  Copy password
+                  {t("guest.copyPassword")}
                 </Button>
               </div>
             </div>
@@ -487,27 +629,27 @@ Booking ID: ${guest.bookingId}`;
           {guest.houseRules && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                House rules
+                {t("guest.houseRules")}
               </h3>
               <div className="space-y-3 text-sm">
                 <div className="flex items-start gap-3">
                   <span className="text-gray-500 dark:text-gray-400 mt-0.5">🔇</span>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white mb-1">Quiet hours</p>
+                    <p className="font-medium text-gray-900 dark:text-white mb-1">{t("guest.quietHours")}</p>
                     <p className="text-gray-600 dark:text-gray-400">{guest.houseRules.quietHours}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-gray-500 dark:text-gray-400 mt-0.5">🚪</span>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white mb-1">Check-out time</p>
+                    <p className="font-medium text-gray-900 dark:text-white mb-1">{t("guest.checkoutTime")}</p>
                     <p className="text-gray-600 dark:text-gray-400">{guest.houseRules.checkOutTime}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <span className="text-gray-500 dark:text-gray-400 mt-0.5">🚭</span>
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white mb-1">Smoking policy</p>
+                    <p className="font-medium text-gray-900 dark:text-white mb-1">{t("guest.smokingPolicy")}</p>
                     <p className="text-gray-600 dark:text-gray-400">{guest.houseRules.smokingPolicy}</p>
                   </div>
                 </div>
@@ -519,7 +661,7 @@ Booking ID: ${guest.bookingId}`;
           {guest.accessStatus === "Active" && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-                Quick actions
+                {locale === "it-IT" ? "Azioni rapide" : "Quick actions"}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <Button
@@ -530,7 +672,7 @@ Booking ID: ${guest.bookingId}`;
                     setShowDetailsModal(false);
                   }}
                 >
-                  Request cleaning
+                  {locale === "it-IT" ? "Richiedi pulizia" : "Request cleaning"}
                 </Button>
                 <Button
                   variant="secondary"
@@ -540,7 +682,7 @@ Booking ID: ${guest.bookingId}`;
                     setShowDetailsModal(false);
                   }}
                 >
-                  Report an issue
+                  {locale === "it-IT" ? "Segnala un problema" : "Report an issue"}
                 </Button>
                 <Button
                   variant="secondary"
@@ -550,7 +692,7 @@ Booking ID: ${guest.bookingId}`;
                     setShowDetailsModal(false);
                   }}
                 >
-                  Late checkout request
+                  {locale === "it-IT" ? "Richiedi late check-out" : "Late checkout request"}
                 </Button>
               </div>
             </div>
@@ -562,21 +704,23 @@ Booking ID: ${guest.bookingId}`;
       <Modal
         isOpen={showAccessModal}
         onClose={() => setShowAccessModal(false)}
-        title="How to access the hotel / room"
+        title={t("guest.howToAccess")}
         size="md"
       >
         <div className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
           <p>{guest.instructions.accessInfo}</p>
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
-            <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">Active period:</p>
+            <p className="font-medium text-blue-900 dark:text-blue-300 mb-1">
+              {locale === "it-IT" ? "Periodo attivo:" : "Active period:"}
+            </p>
             <p className="text-blue-800 dark:text-blue-400">
-              {activeFromDate.toLocaleString("en-US", {
+              {activeFromDate.toLocaleString(locale, {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
-              })} - {activeUntilDate.toLocaleString("en-US", {
+              })} - {activeUntilDate.toLocaleString(locale, {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -586,7 +730,9 @@ Booking ID: ${guest.bookingId}`;
             </p>
           </div>
           <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
-            <p className="font-medium text-yellow-900 dark:text-yellow-300 mb-1">Door not opening?</p>
+            <p className="font-medium text-yellow-900 dark:text-yellow-300 mb-1">
+              {locale === "it-IT" ? "La porta non si apre?" : "Door not opening?"}
+            </p>
             <p className="text-yellow-800 dark:text-yellow-400">{guest.instructions.doorTroubleshooting}</p>
           </div>
         </div>
@@ -596,7 +742,7 @@ Booking ID: ${guest.bookingId}`;
       <Modal
         isOpen={showCheckoutModal}
         onClose={() => setShowCheckoutModal(false)}
-        title="Confirm checkout"
+        title={locale === "it-IT" ? "Conferma check-out" : "Confirm checkout"}
         size="sm"
         footer={
           <div className="flex gap-3 w-full">
@@ -606,7 +752,7 @@ Booking ID: ${guest.bookingId}`;
               onClick={() => setShowCheckoutModal(false)}
               disabled={checkingOut}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
@@ -614,7 +760,11 @@ Booking ID: ${guest.bookingId}`;
               onClick={confirmCheckout}
               disabled={checkingOut}
             >
-              {checkingOut ? "Checking out..." : "Confirm checkout"}
+              {checkingOut
+                ? t("guest.checkingOut")
+                : locale === "it-IT"
+                  ? "Conferma check-out"
+                  : "Confirm checkout"}
             </Button>
           </div>
         }
@@ -637,10 +787,14 @@ Booking ID: ${guest.bookingId}`;
               </svg>
             </div>
             <p className="text-base text-gray-700 dark:text-gray-300 mb-2">
-              Are you sure you want to check out?
+              {locale === "it-IT"
+                ? "Sei sicuro di voler effettuare il check-out?"
+                : "Are you sure you want to check out?"}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              This action cannot be undone. Your access key will be deactivated.
+              {locale === "it-IT"
+                ? "Questa azione non puo essere annullata. La tua chiave di accesso verra disattivata."
+                : "This action cannot be undone. Your access key will be deactivated."}
             </p>
           </div>
         </div>

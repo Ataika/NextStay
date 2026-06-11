@@ -1,21 +1,22 @@
 import stripe
 from app.core.config import FRONTEND_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.room import Room as RoomModel
+from app.models.user import User as UserModel
 from app.services.email_service import send_booking_confirmation_to_guest, send_booking_notification_to_owner
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["stripe"])
+logger = get_logger(__name__)
 
-# Initialize Stripe
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
 
 
-# Dependency to get the DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -24,7 +25,6 @@ def get_db():
         db.close()
 
 
-# Pydantic models
 class CreateCheckoutSessionRequest(BaseModel):
     booking_id: int
 
@@ -36,13 +36,9 @@ class CreateCheckoutSessionResponse(BaseModel):
 
 @router.post("/stripe/create-checkout-session", response_model=CreateCheckoutSessionResponse)
 async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Session = Depends(get_db)):
-    """
-    Create Stripe Checkout session for booking payment
-    """
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=500, detail="Stripe is not configured. Please set STRIPE_SECRET_KEY.")
 
-    # Get booking
     booking = db.query(BookingModel).filter(BookingModel.id == request.booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
@@ -52,16 +48,13 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Ses
             status_code=400, detail=f"Booking is already {booking.status}. Cannot create checkout session."
         )
 
-    # Get room for price calculation
     room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    # Calculate number of nights and total amount
     nights = (booking.check_out - booking.check_in).days
     total_amount = room.price * nights
 
-    # Create Stripe Checkout Session
     try:
         checkout_session = stripe.checkout.Session.create(
             payment_method_types=["card"],
@@ -76,7 +69,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Ses
                                 f"to {booking.check_out.date()} ({nights} nights)"
                             ),
                         },
-                        "unit_amount": int(total_amount * 100),  # Stripe uses cents
+                        "unit_amount": int(total_amount * 100),
                     },
                     "quantity": 1,
                 }
@@ -90,9 +83,9 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Ses
                 "guest_name": booking.guest_name,
             },
             customer_email=booking.guest_email if booking.guest_email else None,
+            idempotency_key=f"checkout-booking-{booking.id}",
         )
 
-        # Save session_id in booking
         booking.stripe_session_id = checkout_session.id
         db.commit()
 
@@ -103,11 +96,6 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Ses
 
 @router.get("/stripe/confirm-and-get-booking")
 def confirm_and_get_booking(session_id: str, db: Session = Depends(get_db)):
-    """
-    Via session_id Stripe checks payment, if necessary converts booking to Confirmed
-    and returns booking with guest token. Used on success page after payment
-    (when webhook is not called locally).
-    """
     if not STRIPE_SECRET_KEY:
         raise HTTPException(status_code=500, detail="Stripe is not configured. Please set STRIPE_SECRET_KEY.")
     try:
@@ -120,7 +108,6 @@ def confirm_and_get_booking(session_id: str, db: Session = Depends(get_db)):
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    # If still Pending, confirm (as in webhook), without sending email
     if booking.status == "Pending":
         booking.status = "Confirmed"
         booking.stripe_payment_intent_id = session.get("payment_intent")
@@ -131,7 +118,6 @@ def confirm_and_get_booking(session_id: str, db: Session = Depends(get_db)):
             booking.amount_paid = room.price * nights
         db.commit()
         db.refresh(booking)
-    # Return booking with guest token in the same format as GET /bookings/{id}
     from app.api.v1.bookings import Booking
 
     return Booking.from_orm_with_dates(booking, include_token=True, db=db)
@@ -144,48 +130,38 @@ async def stripe_webhook(
     stripe_signature: str | None = Header(None, alias="stripe-signature"),
     db: Session = Depends(get_db),
 ):
-    """
-    Handle Stripe webhook for payment confirmation
-    """
     if not STRIPE_WEBHOOK_SECRET:
         raise HTTPException(status_code=500, detail="Stripe webhook secret is not configured")
 
     payload = await request.body()
 
     try:
-        # Check webhook signature
         event = stripe.Webhook.construct_event(payload, stripe_signature, STRIPE_WEBHOOK_SECRET)
     except ValueError as err:
         raise HTTPException(status_code=400, detail=f"Invalid payload: {str(err)}") from err
     except stripe.error.SignatureVerificationError as err:
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(err)}") from err
 
-    # Handle event
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        handle_checkout_session_completed(session, db, background_tasks)
+        handle_checkout_session_completed(event["data"]["object"], db, background_tasks)
     elif event["type"] == "payment_intent.succeeded":
-        payment_intent = event["data"]["object"]
-        handle_payment_intent_succeeded(payment_intent, db)
+        handle_payment_intent_succeeded(event["data"]["object"], db)
 
     return {"status": "success"}
 
 
 def handle_checkout_session_completed(session: dict, db: Session, background_tasks: BackgroundTasks):
-    """Handle completed checkout session"""
     booking_id = int(session["metadata"]["booking_id"])
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
 
     if not booking:
-        print(f"[STRIPE] Booking {booking_id} not found")
+        logger.warning("Stripe webhook: booking %d not found.", booking_id)
         return
 
-    # Update booking status
     booking.status = "Confirmed"
     booking.stripe_payment_intent_id = session.get("payment_intent")
-    booking.amount_paid = session.get("amount_total", 0) / 100  # Convert from cents
+    booking.amount_paid = session.get("amount_total", 0) / 100
 
-    # Get room for price calculation
     room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
     if room:
         nights = (booking.check_out - booking.check_in).days
@@ -194,15 +170,16 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
     db.commit()
     db.refresh(booking)
 
-    # Send email notification
     if booking.guest_email:
         from app.models.guest_token import GuestToken as GuestTokenModel
 
         guest_token = db.query(GuestTokenModel).filter(GuestTokenModel.booking_id == booking.id).first()
-
         token = guest_token.token if guest_token else None
 
-        # Send email via background tasks (do not block webhook)
+        # Resolve owner email from DB instead of hardcoding
+        owner = db.query(UserModel).filter(UserModel.role == "OWNER", UserModel.is_active.is_(True)).first()
+        owner_email = owner.email if owner else "owner@nextstay.com"
+
         background_tasks.add_task(
             send_booking_confirmation_to_guest,
             guest_email=booking.guest_email,
@@ -213,9 +190,6 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
             total_amount=booking.amount_paid or 0,
             guest_token=token or "",
         )
-
-        # Send notification to owner (can be obtained from settings or use default email)
-        owner_email = "owner@nextstay.com"  # TODO: get from settings or use default email
         background_tasks.add_task(
             send_booking_notification_to_owner,
             owner_email=owner_email,
@@ -227,11 +201,8 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
             total_amount=booking.amount_paid or 0,
         )
 
-    print(f"[STRIPE] Booking {booking_id} confirmed successfully")
+    logger.info("Booking %d confirmed via Stripe webhook.", booking_id)
 
 
 def handle_payment_intent_succeeded(payment_intent: dict, db: Session):
-    """Handle successful payment (backup handler)"""
-    # If checkout.session.completed already handled, this handler is not needed
-    # But we keep it for safety
     pass

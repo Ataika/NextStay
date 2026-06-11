@@ -1,4 +1,5 @@
-from fastapi import Request, status
+from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
@@ -13,10 +14,10 @@ def register_exception_handlers(app):
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        """Handle validation errors"""
+        """Handle validation errors — use jsonable_encoder to handle non-serializable ctx values."""
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"detail": exc.errors(), "message": "Validation error"},
+            status_code=422,
+            content={"detail": jsonable_encoder(exc.errors()), "message": "Validation error"},
         )
 
     @app.exception_handler(OperationalError)

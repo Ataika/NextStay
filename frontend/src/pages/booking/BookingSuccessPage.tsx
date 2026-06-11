@@ -7,10 +7,12 @@ import Card from "../../ui/Card";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import ErrorState from "../../ui/ErrorState";
 import toast from "react-hot-toast";
+import { useI18n } from "../../i18n";
 
 export default function BookingSuccessPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { t, locale } = useI18n();
   const sessionId = searchParams.get("session_id");
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,11 +31,11 @@ export default function BookingSuccessPage() {
     try {
       const data = await stripeApi.confirmAndGetBooking(sessionId);
       setBooking(data);
-      toast.success("Payment successful! Your booking is confirmed.");
+      toast.success(t("bookingSuccess.paymentSuccess"));
     } catch (err: any) {
       console.error(err);
-      setError(err?.response?.data?.detail || "Failed to load booking details");
-      toast.error("Could not load booking details.");
+      setError(err?.response?.data?.detail || t("bookingSuccess.loadFailed"));
+      toast.error(t("bookingSuccess.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -46,21 +48,21 @@ export default function BookingSuccessPage() {
   const copyGuestLink = () => {
     if (!guestLink) return;
     navigator.clipboard.writeText(guestLink);
-    toast.success("Room access link copied to clipboard");
+    toast.success(t("bookingSuccess.linkCopied"));
   };
 
   const handleAccessRoom = () => {
     if (booking?.guestToken) {
       navigate(`/guest/${booking.guestToken}`);
     } else {
-      toast.error("Room access token not available.");
+      toast.error(t("bookingSuccess.tokenUnavailable"));
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center">
-        <LoadingSpinner message="Confirming your booking..." />
+        <LoadingSpinner message={t("bookingSuccess.confirming")} />
       </div>
     );
   }
@@ -93,10 +95,10 @@ export default function BookingSuccessPage() {
             </svg>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Payment Successful!
+            {t("bookingSuccess.title")}
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-            Your booking has been confirmed.
+            {t("bookingSuccess.confirmed")}
           </p>
         </div>
 
@@ -104,31 +106,31 @@ export default function BookingSuccessPage() {
           <>
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Booking details
+                {t("bookingSuccess.detailsTitle")}
               </h2>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Booking code:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.bookingCode")}</span>
                   <span className="font-mono font-medium text-gray-900 dark:text-white">
                     #{booking.id}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Guest:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.guestLabel")}</span>
                   <span className="font-medium text-gray-900 dark:text-white">
                     {booking.guestName}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Room:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.roomLabel")}</span>
                   <span className="font-medium text-gray-900 dark:text-white">
                     {booking.roomNumber}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Check-in:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.checkInLabel")}</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(booking.checkIn).toLocaleDateString("en-US", {
+                    {new Date(booking.checkIn).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
@@ -136,9 +138,9 @@ export default function BookingSuccessPage() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Check-out:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.checkOutLabel")}</span>
                   <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(booking.checkOut).toLocaleDateString("en-US", {
+                    {new Date(booking.checkOut).toLocaleDateString(locale, {
                       year: "numeric",
                       month: "long",
                       day: "numeric",
@@ -146,7 +148,7 @@ export default function BookingSuccessPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                  <span className="text-gray-600 dark:text-gray-400">{t("bookingSuccess.statusLabel")}</span>
                   <span className="font-medium text-green-600 dark:text-green-400">
                     {booking.status}
                   </span>
@@ -157,10 +159,10 @@ export default function BookingSuccessPage() {
             {booking.guestToken && (
               <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 mb-4">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  Room access (guest link)
+                  {t("bookingSuccess.accessTitle")}
                 </h3>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                  Save this link to open WiFi, instructions and checkout. No email needed.
+                  {t("bookingSuccess.accessDesc")}
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -170,7 +172,7 @@ export default function BookingSuccessPage() {
                     className="flex-1 px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white"
                   />
                   <Button variant="secondary" onClick={copyGuestLink}>
-                    Copy
+                    {t("bookingSuccess.copy")}
                   </Button>
                 </div>
               </div>
@@ -178,14 +180,14 @@ export default function BookingSuccessPage() {
 
             <div className="space-y-3">
               <Button variant="primary" fullWidth size="lg" onClick={handleAccessRoom}>
-                Open room access page
+                {t("bookingSuccess.openAccess")}
               </Button>
               <Button
                 variant="secondary"
                 fullWidth
                 onClick={() => navigate("/book")}
               >
-                Book another room
+                {t("bookingSuccess.bookAnother")}
               </Button>
             </div>
           </>
@@ -193,8 +195,7 @@ export default function BookingSuccessPage() {
           <div className="space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
               <p className="text-sm text-blue-800 dark:text-blue-300">
-                Your payment was successful. If details do not appear, refresh the page
-                or save this URL and open it later to see your booking and room access link.
+                {t("bookingSuccess.paymentOkNotice")}
               </p>
             </div>
             <Button
@@ -202,7 +203,7 @@ export default function BookingSuccessPage() {
               fullWidth
               onClick={() => navigate("/book")}
             >
-              Return to booking
+              {t("bookingSuccess.returnToBooking")}
             </Button>
           </div>
         )}

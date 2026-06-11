@@ -11,6 +11,7 @@ import Card from "../../ui/Card";
 import ErrorState from "../../ui/ErrorState";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import PageHeader from "../../ui/PageHeader";
+import { useI18n } from "../../i18n";
 
 // ------------------------------------------------------------------
 // Helpers
@@ -103,6 +104,7 @@ function SliderInput({
 // ------------------------------------------------------------------
 
 export default function PricingConfigPage() {
+  const { t } = useI18n();
   const [hotels, setHotels] = useState<TrainingHotelOption[]>([]);
   const [hotelId, setHotelId] = useState<number | null>(null);
 
@@ -112,7 +114,6 @@ export default function PricingConfigPage() {
   const [saving, setSaving] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
 
-  // Form state — kept in sync with fetched config
   const [form, setForm] = useState<UpdateHotelPricingConfig>({
     minPrice: 30,
     maxPrice: 1000,
@@ -162,7 +163,7 @@ export default function PricingConfigPage() {
   const handleSave = async () => {
     if (hotelId === null) return;
     if (form.minPrice >= form.maxPrice) {
-      alert("Minimum price must be less than maximum price.");
+      alert(t("pricingConfig.minMaxError"));
       return;
     }
     setSaving(true);
@@ -173,7 +174,7 @@ export default function PricingConfigPage() {
       setSavedOk(true);
       setTimeout(() => setSavedOk(false), 3000);
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Save failed.");
+      alert(err instanceof Error ? err.message : t("pricingConfig.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -204,20 +205,20 @@ export default function PricingConfigPage() {
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title="Engine Tuning"
-        subtitle="Configure per-hotel pricing rules and control model rollout."
+        title={t("pricingConfig.title")}
+        subtitle={t("pricingConfig.subtitle")}
       />
 
       {/* Hotel selector */}
       <Card padding="md">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-[280px_1fr] md:items-end">
-          <Field label="Hotel">
+          <Field label={t("pricingConfig.hotelLabel")}>
             <select
               value={hotelId ?? ""}
               onChange={(e) => handleHotelChange(Number(e.target.value))}
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
             >
-              {hotels.length === 0 && <option value="">Loading…</option>}
+              {hotels.length === 0 && <option value="">{t("pricingConfig.loadingOption")}</option>}
               {hotels.map((h) => (
                 <option key={h.hotelId} value={h.hotelId}>
                   {h.hotelId} · {h.hotelName} ({h.hotelSegment})
@@ -229,22 +230,22 @@ export default function PricingConfigPage() {
           {config && (
             <div className="flex flex-wrap gap-4 text-sm text-gray-500 dark:text-gray-400">
               <span>
-                Config version:{" "}
+                {t("pricingConfig.configVersion")}{" "}
                 <strong className="text-gray-800 dark:text-gray-200">{config.configVersion}</strong>
               </span>
               <span>
-                Active model:{" "}
+                {t("pricingConfig.activeModel")}{" "}
                 <strong className="font-mono text-gray-800 dark:text-gray-200 text-xs">
-                  {config.activeModelVersion ?? "global (no per-hotel model)"}
+                  {config.activeModelVersion ?? t("pricingConfig.noPerHotelModel")}
                 </strong>
               </span>
               {config.isDefault && (
                 <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                  Using global defaults — not yet saved for this hotel
+                  {t("pricingConfig.globalDefaults")}
                 </span>
               )}
               {config.updatedAt && (
-                <span>Last saved: {new Date(config.updatedAt).toLocaleString()}</span>
+                <span>{t("pricingConfig.lastSaved")} {new Date(config.updatedAt).toLocaleString()}</span>
               )}
             </div>
           )}
@@ -252,21 +253,21 @@ export default function PricingConfigPage() {
       </Card>
 
       {loading ? (
-        <LoadingSpinner message="Loading hotel config…" />
+        <LoadingSpinner message={t("pricingConfig.loadingConfig")} />
       ) : error ? (
-        <ErrorState title="Config unavailable" message={error} onRetry={() => hotelId !== null && void loadConfig(hotelId)} />
+        <ErrorState title={t("pricingConfig.unavailableTitle")} message={error} onRetry={() => hotelId !== null && void loadConfig(hotelId)} />
       ) : (
         <>
           {/* Price bounds */}
           <Card padding="md">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-              Price Bounds for{" "}
+              {t("pricingConfig.priceBoundsFor")}{" "}
               <span className="text-blue-600 dark:text-blue-400">
                 {selectedHotel?.hotelName ?? `Hotel ${hotelId}`}
               </span>
             </h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <Field label="Minimum price" hint="€ floor">
+              <Field label={t("pricingConfig.minPrice")} hint={t("pricingConfig.hintFloor")}>
                 <NumberInput
                   value={form.minPrice}
                   onChange={(v) => setForm((f) => ({ ...f, minPrice: v }))}
@@ -274,7 +275,7 @@ export default function PricingConfigPage() {
                   step={5}
                 />
               </Field>
-              <Field label="Maximum price" hint="€ ceiling">
+              <Field label={t("pricingConfig.maxPrice")} hint={t("pricingConfig.hintCeiling")}>
                 <NumberInput
                   value={form.maxPrice}
                   onChange={(v) => setForm((f) => ({ ...f, maxPrice: v }))}
@@ -282,7 +283,7 @@ export default function PricingConfigPage() {
                   step={10}
                 />
               </Field>
-              <Field label="Max daily change" hint="% per day">
+              <Field label={t("pricingConfig.maxDailyChange")} hint={t("pricingConfig.hintPerDay")}>
                 <NumberInput
                   value={form.maxDailyChangePct}
                   onChange={(v) => setForm((f) => ({ ...f, maxDailyChangePct: v }))}
@@ -297,11 +298,11 @@ export default function PricingConfigPage() {
           {/* Multipliers */}
           <Card padding="md">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-              Demand Multipliers
+              {t("pricingConfig.demandMultipliers")}
             </h3>
             <div className="space-y-5">
               <Field
-                label="Weekend multiplier"
+                label={t("pricingConfig.weekendMultiplier")}
                 hint={`×${form.weekendMultiplier.toFixed(2)} on Friday / Saturday nights`}
               >
                 <SliderInput
@@ -314,7 +315,7 @@ export default function PricingConfigPage() {
                 />
               </Field>
               <Field
-                label="Holiday multiplier"
+                label={t("pricingConfig.holidayMultiplier")}
                 hint={`×${form.holidayMultiplier.toFixed(2)} on flagged holiday dates`}
               >
                 <SliderInput
@@ -332,13 +333,12 @@ export default function PricingConfigPage() {
           {/* Rollout */}
           <Card padding="md">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-              Dynamic Pricing Rollout
+              {t("pricingConfig.rolloutTitle")}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              Fraction of inventory slots that use the dynamic price. Set to 0 to disable, 1 to
-              enable fully.
+              {t("pricingConfig.rolloutDesc")}
             </p>
-            <Field label="Rollout fraction" hint={`${(form.rolloutFraction * 100).toFixed(0)}% of slots`}>
+            <Field label={t("pricingConfig.rolloutFraction")} hint={t("pricingConfig.hintSlots", { pct: String((form.rolloutFraction * 100).toFixed(0)) })}>
               <SliderInput
                 value={form.rolloutFraction}
                 onChange={(v) => setForm((f) => ({ ...f, rolloutFraction: v }))}
@@ -353,14 +353,14 @@ export default function PricingConfigPage() {
           {/* Save / reset */}
           <div className="flex items-center gap-4">
             <Button onClick={() => void handleSave()} disabled={saving || hotelId === null}>
-              {saving ? "Saving…" : "Save config"}
+              {saving ? t("pricingConfig.saving") : t("pricingConfig.saveConfig")}
             </Button>
             <Button variant="secondary" onClick={handleReset} disabled={saving}>
-              Reset
+              {t("pricingConfig.reset")}
             </Button>
             {savedOk && (
               <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                Config saved successfully.
+                {t("pricingConfig.savedOk")}
               </span>
             )}
           </div>
