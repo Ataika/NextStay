@@ -11,7 +11,7 @@ from app.models.hotel import Hotel as HotelModel
 from app.models.room import Room as RoomModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
@@ -100,10 +100,10 @@ class HotelChannelBookingLog(BaseModel):
 
 
 class HotelRegisterRequest(BaseModel):
-    code: str
-    name: str
-    webhookUrl: str | None = None
-    hmacSecret: str | None = None
+    code: str = Field(min_length=1, max_length=50)
+    name: str = Field(min_length=1, max_length=150)
+    webhookUrl: str | None = Field(default=None, max_length=500)
+    hmacSecret: str | None = Field(default=None, max_length=255)
     active: bool = True
 
 
@@ -698,7 +698,7 @@ def register_hotel(
 @router.get("/hotel-sync/hotels", response_model=list[HotelResponse])
 def list_hotels(
     db: Annotated[Session, Depends(get_db)],
-    limit: int = 100,
+    limit: int = 25,
     _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     hotels = db.query(HotelModel).order_by(HotelModel.id).limit(min(max(limit, 1), 100)).all()

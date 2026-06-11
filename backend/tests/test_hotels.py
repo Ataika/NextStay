@@ -92,3 +92,11 @@ def test_register_duplicate_hotel_code_rejected(client, db):
     assert first.status_code == 201, first.text
     second = client.post("/api/v1/hotel-sync/hotels", headers=headers, json=body)
     assert second.status_code == 409
+
+
+def test_register_hotel_empty_code_rejected(client, db):
+    make_owner(db)
+    token = login_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = client.post("/api/v1/hotel-sync/hotels", headers=headers, json={"code": "", "name": "X"})
+    assert resp.status_code == 422

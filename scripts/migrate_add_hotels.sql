@@ -37,8 +37,8 @@ WHERE hotel_id IS NULL;
 ALTER TABLE public.rooms
 DROP CONSTRAINT IF EXISTS rooms_number_key;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_rooms_hotel_number
-ON public.rooms (hotel_id, number);
+ALTER TABLE public.rooms
+ADD CONSTRAINT uq_rooms_hotel_number UNIQUE (hotel_id, number);
 
 -- Tie existing sync tables to the registry (created by migrate_add_hotel_sync.sql).
 ALTER TABLE public.hotel_sync_events
