@@ -1,3 +1,4 @@
+from app.api.v1.hotel_sync import should_publish_outbound
 from app.core.hotel_sync_security import sign_payload, verify_signature
 
 
@@ -29,3 +30,9 @@ def test_verify_rejects_garbage_or_missing_header():
     assert verify_signature(body, "secret", "") is False
     assert verify_signature(body, "secret", "not-a-sig") is False
     assert verify_signature(body, "secret", None) is False
+
+
+def test_should_publish_outbound_only_for_pms_origin():
+    assert should_publish_outbound("PMS") is True
+    assert should_publish_outbound("HOTEL") is False
+    assert should_publish_outbound(None) is False

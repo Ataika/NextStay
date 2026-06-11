@@ -22,6 +22,15 @@ VALID_ROOM_STATUSES = {"Available", "Occupied", "Cleaning", "Maintenance", "Dirt
 VALID_EVENT_TYPES = {"booking_created", "booking_cancelled", "room_status_updated"}
 
 
+def should_publish_outbound(origin: str | None) -> bool:
+    """Anti-echo: only PMS-originated changes are pushed back to hotels.
+
+    Events that arrived FROM a hotel (origin == 'HOTEL') must never be
+    re-published to that hotel, or they would ping-pong forever.
+    """
+    return origin == "PMS"
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -44,6 +53,8 @@ class HotelSyncEventRequest(BaseModel):
     eventId: str
     hotelId: int = 1
     source: str = "hotel_site_simulator"
+    origin: str = "HOTEL"
+    revision: int = 0
     type: str
     externalBookingId: str | None = None
     roomId: int | None = None
@@ -157,6 +168,8 @@ def ensure_sync_tables(db: Session) -> None:
                 payload JSONB NOT NULL,
                 status TEXT NOT NULL DEFAULT 'received',
                 error TEXT,
+                origin TEXT NOT NULL DEFAULT 'HOTEL',
+                revision INTEGER NOT NULL DEFAULT 0,
                 booking_id INTEGER REFERENCES public.bookings(id) ON DELETE SET NULL,
                 received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 processed_at TIMESTAMPTZ,
@@ -207,6 +220,12 @@ def ensure_sync_tables(db: Session) -> None:
                 ON public.hotel_channel_bookings(room_id, check_in, check_out);
             """
         )
+    )
+    db.execute(
+        text("ALTER TABLE public.hotel_sync_events ADD COLUMN IF NOT EXISTS origin TEXT NOT NULL DEFAULT 'HOTEL'")
+    )
+    db.execute(
+        text("ALTER TABLE public.hotel_sync_events ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0")
     )
 
 
@@ -469,11 +488,11 @@ def create_event_record(db: Session, event: HotelSyncEventRequest):
             text(
                 """
                 INSERT INTO public.hotel_sync_events (
-                    hotel_id, external_event_id, source, event_type, payload, status
+                    hotel_id, external_event_id, source, event_type, payload, status, origin
                 )
                 VALUES (
                     :hotel_id, :external_event_id, :source, :event_type,
-                    CAST(:payload AS JSONB), 'received'
+                    CAST(:payload AS JSONB), 'received', :origin
                 )
                 ON CONFLICT (external_event_id) DO NOTHING
                 RETURNING id
@@ -485,6 +504,7 @@ def create_event_record(db: Session, event: HotelSyncEventRequest):
                 "source": event.source,
                 "event_type": event.type,
                 "payload": json.dumps(payload),
+                "origin": event.origin,
             },
         )
         .mappings()
