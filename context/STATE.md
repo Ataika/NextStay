@@ -77,6 +77,13 @@
 
 ---
 
+## Hotel Sync (вариант A) — прогресс
+
+- ✅ **Phase 1 (мульти-отель, фундамент БД)** — модель `Hotel`, реестр `POST/GET /hotel-sync/hotels`, `rooms.hotel_id` + `UNIQUE(hotel_id, number)`, миграция `migrate_add_hotels.sql`. 85 тестов. Коммиты `90feb54`…`b7da024`.
+- 🟡 Существующая one-way реализация (`hotel_sync.py`, `hotel_sync_events`, `hotel_channel_bookings`) — база для Phase 2.
+- ❌ **Phase 2** — HMAC, обратный webhook PMS→отель, анти-эхо, hotel-scoping `find_room`/`rooms.py`.
+- ❌ **Phase 3** — сервис `hotelsim` (мини-сайт + генератор) + docker-compose.
+
 ## Главные пробелы (приоритеты Атая)
 
 1. **DWH в dbt** — построить `core` (dims + SCD) и `mart` (occupancy, loyalty, RevPAR). Сейчас почти пусто.

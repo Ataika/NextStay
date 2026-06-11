@@ -185,7 +185,7 @@ ER-добавления, sequence-диаграммы (inbound/outbound), HMAC-б
 
 ### Дельта до варианта A (что добавляем)
 1. **Реестр отелей** — таблица `hotels` (code, name, webhook_url, hmac_secret, active). FK `hotel_sync_events.hotel_id` / `hotel_channel_bookings.hotel_id` → `hotels.id`; убрать `DEFAULT 1`, валидировать существование отеля.
-2. **Мульти-отель в поиске номеров** — `find_room` сейчас ищет `Room.number` глобально; добавить `hotel_id` в `rooms` и искать по `(hotel_id, number)`; уникальность `rooms.number` → `UNIQUE(hotel_id, number)`.
+2. **Мульти-отель в поиске номеров** — `find_room` сейчас ищет `Room.number` глобально; искать по `(hotel_id, number)`. (`hotel_id` в `rooms` + `UNIQUE(hotel_id, number)` уже сделаны в Phase 1.) **Carry-over из ревью Phase 1:** `rooms.py` `create_room`/`update_room` тоже проверяют дубль `number` глобально — скоупить по `hotel_id`, иначе ложный 400 при втором отеле.
 3. **HMAC** — заголовок `X-NextStay-Signature: sha256=<HMAC(raw_body, hotel.hmac_secret)>`, constant-time сравнение; общий токен оставить как fallback для dev.
 4. **Обратная синхронизация PMS→отель** — `sync_publisher`: при изменениях с `origin=PMS` (отмена/чек-аут/смена статуса в админке) слать подписанный webhook на `hotels.webhook_url`. Анти-эхо: события, пришедшие как inbound (`origin=HOTEL`), не ре-публиковать; добавить колонку `origin` в `hotel_sync_events` и (опц.) `revision`.
 5. **Сервис `hotelsim/`** — отдельное FastAPI-приложение: мини-сайт (vanilla HTML/JS), свой SQLite-стор на N отелей, `POST /webhook` (приём PMS-событий), фоновый генератор трафика, исходящие подписанные вызовы на PMS `/hotel-sync/events`. Сервис в `docker-compose` (порт 8090).
