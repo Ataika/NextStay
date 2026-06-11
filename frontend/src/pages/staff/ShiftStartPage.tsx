@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { staffApi } from "../../api/api";
+import { useI18n } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import Button from "../../ui/Button";
 
 export default function ShiftStartPage() {
   const navigate      = useNavigate();
+  const { t } = useI18n();
   const setShiftStart = useAuthStore((s) => s.setShiftStart);
   const loginTime     = useAuthStore((s) => s.loginTime);
 
@@ -64,7 +66,7 @@ export default function ShiftStartPage() {
       setShiftStart(res.started_at);
       navigate("/staff", { replace: true });
     } catch {
-      setError("Invalid code — please check the current display and try again.");
+      setError(t("shiftStart.invalidCode"));
       setInput("");
     } finally {
       setSubmitting(false);
@@ -79,16 +81,16 @@ export default function ShiftStartPage() {
 
         {/* Header */}
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Start Shift</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t("shiftStart.title")}</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Enter the current shift code to begin your shift timer.
+            {t("shiftStart.description")}
           </p>
         </div>
 
         {/* Code display (shown on hotel kiosk / manager tablet) */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 text-center shadow-sm">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            Current Shift Code
+            {t("shiftStart.currentCode")}
           </p>
           {codeLoading ? (
             <div className="text-4xl font-bold text-gray-300 tracking-[0.25em] h-12 flex items-center justify-center">
@@ -111,7 +113,7 @@ export default function ShiftStartPage() {
               />
             </div>
             <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-              Refreshes in {expiresIn}s
+              {t("shiftStart.refreshesIn", { seconds: expiresIn })}
             </p>
           </div>
         </div>
@@ -120,7 +122,7 @@ export default function ShiftStartPage() {
         <form onSubmit={(e) => void handleSubmit(e)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm space-y-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-              Enter code to start shift
+              {t("shiftStart.enterCode")}
             </label>
             <input
               type="text"
@@ -144,17 +146,17 @@ export default function ShiftStartPage() {
             fullWidth
             disabled={input.length !== 4 || submitting}
           >
-            {submitting ? "Verifying…" : "Start My Shift"}
+            {submitting ? t("shiftStart.verifying") : t("shiftStart.startMyShift")}
           </Button>
         </form>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-          The code above rotates every 2 minutes.{" "}
+          {t("shiftStart.rotates")}{" "}
           <button
             onClick={() => navigate("/staff")}
             className="text-blue-500 hover:underline"
           >
-            Go back without starting
+            {t("shiftStart.goBack")}
           </button>
         </p>
       </div>

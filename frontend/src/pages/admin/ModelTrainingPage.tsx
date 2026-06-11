@@ -11,6 +11,7 @@ import EmptyState from "../../ui/EmptyState";
 import ErrorState from "../../ui/ErrorState";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import PageHeader from "../../ui/PageHeader";
+import { useI18n } from "../../i18n";
 
 // ------------------------------------------------------------------
 // Helpers
@@ -62,6 +63,7 @@ function UploadSection({
   onHotelChange: (id: number) => void;
   onJobStarted: (job: TrainingJob) => void;
 }) {
+  const { t } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [trainFraction, setTrainFraction] = useState(0.7);
   const [validFraction, setValidFraction] = useState(0.15);
@@ -89,21 +91,21 @@ function UploadSection({
   return (
     <Card padding="md">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-        Upload Dataset &amp; Train Model
+        {t("modelTraining.uploadTitle")}
       </h3>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Hotel selector */}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-            Hotel
+            {t("modelTraining.hotelLabel")}
           </span>
           <select
             value={hotelId ?? ""}
             onChange={(e) => onHotelChange(Number(e.target.value))}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
           >
-            {hotels.length === 0 && <option value="">Loading…</option>}
+            {hotels.length === 0 && <option value="">{t("modelTraining.loadingOption")}</option>}
             {hotels.map((h) => (
               <option key={h.hotelId} value={h.hotelId}>
                 {h.hotelId} · {h.hotelName}
@@ -115,7 +117,7 @@ function UploadSection({
         {/* Train fraction */}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-            Train fraction&nbsp;
+            {t("modelTraining.trainFraction")}&nbsp;
             <span className="font-normal text-gray-500">({(trainFraction * 100).toFixed(0)}%)</span>
           </span>
           <input
@@ -132,7 +134,7 @@ function UploadSection({
         {/* Validation fraction */}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-            Validation fraction&nbsp;
+            {t("modelTraining.validFraction")}&nbsp;
             <span className="font-normal text-gray-500">({(validFraction * 100).toFixed(0)}%)</span>
           </span>
           <input
@@ -149,7 +151,7 @@ function UploadSection({
         {/* CSV file */}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
-            Training CSV
+            {t("modelTraining.trainingCsv")}
           </span>
           <input
             ref={fileRef}
@@ -166,7 +168,7 @@ function UploadSection({
           onClick={() => void handleSubmit()}
           disabled={!file || hotelId === null || uploading}
         >
-          {uploading ? "Uploading…" : "Upload & Train"}
+          {uploading ? t("modelTraining.uploading") : t("modelTraining.uploadTrain")}
         </Button>
         {file && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -180,9 +182,7 @@ function UploadSection({
       )}
 
       <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-        The CSV must include all required feature columns defined in{" "}
-        <code>feature_schema_v1.json</code>. Data is appended to{" "}
-        <code>ml.pricingdata</code> and training starts immediately in the background.
+        {t("modelTraining.csvHelp")}
       </p>
     </Card>
   );
@@ -203,34 +203,35 @@ function JobsSection({
   error: string | null;
   onRefresh: () => void;
 }) {
-  if (loading) return <LoadingSpinner message="Loading training jobs…" />;
-  if (error) return <ErrorState title="Could not load jobs" message={error} onRetry={onRefresh} />;
+  const { t } = useI18n();
+  if (loading) return <LoadingSpinner message={t("modelTraining.loadingJobs")} />;
+  if (error) return <ErrorState title={t("modelTraining.jobsErrorTitle")} message={error} onRetry={onRefresh} />;
 
   return (
     <Card padding="none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Training Jobs</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("modelTraining.jobsTitle")}</h3>
         <Button size="sm" variant="secondary" onClick={onRefresh}>
-          Refresh
+          {t("modelTraining.refresh")}
         </Button>
       </div>
 
       {jobs.length === 0 ? (
         <div className="p-6">
-          <EmptyState title="No training jobs" message="Upload a dataset to start the first training run." />
+          <EmptyState title={t("modelTraining.noJobsTitle")} message={t("modelTraining.noJobsMessage")} />
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Job ID</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hotel</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Status</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Triggered</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Completed</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Rows</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Model version</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colJobId")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colHotel")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colStatus")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colTriggered")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colCompleted")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colRows")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colModelVersion")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -279,24 +280,25 @@ function ModelsSection({
   onRefresh: () => void;
   onPromote: (id: number) => void;
 }) {
-  if (loading) return <LoadingSpinner message="Loading model registry…" />;
+  const { t } = useI18n();
+  if (loading) return <LoadingSpinner message={t("modelTraining.loadingModels")} />;
   if (error)
-    return <ErrorState title="Could not load models" message={error} onRetry={onRefresh} />;
+    return <ErrorState title={t("modelTraining.modelsErrorTitle")} message={error} onRetry={onRefresh} />;
 
   return (
     <Card padding="none">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Model Registry</h3>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{t("modelTraining.modelsTitle")}</h3>
         <Button size="sm" variant="secondary" onClick={onRefresh}>
-          Refresh
+          {t("modelTraining.refresh")}
         </Button>
       </div>
 
       {models.length === 0 ? (
         <div className="p-6">
           <EmptyState
-            title="No models yet"
-            message="Train a model to see it here. After training you can promote it to make it active."
+            title={t("modelTraining.noModelsTitle")}
+            message={t("modelTraining.noModelsMessage")}
           />
         </div>
       ) : (
@@ -304,13 +306,13 @@ function ModelsSection({
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Version</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Hotel</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Rows</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Test metrics</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Trained</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">Active</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">Action</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colVersion")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colHotel")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colRows")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colTestMetrics")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colTrained")}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colActive")}</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-300">{t("modelTraining.colAction")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
@@ -336,18 +338,18 @@ function ModelsSection({
                     <td className="px-4 py-3">
                       {m.isActive ? (
                         <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          Active
+                          {t("modelTraining.activeLabel")}
                         </span>
                       ) : (
                         <span className="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                          Inactive
+                          {t("modelTraining.inactiveLabel")}
                         </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {!m.isActive && (
                         <Button size="sm" onClick={() => onPromote(m.id)}>
-                          Promote
+                          {t("modelTraining.promote")}
                         </Button>
                       )}
                     </td>
@@ -367,6 +369,7 @@ function ModelsSection({
 // ------------------------------------------------------------------
 
 export default function ModelTrainingPage() {
+  const { t } = useI18n();
   const [hotels, setHotels] = useState<TrainingHotelOption[]>([]);
   const [hotelId, setHotelId] = useState<number | null>(null);
 
@@ -378,7 +381,6 @@ export default function ModelTrainingPage() {
   const [modelsLoading, setModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState<string | null>(null);
 
-  // Track active job IDs for auto-polling
   const [pollingJobId, setPollingJobId] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -400,7 +402,6 @@ export default function ModelTrainingPage() {
     try {
       const data = await trainingApi.listJobs(hid ?? undefined);
       setJobs(data);
-      // Start polling if any job is still running/pending
       const activeJob = data.find((j) => j.status === "pending" || j.status === "running");
       if (activeJob) {
         setPollingJobId(activeJob.id);
@@ -445,7 +446,6 @@ export default function ModelTrainingPage() {
     }
   };
 
-  // Auto-poll running job every 4 seconds
   useEffect(() => {
     if (pollingJobId === null) {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -487,16 +487,18 @@ export default function ModelTrainingPage() {
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title="Model Training"
-        subtitle="Upload hotel-specific datasets and train per-hotel pricing models."
+        title={t("modelTraining.title")}
+        subtitle={t("modelTraining.subtitle")}
       />
 
       {activeJob && (
         <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-900" padding="md">
           <p className="text-sm text-blue-900 dark:text-blue-200">
-            Training job <strong>#{activeJob.id}</strong> is{" "}
-            <strong>{activeJob.status}</strong> for hotel {activeJob.hotelId}. The table updates
-            automatically every 4 seconds.
+            {t("modelTraining.activeJobNotice", {
+              id: String(activeJob.id),
+              status: activeJob.status,
+              hotel: String(activeJob.hotelId),
+            })}
           </p>
         </Card>
       )}

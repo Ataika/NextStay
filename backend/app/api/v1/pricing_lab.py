@@ -104,7 +104,7 @@ def require_pricing_lab_owner(
         return {"role": "OWNER", "authSource": "dev_token"}
 
     user = get_current_user(credentials=credentials, db=db)
-    if user.role.upper() != "OWNER":
+    if user.role.upper() not in ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
     return user
 

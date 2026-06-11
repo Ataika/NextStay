@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi, devLoginConfig } from "../api/api";
+import LanguageSelector from "../components/LanguageSelector";
+import { useI18n } from "../i18n";
 import { useAuthStore, isAdminRole } from "../store/authStore";
 import type { UserRole } from "../store/authStore";
 import Button from "../ui/Button";
 import Card from "../ui/Card";
+import type { AxiosError } from "axios";
 
 type Mode = "password" | "otp-email" | "otp-code";
 
@@ -21,9 +24,15 @@ export default function LoginPage() {
   const role     = useAuthStore((s) => s.role);
   const setAuth  = useAuthStore((s) => s.setAuth);
   const autoLoginAttemptedRef = useRef(false);
+  const { t } = useI18n();
 
-  const redirectAfterLogin = (userRole: UserRole) => {
+  const redirectAfterLogin = useCallback((userRole: UserRole) => {
     navigate(isAdminRole(userRole) ? "/admin" : "/staff", { replace: true });
+  }, [navigate]);
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    const axiosError = error as AxiosError<{ detail?: string }>;
+    return axiosError.response?.data?.detail || axiosError.message || fallback;
   };
 
   // Auto-login for dev owner account
@@ -33,16 +42,16 @@ export default function LoginPage() {
     void (async () => {
       try {
         const res = await authApi.devLogin(devLoginConfig.email, devLoginConfig.password);
-        setAuth(res.token, res.role as UserRole, res.user.email, res.user.name);
+        setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
         redirectAfterLogin(res.role as UserRole);
       } catch { /* ignore */ }
     })();
-  }, [role, token]);
+  }, [redirectAfterLogin, role, setAuth, token]);
 
   // Already logged in
   useEffect(() => {
     if (token && role) redirectAfterLogin(role);
-  }, []);
+  }, [redirectAfterLogin, role, token]);
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +59,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await authApi.passwordLogin(email.trim(), password);
-      setAuth(res.token, res.role as UserRole, res.user.email, res.user.name);
+      setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
       redirectAfterLogin(res.role as UserRole);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Invalid email or password.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.invalidPassword")));
     } finally {
       setLoading(false);
     }
@@ -66,12 +75,12 @@ export default function LoginPage() {
     try {
       const res = await authApi.requestOtp(email.trim());
       if (res.retryAfterSeconds) {
-        setError(`Please wait ${res.retryAfterSeconds}s before requesting another code.`);
+        setError(t("login.requestWait", { seconds: res.retryAfterSeconds }));
         return;
       }
       setMode("otp-code");
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Failed to send code.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.failedSendCode")));
     } finally {
       setLoading(false);
     }
@@ -83,10 +92,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await authApi.verifyOtp(email.trim(), otpCode);
-      setAuth(res.token, res.role as UserRole, res.user.email, res.user.name);
+      setAuth(res.user.id, res.token, res.role as UserRole, res.user.email, res.user.name);
       redirectAfterLogin(res.role as UserRole);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || err?.message || "Invalid code.");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error, t("login.invalidCode")));
     } finally {
       setLoading(false);
     }
@@ -95,11 +104,15 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
       <Card className="w-full max-w-sm space-y-6" padding="lg">
+        <div className="flex justify-end">
+          <LanguageSelector compact />
+        </div>
+
         {/* Header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">NextStay</h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {mode === "otp-code" ? "Enter the 6-digit code sent to your email" : "Sign in to your account"}
+            {mode === "otp-code" ? t("login.promptCode") : t("login.promptSignIn")}
           </p>
         </div>
 
@@ -113,7 +126,7 @@ export default function LoginPage() {
         {mode === "password" && (
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.email")}</label>
               <input
                 type="email"
                 required
@@ -125,7 +138,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.password")}</label>
               <input
                 type="password"
                 required
@@ -136,16 +149,16 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" variant="primary" fullWidth disabled={loading}>
-              {loading ? "Signing in…" : "Sign In"}
+              {loading ? t("login.signingIn") : t("login.signIn")}
             </Button>
             <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-              Don't have a password?{" "}
+              {t("login.dontHavePassword")}{" "}
               <button
                 type="button"
                 className="text-blue-500 hover:underline"
                 onClick={() => { setError(""); setMode("otp-email"); }}
               >
-                Use email code
+                {t("login.useEmailCode")}
               </button>
             </p>
           </form>
@@ -155,7 +168,7 @@ export default function LoginPage() {
         {mode === "otp-email" && (
           <form onSubmit={handleRequestOtp} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("login.email")}</label>
               <input
                 type="email"
                 required
@@ -167,7 +180,7 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" variant="primary" fullWidth disabled={loading}>
-              {loading ? "Sending…" : "Send Code"}
+              {loading ? t("login.sending") : t("login.sendCode")}
             </Button>
             <p className="text-center text-xs text-gray-400 dark:text-gray-500">
               <button
@@ -175,7 +188,7 @@ export default function LoginPage() {
                 className="text-blue-500 hover:underline"
                 onClick={() => { setError(""); setMode("password"); }}
               >
-                ← Back to password login
+                {`<- ${t("login.backToPassword")}`}
               </button>
             </p>
           </form>
@@ -186,7 +199,7 @@ export default function LoginPage() {
           <form onSubmit={handleVerifyOtp} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                6-digit code sent to {email}
+                {t("login.codeSentTo", { email })}
               </label>
               <input
                 type="text"
@@ -201,7 +214,7 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" variant="primary" fullWidth disabled={loading || otpCode.length !== 6}>
-              {loading ? "Verifying…" : "Verify Code"}
+              {loading ? t("login.verifying") : t("login.verifyCode")}
             </Button>
             <p className="text-center text-xs text-gray-400 dark:text-gray-500">
               <button
@@ -209,7 +222,7 @@ export default function LoginPage() {
                 className="text-blue-500 hover:underline"
                 onClick={() => { setError(""); setOtpCode(""); setMode("otp-email"); }}
               >
-                ← Use a different email
+                {`<- ${t("login.useDifferentEmail")}`}
               </button>
             </p>
           </form>

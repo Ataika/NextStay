@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { tasksApi, staffApi } from "../../api/api";
+import { useI18n } from "../../i18n";
 import type { CleaningTask } from "../../mocks/tasks";
 import type { StaffMember, ShiftResponse } from "../../api/api";
 import { useAuthStore } from "../../store/authStore";
@@ -59,18 +60,16 @@ function getCalWeeks(month: Date): Date[][] {
 // ---------------------------------------------------------------------------
 
 const SHIFT_CONFIG = {
-  morning:       { label: "Morning",     hours: "07:00–15:00", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  afternoon:     { label: "Afternoon",   hours: "15:00–23:00", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
-  night:         { label: "Night",       hours: "23:00–07:00", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
-  off:           { label: "Day Off",     hours: "—",           color: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
-  day_extended:  { label: "Day (12h)",   hours: "08:00–20:00", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
-  night_extended:{ label: "Night (12h)", hours: "20:00–08:00", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
+  morning:       { hours: "07:00–15:00", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  afternoon:     { hours: "15:00–23:00", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
+  night:         { hours: "23:00–07:00", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
+  off:           { hours: "—",           color: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300" },
+  day_extended:  { hours: "08:00–20:00", color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300" },
+  night_extended:{ hours: "20:00–08:00", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300" },
 } as const;
 
 type ShiftType = keyof typeof SHIFT_CONFIG;
 
-const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-const CAL_DAYS  = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTH_HOURS = 160;
 
 // ---------------------------------------------------------------------------
@@ -78,6 +77,7 @@ const MONTH_HOURS = 160;
 // ---------------------------------------------------------------------------
 
 function ShiftTimer({ loginTime }: { loginTime: string }) {
+  const { t } = useI18n();
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -102,7 +102,7 @@ function ShiftTimer({ loginTime }: { loginTime: string }) {
     <div className="flex items-center gap-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
       <div>
-        <p className="text-[10px] uppercase tracking-wide text-green-600 dark:text-green-500 font-semibold">Shift active</p>
+        <p className="text-[10px] uppercase tracking-wide text-green-600 dark:text-green-500 font-semibold">{t("shifts.active")}</p>
         <p className="text-sm font-bold text-green-800 dark:text-green-300 tabular-nums leading-none mt-0.5">
           {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
         </p>
@@ -134,6 +134,7 @@ type PriorityFilter = CleaningTask["priority"] | "All";
 
 export default function StaffPage() {
   const navigate    = useNavigate();
+  const { locale, priorityLabel, roleLabel: translateRoleLabel, shiftLabel, t } = useI18n();
   const authName    = useAuthStore((s) => s.name);
   const authEmail   = useAuthStore((s) => s.email);
   const loginTime   = useAuthStore((s) => s.loginTime);
@@ -183,22 +184,22 @@ export default function StaffPage() {
       setTasksLoading(true);
       setTasks(await tasksApi.getAll());
     } catch {
-      toast.error("Failed to load tasks");
+      toast.error(t("staff.failedLoadTasks"));
     } finally {
       setTasksLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const loadSchedule = useCallback(async () => {
     try {
       setScheduleLoading(true);
       setShifts(await staffApi.getMySchedule(toDateStr(weekStart)));
     } catch {
-      toast.error("Failed to load schedule");
+      toast.error(t("staff.failedLoadSchedule"));
     } finally {
       setScheduleLoading(false);
     }
-  }, [weekStart]);
+  }, [t, weekStart]);
 
   const loadCalendar = useCallback(async () => {
     try {
@@ -217,11 +218,11 @@ export default function StaffPage() {
       }
       setCalShifts(all);
     } catch {
-      toast.error("Failed to load calendar");
+      toast.error(t("staff.failedLoadCalendar"));
     } finally {
       setCalLoading(false);
     }
-  }, [calMonth]);
+  }, [calMonth, t]);
 
   useEffect(() => { void loadTasks(); }, [loadTasks]);
   useEffect(() => { if (tab === "schedule") void loadSchedule(); }, [tab, loadSchedule]);
@@ -235,20 +236,20 @@ export default function StaffPage() {
     if (!profile) return;
     try {
       await tasksApi.assign(taskId, profile.id, profile.name);
-      toast.success("Task started");
+      toast.success(t("staff.taskStarted"));
       void loadTasks();
     } catch {
-      toast.error("Failed to start task");
+      toast.error(t("staff.failedStartTask"));
     }
   };
 
   const handleComplete = async (taskId: number) => {
     try {
       await tasksApi.complete(taskId);
-      toast.success("Task completed");
+      toast.success(t("staff.taskCompleted"));
       void loadTasks();
     } catch {
-      toast.error("Failed to complete task");
+      toast.error(t("staff.failedCompleteTask"));
     }
   };
 
@@ -257,11 +258,11 @@ export default function StaffPage() {
     try {
       setDeleting(true);
       await tasksApi.delete(deleteTarget.id);
-      toast.success("Task deleted");
+      toast.success(t("staff.taskDeleted"));
       setDeleteTarget(null);
       void loadTasks();
     } catch {
-      toast.error("Failed to delete task");
+      toast.error(t("staff.failedDeleteTask"));
     } finally {
       setDeleting(false);
     }
@@ -310,10 +311,14 @@ export default function StaffPage() {
     return d.getFullYear() === calMonth.getFullYear() && d.getMonth() === calMonth.getMonth();
   });
 
-  const displayName = profile?.name ?? authName ?? "Staff Member";
+  const displayName = profile?.name ?? authName ?? t("staff.staffMember");
   const roleLabel   = profile?.role
-    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
+    ? translateRoleLabel(profile.role)
     : null;
+  const calendarDayLabels = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDays(getMondayOf(new Date()), index).toLocaleDateString(locale, { weekday: "short" })),
+    [locale]
+  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -326,7 +331,7 @@ export default function StaffPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {profileLoading ? "Loading…" : `Hello, ${displayName.split(" ")[0]}`}
+            {profileLoading ? t("staff.loading") : t("staff.hello", { name: displayName.split(" ")[0] })}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {roleLabel ? `${roleLabel} · ` : ""}{authEmail ?? ""}
@@ -336,7 +341,7 @@ export default function StaffPage() {
           {loginTime && <ShiftTimer loginTime={loginTime} />}
           {profile && (
             <div className="text-right">
-              <p className="text-xs text-gray-400">This month</p>
+              <p className="text-xs text-gray-400">{t("staff.thisMonth")}</p>
               <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
                 {profile.hours_this_month}h
               </p>
@@ -349,31 +354,37 @@ export default function StaffPage() {
       {!loginTime && (
         <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Shift not started</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">Enter the shift code to start your shift timer.</p>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t("staff.shiftNotStarted")}</p>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t("staff.shiftNotStartedPrompt")}</p>
           </div>
           <button
             onClick={() => navigate("/shift-start")}
             className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
           >
-            Start Shift →
+            {t("staff.startShift")}
           </button>
         </div>
       )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-        {(["tasks", "schedule", "calendar", "hours"] as const).map((t) => (
+        {(["tasks", "schedule", "calendar", "hours"] as const).map((tabName) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabName}
+            onClick={() => setTab(tabName)}
             className={`flex-1 py-1.5 text-xs sm:text-sm rounded-md font-medium transition-colors capitalize ${
-              tab === t
+              tab === tabName
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            {t === "tasks" ? "Tasks" : t === "schedule" ? "Schedule" : t === "calendar" ? "Calendar" : "Hours"}
+            {tabName === "tasks"
+              ? t("staff.tabTasks")
+              : tabName === "schedule"
+                ? t("staff.tabSchedule")
+                : tabName === "calendar"
+                  ? t("staff.tabCalendar")
+                  : t("staff.tabHours")}
           </button>
         ))}
       </div>
@@ -385,9 +396,9 @@ export default function StaffPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: "Pending",     value: taskStats.pending,    color: "text-gray-900 dark:text-white" },
-              { label: "In progress", value: taskStats.inProgress, color: "text-blue-700 dark:text-blue-300" },
-              { label: "Completed",   value: taskStats.completed,  color: "text-emerald-700 dark:text-emerald-300" },
+              { label: t("staff.statPending"), value: taskStats.pending, color: "text-gray-900 dark:text-white" },
+              { label: t("staff.statInProgress"), value: taskStats.inProgress, color: "text-blue-700 dark:text-blue-300" },
+              { label: t("staff.statCompleted"), value: taskStats.completed, color: "text-emerald-700 dark:text-emerald-300" },
             ].map((s) => (
               <Card key={s.label} padding="sm" className="text-center">
                 <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -403,20 +414,20 @@ export default function StaffPage() {
                 onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="All">All statuses</option>
-                <option value="Pending">Pending</option>
-                <option value="In Progress">In progress</option>
-                <option value="Completed">Completed</option>
+                <option value="All">{t("staff.allStatuses")}</option>
+                <option value="Pending">{t("taskStatus.Pending")}</option>
+                <option value="In Progress">{t("taskStatus.InProgress")}</option>
+                <option value="Completed">{t("taskStatus.Completed")}</option>
               </select>
               <select
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="All">All priorities</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
+                <option value="All">{t("staff.allPriorities")}</option>
+                <option value="High">{priorityLabel("High")}</option>
+                <option value="Medium">{priorityLabel("Medium")}</option>
+                <option value="Low">{priorityLabel("Low")}</option>
               </select>
               {profile && (
                 <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 cursor-pointer">
@@ -426,17 +437,17 @@ export default function StaffPage() {
                     onChange={(e) => setOnlyMyTasks(e.target.checked)}
                     className="rounded border-gray-300"
                   />
-                  <span className="text-sm text-gray-900 dark:text-white">Only my tasks</span>
+                  <span className="text-sm text-gray-900 dark:text-white">{t("staff.onlyMyTasks")}</span>
                 </label>
               )}
             </div>
           </Card>
 
           {tasksLoading ? (
-            <LoadingSpinner message="Loading tasks…" fullScreen={false} />
+            <LoadingSpinner message={t("staff.loadingTasks")} fullScreen={false} />
           ) : filteredTasks.length === 0 ? (
             <Card padding="lg">
-              <p className="text-center text-sm text-gray-400">No tasks match the current filters.</p>
+              <p className="text-center text-sm text-gray-400">{t("staff.noTasks")}</p>
             </Card>
           ) : (
             <div className="space-y-3">
@@ -461,24 +472,24 @@ export default function StaffPage() {
       {tab === "schedule" && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setWeekStart((d) => addDays(d, -7))}>← Prev</Button>
+            <Button size="sm" variant="secondary" onClick={() => setWeekStart((d) => addDays(d, -7))}>{`<- ${t("common.prev")}`}</Button>
             <span className="flex-1 text-center text-sm font-medium text-gray-700 dark:text-gray-300">
-              {weekDays[0].toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+              {weekDays[0].toLocaleDateString(locale, { day: "numeric", month: "short" })}
               {" – "}
-              {weekDays[6].toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {weekDays[6].toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric" })}
             </span>
-            <Button size="sm" variant="secondary" onClick={() => setWeekStart((d) => addDays(d, 7))}>Next →</Button>
-            <Button size="sm" variant="secondary" onClick={() => setWeekStart(getMondayOf(new Date()))}>Today</Button>
+            <Button size="sm" variant="secondary" onClick={() => setWeekStart((d) => addDays(d, 7))}>{`${t("common.next")} ->`}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setWeekStart(getMondayOf(new Date()))}>{t("common.today")}</Button>
           </div>
 
           {!profile && !profileLoading ? (
             <Card padding="lg">
               <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                Your account isn't linked to a staff profile yet. Ask your manager to add your email.
+                {t("staff.noStaffProfileLong")}
               </p>
             </Card>
           ) : scheduleLoading ? (
-            <LoadingSpinner message="Loading schedule…" fullScreen={false} />
+            <LoadingSpinner message={t("staff.loadingSchedule")} fullScreen={false} />
           ) : (
             <Card padding="none">
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -498,7 +509,7 @@ export default function StaffPage() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 text-center">
                           <p className={`text-xs font-medium ${isToday ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}>
-                            {DAY_NAMES[i].slice(0, 3).toUpperCase()}
+                            {day.toLocaleDateString(locale, { weekday: "short" }).replace(".", "").toUpperCase()}
                           </p>
                           <p className={`text-lg font-bold leading-none ${isToday ? "text-blue-600 dark:text-blue-400" : "text-gray-800 dark:text-gray-200"}`}>
                             {day.getDate()}
@@ -507,10 +518,10 @@ export default function StaffPage() {
                         <div>
                           {cfg ? (
                             <span className={`inline-block px-2.5 py-1 rounded-lg text-sm font-medium ${cfg.color}`}>
-                              {cfg.label}
+                              {shiftLabel(shift?.shift_type ?? "off")}
                             </span>
                           ) : (
-                            <span className="text-sm text-gray-300 dark:text-gray-600">Unscheduled</span>
+                            <span className="text-sm text-gray-300 dark:text-gray-600">{t("shifts.unscheduled")}</span>
                           )}
                         </div>
                       </div>
@@ -536,13 +547,13 @@ export default function StaffPage() {
           {profile && !scheduleLoading && (
             <Card padding="md">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Hours this week</span>
+                <span className="text-gray-600 dark:text-gray-400">{t("staff.hoursThisWeek")}</span>
                 <span className="font-semibold text-gray-900 dark:text-white tabular-nums">
                   {shifts.filter((s) => s.shift_type !== "off").reduce((sum, s) => sum + s.hours, 0)}h
                 </span>
               </div>
               <div className="flex justify-between text-sm mt-2">
-                <span className="text-gray-600 dark:text-gray-400">Days off this week</span>
+                <span className="text-gray-600 dark:text-gray-400">{t("staff.daysOffThisWeek")}</span>
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {shifts.filter((s) => s.shift_type === "off").length}
                 </span>
@@ -559,27 +570,27 @@ export default function StaffPage() {
         <div className="space-y-4">
           {/* Month navigation */}
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setCalMonth((m) => addMonths(m, -1))}>← Prev</Button>
+            <Button size="sm" variant="secondary" onClick={() => setCalMonth((m) => addMonths(m, -1))}>{`<- ${t("common.prev")}`}</Button>
             <span className="flex-1 text-center text-sm font-semibold text-gray-800 dark:text-gray-200">
-              {calMonth.toLocaleString("en-US", { month: "long", year: "numeric" })}
+              {calMonth.toLocaleString(locale, { month: "long", year: "numeric" })}
             </span>
-            <Button size="sm" variant="secondary" onClick={() => setCalMonth((m) => addMonths(m, 1))}>Next →</Button>
-            <Button size="sm" variant="secondary" onClick={() => setCalMonth(startOfMonth(new Date()))}>Today</Button>
+            <Button size="sm" variant="secondary" onClick={() => setCalMonth((m) => addMonths(m, 1))}>{`${t("common.next")} ->`}</Button>
+            <Button size="sm" variant="secondary" onClick={() => setCalMonth(startOfMonth(new Date()))}>{t("common.today")}</Button>
           </div>
 
           {!profile && !profileLoading ? (
             <Card padding="lg">
               <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                Your account isn't linked to a staff profile yet.
+                {t("staff.noStaffProfileShort")}
               </p>
             </Card>
           ) : calLoading ? (
-            <LoadingSpinner message="Loading calendar…" fullScreen={false} />
+            <LoadingSpinner message={t("staff.loadingCalendar")} fullScreen={false} />
           ) : (
             <Card padding="none" className="overflow-hidden">
               {/* Day headers */}
               <div className="grid grid-cols-7 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                {CAL_DAYS.map((d) => (
+                {calendarDayLabels.map((d) => (
                   <div key={d} className="text-center py-2 text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
                     {d}
                   </div>
@@ -620,7 +631,7 @@ export default function StaffPage() {
                         {/* Shift badge */}
                         {cfg && inMonth && (
                           <span className={`text-[9px] px-1 py-0.5 rounded font-semibold leading-tight block truncate ${cfg.color}`}>
-                            {cfg.label === "Afternoon" ? "Aft." : cfg.label}
+                            {shiftLabel(shift.shift_type).length > 8 ? shiftLabel(shift.shift_type).slice(0, 8) : shiftLabel(shift.shift_type)}
                           </span>
                         )}
 
@@ -628,7 +639,7 @@ export default function StaffPage() {
                         {hasTask && (
                           <span
                             className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full"
-                            title="Pending tasks"
+                            title={t("staff.pendingDotTitle")}
                           />
                         )}
                       </div>
@@ -641,19 +652,19 @@ export default function StaffPage() {
 
           {/* Legend */}
           <Card padding="sm">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-2 font-semibold">Legend</p>
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-2 font-semibold">{t("staff.legend")}</p>
             <div className="flex flex-wrap gap-2">
-              {(Object.entries(SHIFT_CONFIG) as [ShiftType, typeof SHIFT_CONFIG[ShiftType]][]).map(([, cfg]) => (
-                <span key={cfg.label} className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cfg.color}`}>
-                  {cfg.label}
+              {(Object.entries(SHIFT_CONFIG) as [ShiftType, typeof SHIFT_CONFIG[ShiftType]][]).map(([type, cfg]) => (
+                <span key={type} className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${cfg.color}`}>
+                  {shiftLabel(type)}
                 </span>
               ))}
               <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                Unscheduled
+                {t("shifts.unscheduled")}
               </span>
               <span className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400">
                 <span className="w-1.5 h-1.5 bg-red-500 rounded-full inline-block" />
-                Pending tasks
+                {t("staff.pendingTasks")}
               </span>
             </div>
           </Card>
@@ -662,13 +673,13 @@ export default function StaffPage() {
           {!calLoading && (
             <Card padding="md">
               <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                {calMonth.toLocaleString("en-US", { month: "long" })} at a glance
+                {t("staff.atAGlance", { month: calMonth.toLocaleString(locale, { month: "long" }) })}
               </p>
               <div className="grid grid-cols-3 gap-3 text-center">
                 {[
-                  { label: "Scheduled h",  value: calMonthShifts.filter((s) => s.shift_type !== "off").reduce((sum, s) => sum + s.hours, 0) },
-                  { label: "Work days",    value: calMonthShifts.filter((s) => s.shift_type !== "off").length },
-                  { label: "Days off",     value: calMonthShifts.filter((s) => s.shift_type === "off").length },
+                  { label: t("staff.scheduledHours"), value: calMonthShifts.filter((s) => s.shift_type !== "off").reduce((sum, s) => sum + s.hours, 0) },
+                  { label: t("staff.workDays"), value: calMonthShifts.filter((s) => s.shift_type !== "off").length },
+                  { label: t("staff.daysOff"), value: calMonthShifts.filter((s) => s.shift_type === "off").length },
                 ].map(({ label, value }) => (
                   <div key={label}>
                     <p className="text-xl font-bold text-gray-900 dark:text-white tabular-nums">{value}</p>
@@ -687,18 +698,18 @@ export default function StaffPage() {
       {tab === "hours" && (
         <div className="space-y-4">
           {profileLoading ? (
-            <LoadingSpinner message="Loading…" fullScreen={false} />
+            <LoadingSpinner message={t("staff.loadingHours")} fullScreen={false} />
           ) : !profile ? (
             <Card padding="lg">
               <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                Your account isn't linked to a staff profile yet. Ask your manager to add your email.
+                {t("staff.noStaffProfileLong")}
               </p>
             </Card>
           ) : (
             <>
               <Card padding="md">
                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  Hours worked — {new Date().toLocaleString("en-US", { month: "long", year: "numeric" })}
+                  {t("staff.hoursWorked", { month: new Date().toLocaleString(locale, { month: "long", year: "numeric" }) })}
                 </p>
                 <div className="flex items-end justify-between mb-2">
                   <span className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">{profile.hours_this_month}</span>
@@ -710,17 +721,17 @@ export default function StaffPage() {
                   color={profile.hours_this_month >= MONTH_HOURS ? "bg-emerald-500" : "bg-blue-500"}
                 />
                 <p className="text-xs text-gray-400 mt-2">
-                  {Math.max(0, MONTH_HOURS - profile.hours_this_month)}h remaining to full month
+                  {t("staff.remainingToFullMonth", { count: Math.max(0, MONTH_HOURS - profile.hours_this_month) })}
                 </p>
               </Card>
 
               <Card padding="md">
                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  Days off — {new Date().getFullYear()}
+                  {t("staff.daysOffYear", { year: new Date().getFullYear() })}
                 </p>
                 <div className="flex items-end justify-between mb-2">
                   <span className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">{profile.days_off_this_year}</span>
-                  <span className="text-sm text-gray-400 mb-1">/ {profile.annual_days_off} days</span>
+                  <span className="text-sm text-gray-400 mb-1">/ {profile.annual_days_off} {locale === "it-IT" ? "giorni" : "days"}</span>
                 </div>
                 <ProgressBar
                   value={profile.days_off_this_year}
@@ -728,19 +739,19 @@ export default function StaffPage() {
                   color={profile.days_off_this_year >= profile.annual_days_off ? "bg-rose-500" : "bg-emerald-500"}
                 />
                 <p className="text-xs text-gray-400 mt-2">
-                  {Math.max(0, profile.annual_days_off - profile.days_off_this_year)} days remaining
+                  {t("staff.daysRemaining", { count: Math.max(0, profile.annual_days_off - profile.days_off_this_year) })}
                 </p>
               </Card>
 
               <Card padding="md">
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">My Profile</p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">{t("staff.myProfile")}</p>
                 <div className="space-y-2 text-sm">
                   {[
-                    { label: "Name",  value: profile.name },
-                    { label: "Role",  value: profile.role.charAt(0).toUpperCase() + profile.role.slice(1) },
-                    { label: "Email", value: profile.email ?? "—" },
-                    { label: "Phone", value: profile.phone ?? "—" },
-                    { label: "Since", value: profile.hire_date ? new Date(profile.hire_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—" },
+                    { label: t("staff.profileName"), value: profile.name },
+                    { label: t("staff.profileRole"), value: translateRoleLabel(profile.role) },
+                    { label: t("staff.profileEmail"), value: profile.email ?? "—" },
+                    { label: t("staff.profilePhone"), value: profile.phone ?? "—" },
+                    { label: t("staff.profileSince"), value: profile.hire_date ? new Date(profile.hire_date).toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" }) : "—" },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex justify-between">
                       <span className="text-gray-500 dark:text-gray-400">{label}</span>
@@ -758,20 +769,20 @@ export default function StaffPage() {
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => !deleting && setDeleteTarget(null)}
-        title="Delete task"
+        title={t("staff.deleteTask")}
         size="sm"
         footer={
           <div className="flex gap-3 w-full">
-            <Button variant="secondary" fullWidth onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="secondary" fullWidth onClick={() => setDeleteTarget(null)} disabled={deleting}>{t("common.cancel")}</Button>
             <Button variant="danger" fullWidth onClick={() => void handleDelete()} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete"}
+              {deleting ? t("staff.deleting") : t("taskCard.delete")}
             </Button>
           </div>
         }
       >
         {deleteTarget && (
           <p className="text-gray-700 dark:text-gray-300">
-            Delete task for Room #{deleteTarget.roomNumber}? This cannot be undone.
+            {t("staff.deleteTaskPrompt", { room: deleteTarget.roomNumber })}
           </p>
         )}
       </Modal>

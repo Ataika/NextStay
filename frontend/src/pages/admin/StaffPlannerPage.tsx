@@ -7,6 +7,7 @@ import PageHeader from "../../ui/PageHeader";
 import Modal from "../../ui/Modal";
 import toast from "react-hot-toast";
 import { useAuthStore, canManageEngine, isAdminRole } from "../../store/authStore";
+import { useI18n } from "../../i18n";
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -82,7 +83,7 @@ const SHIFT_CONFIG = {
     hours: "—",
     color: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
     ring: "ring-rose-400",
-    adminOnly: false, // also available to DIRECTOR/MANAGER
+    adminOnly: false,
   },
 } as const;
 
@@ -115,10 +116,11 @@ const DEFAULT_FORM = {
 // ---------------------------------------------------------------------------
 
 export default function StaffPlannerPage() {
+  const { t } = useI18n();
   const role           = useAuthStore((s) => s.role);
-  const canAssignShifts = canManageEngine(role);  // OWNER/SYS_ADMIN: any shift type
-  const canAssignOff    = isAdminRole(role);       // + DIRECTOR/MANAGER: days off only
-  const canAssign       = canAssignOff;            // can click any cell
+  const canAssignShifts = canManageEngine(role);
+  const canAssignOff    = isAdminRole(role);
+  const canAssign       = canAssignOff;
   const [tab, setTab] = useState<"team" | "schedule">("team");
 
   // --- Team state ---
@@ -145,7 +147,7 @@ export default function StaffPlannerPage() {
       setStaffLoading(true);
       setStaff(await staffApi.list());
     } catch {
-      toast.error("Failed to load staff");
+      toast.error(t("staffPlanner.loadFailed"));
     } finally {
       setStaffLoading(false);
     }
@@ -156,7 +158,7 @@ export default function StaffPlannerPage() {
       setScheduleLoading(true);
       setShifts(await staffApi.getSchedule(toDateStr(weekStart)));
     } catch {
-      toast.error("Failed to load schedule");
+      toast.error(t("staffPlanner.scheduleFailed"));
     } finally {
       setScheduleLoading(false);
     }
@@ -196,7 +198,7 @@ export default function StaffPlannerPage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      toast.error("Name is required");
+      toast.error(t("staffPlanner.nameRequired"));
       return;
     }
     try {
@@ -211,28 +213,28 @@ export default function StaffPlannerPage() {
       };
       if (editingId !== null) {
         await staffApi.update(editingId, { ...payload, is_active: form.is_active });
-        toast.success("Staff member updated");
+        toast.success(t("staffPlanner.updated"));
       } else {
         await staffApi.create(payload);
-        toast.success("Staff member added");
+        toast.success(t("staffPlanner.added"));
       }
       setShowModal(false);
       void loadStaff();
     } catch {
-      toast.error("Failed to save staff member");
+      toast.error(t("staffPlanner.saveFailed"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: number, name: string) => {
-    if (!confirm(`Delete ${name}? This will remove all their shifts.`)) return;
+    if (!confirm(t("staffPlanner.deleteConfirm", { name }))) return;
     try {
       await staffApi.delete(id);
-      toast.success("Staff member removed");
+      toast.success(t("staffPlanner.removed"));
       void loadStaff();
     } catch {
-      toast.error("Failed to delete staff member");
+      toast.error(t("staffPlanner.deleteFailed"));
     }
   };
 
@@ -253,9 +255,9 @@ export default function StaffPlannerPage() {
         ...prev.filter((s) => !(s.staff_id === staffId && s.shift_date === dateStr)),
         result,
       ]);
-      void loadStaff(); // refresh hours/days-off counters in Team tab
+      void loadStaff();
     } catch {
-      toast.error("Failed to save shift");
+      toast.error(t("staffPlanner.shiftSaveFailed"));
     } finally {
       setSavingCell(null);
     }
@@ -272,7 +274,7 @@ export default function StaffPlannerPage() {
       setShifts((prev) => prev.filter((s) => s.id !== existing.id));
       void loadStaff();
     } catch {
-      toast.error("Failed to clear shift");
+      toast.error(t("staffPlanner.shiftClearFailed"));
     } finally {
       setSavingCell(null);
     }
@@ -296,29 +298,29 @@ export default function StaffPlannerPage() {
     <div className="w-full space-y-5">
       <div className="flex items-start justify-between gap-4">
         <PageHeader
-          title="Staff Planner"
-          subtitle="Manage your team members and assign weekly shifts."
+          title={t("staffPlanner.title")}
+          subtitle={t("staffPlanner.subtitle")}
         />
         {tab === "team" && (
           <div className="shrink-0 pt-1">
-            <Button onClick={openAdd}>+ Add Staff</Button>
+            <Button onClick={openAdd}>{t("staffPlanner.addStaff")}</Button>
           </div>
         )}
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-fit">
-        {(["team", "schedule"] as const).map((t) => (
+        {(["team", "schedule"] as const).map((tabKey) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={tabKey}
+            onClick={() => setTab(tabKey)}
             className={`px-4 py-1.5 text-sm rounded-md font-medium transition-colors capitalize ${
-              tab === t
+              tab === tabKey
                 ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            {t === "team" ? "Team" : "Schedule"}
+            {tabKey === "team" ? t("staffPlanner.tabTeam") : t("staffPlanner.tabSchedule")}
           </button>
         ))}
       </div>
@@ -331,36 +333,41 @@ export default function StaffPlannerPage() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                {["Name", "Role", "Hours this month", "Days off this year", "Status", ""].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400"
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
+                {[
+                  t("staffPlanner.colName"),
+                  t("staffPlanner.colRole"),
+                  t("staffPlanner.colHours"),
+                  t("staffPlanner.colDaysOff"),
+                  t("staffPlanner.colStatus"),
+                  "",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400"
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {staffLoading ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
-                    Loading…
+                    {t("staffPlanner.loading")}
                   </td>
                 </tr>
               ) : staff.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
-                    No staff members yet. Click{" "}
+                    {t("staffPlanner.noStaff")}{" "}
                     <button
                       className="text-blue-500 hover:underline"
                       onClick={openAdd}
                     >
-                      + Add Staff
+                      {t("staffPlanner.noStaffLink")}
                     </button>{" "}
-                    to get started.
+                    {t("staffPlanner.noStaffEnd")}
                   </td>
                 </tr>
               ) : (
@@ -393,7 +400,7 @@ export default function StaffPlannerPage() {
                             : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
                         }`}
                       >
-                        {m.is_active ? "Active" : "Inactive"}
+                        {m.is_active ? t("staffPlanner.active") : t("staffPlanner.inactive")}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -402,13 +409,13 @@ export default function StaffPlannerPage() {
                           onClick={() => openEdit(m)}
                           className="text-xs text-blue-500 hover:text-blue-700 dark:hover:text-blue-300"
                         >
-                          Edit
+                          {t("staffPlanner.edit")}
                         </button>
                         <button
                           onClick={() => void handleDelete(m.id, m.name)}
                           className="text-xs text-red-400 hover:text-red-600"
                         >
-                          Delete
+                          {t("staffPlanner.delete")}
                         </button>
                       </div>
                     </td>
@@ -432,7 +439,7 @@ export default function StaffPlannerPage() {
               variant="secondary"
               onClick={() => setWeekStart((d) => addDays(d, -7))}
             >
-              ← Prev
+              {t("staffPlanner.prevWeek")}
             </Button>
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[200px] text-center">
               {weekDays[0].toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
@@ -448,14 +455,14 @@ export default function StaffPlannerPage() {
               variant="secondary"
               onClick={() => setWeekStart((d) => addDays(d, 7))}
             >
-              Next →
+              {t("staffPlanner.nextWeek")}
             </Button>
             <Button
               size="sm"
               variant="secondary"
               onClick={() => setWeekStart(getMondayOf(new Date()))}
             >
-              Today
+              {t("staffPlanner.today")}
             </Button>
           </div>
 
@@ -468,7 +475,7 @@ export default function StaffPlannerPage() {
                 </span>
               ),
             )}
-            <span className="text-gray-400 dark:text-gray-500">— = Unscheduled (click to assign)</span>
+            <span className="text-gray-400 dark:text-gray-500">{t("staffPlanner.unscheduled")}</span>
           </div>
 
           {/* Click-outside overlay to close cell dropdown */}
@@ -482,7 +489,7 @@ export default function StaffPlannerPage() {
                 <thead className="bg-gray-50 dark:bg-gray-900/60">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 w-36 sticky left-0 bg-gray-50 dark:bg-gray-900/60">
-                      Staff
+                      {t("staffPlanner.staffCol")}
                     </th>
                     {weekDays.map((day, i) => {
                       const isToday = toDateStr(day) === toDateStr(new Date());
@@ -510,13 +517,13 @@ export default function StaffPlannerPage() {
                   {scheduleLoading ? (
                     <tr>
                       <td colSpan={8} className="py-10 text-center text-sm text-gray-400">
-                        Loading schedule…
+                        {t("staffPlanner.loadingSchedule")}
                       </td>
                     </tr>
                   ) : activeStaff.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-10 text-center text-sm text-gray-400">
-                        No active staff. Add members in the Team tab.
+                        {t("staffPlanner.noActiveStaff")}
                       </td>
                     </tr>
                   ) : (
@@ -582,7 +589,7 @@ export default function StaffPlannerPage() {
                                     <div className="absolute z-10 top-full left-1/2 -translate-x-1/2 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg p-1.5 flex flex-col gap-0.5 min-w-[140px]">
                                       {!canAssignShifts && (
                                         <p className="px-2.5 py-1 text-[10px] text-gray-400 border-b border-gray-100 dark:border-gray-700 mb-0.5">
-                                          Days off only
+                                          {t("staffPlanner.daysOffOnly")}
                                         </p>
                                       )}
                                       {(
@@ -615,7 +622,7 @@ export default function StaffPlannerPage() {
                                           }
                                           className="text-left px-2.5 py-1.5 rounded-lg text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 mt-0.5 border-t border-gray-100 dark:border-gray-700"
                                         >
-                                          Clear
+                                          {t("staffPlanner.clear")}
                                         </button>
                                       )}
                                     </div>
@@ -641,14 +648,14 @@ export default function StaffPlannerPage() {
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={editingId !== null ? "Edit Staff Member" : "Add Staff Member"}
+        title={editingId !== null ? t("staffPlanner.editStaffTitle") : t("staffPlanner.addStaffTitle")}
         size="md"
       >
         <div className="space-y-4">
           {/* Name */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Full Name <span className="text-red-500">*</span>
+              {t("staffPlanner.fullName")} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -662,7 +669,7 @@ export default function StaffPlannerPage() {
           {/* Role */}
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Role <span className="text-red-500">*</span>
+              {t("staffPlanner.role")} <span className="text-red-500">*</span>
             </label>
             <select
               value={form.role}
@@ -681,7 +688,7 @@ export default function StaffPlannerPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email
+                {t("staffPlanner.email")}
               </label>
               <input
                 type="email"
@@ -693,7 +700,7 @@ export default function StaffPlannerPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Phone
+                {t("staffPlanner.phone")}
               </label>
               <input
                 type="tel"
@@ -709,7 +716,7 @@ export default function StaffPlannerPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Hire Date
+                {t("staffPlanner.hireDate")}
               </label>
               <input
                 type="date"
@@ -720,7 +727,7 @@ export default function StaffPlannerPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Annual Days Off
+                {t("staffPlanner.annualDaysOff")}
               </label>
               <input
                 type="number"
@@ -744,7 +751,7 @@ export default function StaffPlannerPage() {
                 onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                 className="rounded border-gray-300"
               />
-              <span className="text-sm text-gray-700 dark:text-gray-300">Active</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{t("staffPlanner.activeLabel")}</span>
             </label>
           )}
 
@@ -756,7 +763,7 @@ export default function StaffPlannerPage() {
               onClick={() => setShowModal(false)}
               disabled={saving}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="primary"
@@ -764,7 +771,11 @@ export default function StaffPlannerPage() {
               disabled={saving || !form.name.trim()}
               onClick={() => void handleSave()}
             >
-              {saving ? "Saving…" : editingId !== null ? "Save Changes" : "Add Staff"}
+              {saving
+                ? t("staffPlanner.saving")
+                : editingId !== null
+                ? t("staffPlanner.saveChanges")
+                : t("staffPlanner.addStaff")}
             </Button>
           </div>
         </div>

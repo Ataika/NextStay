@@ -1,25 +1,23 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useAuthStore } from "../store/authStore";
+import { useAuthStore, isAdminRole } from "../store/authStore";
 import type { UserRole } from "../store/authStore";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: UserRole;
+  allowedRoles: UserRole[];
 }
 
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const token = useAuthStore((s) => s.token);
-  const role = useAuthStore((s) => s.role);
+  const role  = useAuthStore((s) => s.role);
 
-  // if there is no full auth session
   if (!token || !role) {
     return <Navigate to="/login" replace />;
   }
 
-  // if a specific role is needed and the role doesn't match
-  if (requiredRole && role !== requiredRole) {
-    return <Navigate to={role === "OWNER" ? "/admin" : "/staff"} replace />;
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to={isAdminRole(role) ? "/admin" : "/staff"} replace />;
   }
 
   return <>{children}</>;

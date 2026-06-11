@@ -2,8 +2,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import AdminPage from "../pages/admin/AdminPage";
 import StaffPage from "../pages/staff/StaffPage";
+import ChatPage from "../pages/staff/ChatPage";
 import ShiftStartPage from "../pages/staff/ShiftStartPage";
 import GuestPage from "../pages/guest/GuestPage";
+import NextStayPage from "../pages/NextStayPage";
 import BookingPage from "../pages/booking/BookingPage";
 import BookingSuccessPage from "../pages/booking/BookingSuccessPage";
 import BookingCancelPage from "../pages/booking/BookingCancelPage";
@@ -28,6 +30,7 @@ export default function AppRouter() {
         <Route path="/" element={<IndexRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/book" element={<BookingPage />} />
+        <Route path="/nextstay" element={<NextStayPage />} />
         <Route path="/booking/success" element={<BookingSuccessPage />} />
         <Route path="/booking/cancel" element={<BookingCancelPage />} />
         <Route path="/guest/:token" element={<GuestPage />} />
@@ -46,6 +49,14 @@ export default function AppRouter() {
             element={
               <ProtectedRoute allowedRoles={["STAFF"]}>
                 <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/chat"
+            element={
+              <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"]}>
+                <ChatPage />
               </ProtectedRoute>
             }
           />

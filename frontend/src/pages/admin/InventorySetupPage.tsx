@@ -4,6 +4,7 @@ import http from "../../api/http";
 import Button from "../../ui/Button";
 import Card from "../../ui/Card";
 import PageHeader from "../../ui/PageHeader";
+import { useI18n } from "../../i18n";
 
 interface RoomTypeRow {
   id: number;
@@ -28,6 +29,7 @@ const DEFAULT_ROWS: RoomTypeRow[] = [
 let nextId = 10;
 
 export default function InventorySetupPage() {
+  const { t } = useI18n();
   const [rows, setRows] = useState<RoomTypeRow[]>(DEFAULT_ROWS);
   const [hotelName, setHotelName] = useState("NextStay Hotel");
   const [rowsPerType, setRowsPerType] = useState(1200);
@@ -126,19 +128,19 @@ export default function InventorySetupPage() {
   return (
     <div className="w-full space-y-6">
       <PageHeader
-        title="Inventory Setup"
-        subtitle="Define your hotel room types, apply them to the site, and generate datasets for the pricing engine."
+        title={t("inventorySetup.title")}
+        subtitle={t("inventorySetup.subtitle")}
       />
 
       {/* Hotel name */}
       <Card padding="md">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Hotel</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{t("inventorySetup.hotelLabel")}</h2>
         <input
           type="text"
           value={hotelName}
           onChange={(e) => setHotelName(e.target.value)}
           className="w-full max-w-sm rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-          placeholder="Hotel name"
+          placeholder={t("inventorySetup.hotelPlaceholder")}
         />
       </Card>
 
@@ -146,15 +148,21 @@ export default function InventorySetupPage() {
       <Card padding="none">
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            Room Types — {totalRooms} total rooms
+            {t("inventorySetup.roomTypesTitle", { count: String(totalRooms) })}
           </h2>
-          <Button size="sm" variant="secondary" onClick={addRow}>+ Add type</Button>
+          <Button size="sm" variant="secondary" onClick={addRow}>{t("inventorySetup.addType")}</Button>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50 dark:bg-gray-900/60">
               <tr>
-                {["Room Type", "Count", "Base Price (€)", "Capacity (guests)", ""].map((h) => (
+                {[
+                  t("inventorySetup.colRoomType"),
+                  t("inventorySetup.colCount"),
+                  t("inventorySetup.colBasePrice"),
+                  t("inventorySetup.colCapacity"),
+                  "",
+                ].map((h) => (
                   <th key={h} className="px-4 py-2 text-left font-medium text-gray-600 dark:text-gray-300">
                     {h}
                   </th>
@@ -206,7 +214,7 @@ export default function InventorySetupPage() {
                         onClick={() => removeRow(row.id)}
                         className="text-red-500 hover:text-red-700 text-xs"
                       >
-                        Remove
+                        {t("inventorySetup.remove")}
                       </button>
                     )}
                   </td>
@@ -219,21 +227,21 @@ export default function InventorySetupPage() {
 
       {/* Actions */}
       <Card padding="md">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">Actions</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">{t("inventorySetup.actionsTitle")}</h2>
 
         <div className="flex flex-wrap gap-3 items-start">
           {/* Step 1 */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Step 1</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("inventorySetup.step1")}</span>
             <Button onClick={() => void handleApply()} disabled={setupLoading}>
-              {setupLoading ? "Applying…" : "Apply to Site"}
+              {setupLoading ? t("inventorySetup.applying") : t("inventorySetup.applyToSite")}
             </Button>
-            <span className="text-xs text-gray-400">Replaces all rooms in the hotel app</span>
+            <span className="text-xs text-gray-400">{t("inventorySetup.applyHint")}</span>
           </div>
 
           {/* Step 2 */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Step 2</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("inventorySetup.step2")}</span>
             <div className="flex items-center gap-2">
               <select
                 value={rowsPerType}
@@ -245,19 +253,19 @@ export default function InventorySetupPage() {
                 <option value={2000}>2000 rows / type</option>
               </select>
               <Button variant="secondary" onClick={() => void handleDownloadDataset()} disabled={datasetLoading}>
-                {datasetLoading ? "Generating…" : "Download Training Dataset"}
+                {datasetLoading ? t("inventorySetup.generating") : t("inventorySetup.downloadDataset")}
               </Button>
             </div>
-            <span className="text-xs text-gray-400">Upload on Model Training page</span>
+            <span className="text-xs text-gray-400">{t("inventorySetup.downloadHint")}</span>
           </div>
 
           {/* Step 3 */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Step 3 (after training)</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t("inventorySetup.step3")}</span>
             <Button variant="secondary" onClick={() => void handleRunSnapshot()} disabled={snapshotLoading}>
-              {snapshotLoading ? "Running…" : "Run Pricing Snapshot"}
+              {snapshotLoading ? t("inventorySetup.running") : t("inventorySetup.runSnapshot")}
             </Button>
-            <span className="text-xs text-gray-400">Prices appear in Pricing Lab</span>
+            <span className="text-xs text-gray-400">{t("inventorySetup.snapshotHint")}</span>
           </div>
         </div>
       </Card>
@@ -266,10 +274,13 @@ export default function InventorySetupPage() {
       {setupResult && (
         <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900" padding="md">
           <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
-            Rooms applied — {setupResult.rooms_created} rooms created ({setupResult.rooms_deleted} deleted)
+            {t("inventorySetup.roomsApplied", {
+              created: String(setupResult.rooms_created),
+              deleted: String(setupResult.rooms_deleted),
+            })}
           </p>
           <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">
-            Types: {setupResult.room_types.join(", ")}
+            {t("inventorySetup.typesLabel", { types: setupResult.room_types.join(", ") })}
           </p>
         </Card>
       )}
@@ -288,7 +299,7 @@ export default function InventorySetupPage() {
 
       {snapshotResult && (
         <Card className="border-emerald-200 bg-emerald-50 dark:bg-emerald-950/40 dark:border-emerald-900" padding="md">
-          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Snapshot complete</p>
+          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">{t("inventorySetup.snapshotComplete")}</p>
           <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1">{snapshotResult}</p>
         </Card>
       )}
@@ -301,14 +312,14 @@ export default function InventorySetupPage() {
 
       {/* Guide */}
       <Card padding="md">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">How it works</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{t("inventorySetup.howItWorksTitle")}</h2>
         <ol className="space-y-2 text-sm text-gray-600 dark:text-gray-400 list-decimal list-inside">
-          <li><strong>Define</strong> your room types above (name, count, price, capacity)</li>
-          <li><strong>Apply to Site</strong> — this replaces all rooms in the hotel app with your definition</li>
-          <li><strong>Download Training Dataset</strong> — synthetic CSV based on your room types, ready to upload on the Model Training page</li>
-          <li>Go to <strong>Model Training</strong>, upload the CSV, train and promote the model</li>
-          <li>Come back and click <strong>Run Pricing Snapshot</strong> — dynamic prices are generated for the next 30 days</li>
-          <li>Go to <strong>Pricing Lab</strong> to inspect the generated prices</li>
+          <li>{t("inventorySetup.step1Guide")}</li>
+          <li>{t("inventorySetup.step2Guide")}</li>
+          <li>{t("inventorySetup.step3Guide")}</li>
+          <li>{t("inventorySetup.step4Guide")}</li>
+          <li>{t("inventorySetup.step5Guide")}</li>
+          <li>{t("inventorySetup.step6Guide")}</li>
         </ol>
       </Card>
     </div>
