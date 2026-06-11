@@ -7,6 +7,7 @@ from app.core.config import HOTEL_SYNC_TOKEN, HOTEL_SYNC_TOKEN_ENABLED
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.guest_token import GuestToken as GuestTokenModel
+from app.models.hotel import Hotel as HotelModel
 from app.models.room import Room as RoomModel
 from app.security.auth import require_roles
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -96,6 +97,22 @@ class HotelChannelBookingLog(BaseModel):
     guestEmail: str | None
     syncedAt: str
     cancelledAt: str | None
+
+
+class HotelRegisterRequest(BaseModel):
+    code: str
+    name: str
+    webhookUrl: str | None = None
+    hmacSecret: str | None = None
+    active: bool = True
+
+
+class HotelResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+    webhookUrl: str | None = None
+    active: bool
 
 
 def dump_model(model: BaseModel) -> dict[str, Any]:
@@ -647,4 +664,51 @@ def list_channel_bookings(
             cancelledAt=row["cancelled_at"].isoformat() if row["cancelled_at"] else None,
         )
         for row in rows
+    ]
+
+
+@router.post("/hotel-sync/hotels", response_model=HotelResponse, status_code=201)
+def register_hotel(
+    payload: HotelRegisterRequest,
+    db: Annotated[Session, Depends(get_db)],
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR")),
+):
+    existing = db.query(HotelModel).filter(HotelModel.code == payload.code).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Hotel code already registered.")
+    hotel = HotelModel(
+        code=payload.code,
+        name=payload.name,
+        webhook_url=payload.webhookUrl,
+        hmac_secret=payload.hmacSecret,
+        active=payload.active,
+    )
+    db.add(hotel)
+    db.commit()
+    db.refresh(hotel)
+    return HotelResponse(
+        id=hotel.id,
+        code=hotel.code,
+        name=hotel.name,
+        webhookUrl=hotel.webhook_url,
+        active=hotel.active,
+    )
+
+
+@router.get("/hotel-sync/hotels", response_model=list[HotelResponse])
+def list_hotels(
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = 100,
+    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+):
+    hotels = db.query(HotelModel).order_by(HotelModel.id).limit(min(max(limit, 1), 100)).all()
+    return [
+        HotelResponse(
+            id=h.id,
+            code=h.code,
+            name=h.name,
+            webhookUrl=h.webhook_url,
+            active=h.active,
+        )
+        for h in hotels
     ]

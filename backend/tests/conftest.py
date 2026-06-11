@@ -55,10 +55,10 @@ def override_get_db():
 
 
 # Override every router's get_db with our SQLite one.
-from app.api.v1 import auth, bookings, chat, hotel_profile, rooms, staff, tasks  # noqa: E402
+from app.api.v1 import auth, bookings, chat, hotel_profile, hotel_sync, rooms, staff, tasks  # noqa: E402
 from app.security import auth as security_auth  # noqa: E402
 
-for module in (auth, bookings, rooms, tasks, hotel_profile, staff, chat):
+for module in (auth, bookings, rooms, tasks, hotel_profile, staff, chat, hotel_sync):
     app.dependency_overrides[module.get_db] = override_get_db
 
 app.dependency_overrides[security_auth.get_db] = override_get_db

@@ -1,6 +1,8 @@
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from tests.conftest import login_owner, make_owner
+
 
 def test_hotel_model_persists(db):
     from app.models.hotel import Hotel
@@ -53,3 +55,40 @@ def test_duplicate_room_number_within_hotel_rejected(db):
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
+
+
+def test_register_and_list_hotels(client, db):
+    make_owner(db)
+    token = login_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    resp = client.post(
+        "/api/v1/hotel-sync/hotels",
+        headers=headers,
+        json={
+            "code": "GRAND_BISHKEK",
+            "name": "Grand Bishkek",
+            "webhookUrl": "http://hotelsim:8090/webhook",
+            "hmacSecret": "secret-123",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["code"] == "GRAND_BISHKEK"
+
+    listed = client.get("/api/v1/hotel-sync/hotels", headers=headers)
+    assert listed.status_code == 200
+    codes = [h["code"] for h in listed.json()]
+    assert "GRAND_BISHKEK" in codes
+    assert all("hmacSecret" not in h and "hmac_secret" not in h for h in listed.json())
+
+
+def test_register_duplicate_hotel_code_rejected(client, db):
+    make_owner(db)
+    token = login_owner(client)
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {"code": "DUP", "name": "Dup Hotel"}
+
+    first = client.post("/api/v1/hotel-sync/hotels", headers=headers, json=body)
+    assert first.status_code == 201, first.text
+    second = client.post("/api/v1/hotel-sync/hotels", headers=headers, json=body)
+    assert second.status_code == 409
