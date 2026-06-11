@@ -26,6 +26,7 @@ from app.models import chat_message as _cm_mod  # noqa: F401
 from app.models import chat_participant as _cp_mod  # noqa: F401
 from app.models import email_otp as _otp_mod  # noqa: F401
 from app.models import guest_token as _gt_mod  # noqa: F401
+from app.models import hotel as _hotel_mod  # noqa: F401
 from app.models import hotel_profile as _hp_mod  # noqa: F401
 from app.models import room as _room_mod  # noqa: F401
 from app.models import task as _task_mod  # noqa: F401
