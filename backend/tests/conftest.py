@@ -162,7 +162,17 @@ def make_owner(db):
     return user
 
 
-def make_room(db, number="101", price=100.0, status="Available"):
+def make_hotel(db, code="DEFAULT", name="Default Hotel", webhook_url=None, hmac_secret="test-secret"):
+    from app.models.hotel import Hotel
+
+    hotel = Hotel(code=code, name=name, webhook_url=webhook_url, hmac_secret=hmac_secret, active=True)
+    db.add(hotel)
+    db.commit()
+    db.refresh(hotel)
+    return hotel
+
+
+def make_room(db, number="101", price=100.0, status="Available", hotel_id=None):
     from app.models.room import Room
 
     room = Room(
@@ -171,6 +181,7 @@ def make_room(db, number="101", price=100.0, status="Available"):
         status=status,
         price=price,
         capacity=2,
+        hotel_id=hotel_id,
     )
     db.add(room)
     db.commit()
