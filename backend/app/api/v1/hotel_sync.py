@@ -245,9 +245,13 @@ def create_guest_token(db: Session, booking: BookingModel) -> str:
 
 def find_room(db: Session, event: HotelSyncEventRequest) -> RoomModel:
     if event.roomId is not None:
-        room = db.query(RoomModel).filter(RoomModel.id == event.roomId).first()
+        room = db.query(RoomModel).filter(RoomModel.id == event.roomId, RoomModel.hotel_id == event.hotelId).first()
     elif event.roomNumber:
-        room = db.query(RoomModel).filter(RoomModel.number == event.roomNumber).first()
+        room = (
+            db.query(RoomModel)
+            .filter(RoomModel.number == event.roomNumber, RoomModel.hotel_id == event.hotelId)
+            .first()
+        )
     else:
         raise HTTPException(status_code=422, detail="roomId or roomNumber is required.")
 

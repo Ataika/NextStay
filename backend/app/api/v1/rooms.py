@@ -35,7 +35,7 @@ class RoomBase(BaseModel):
 
 
 class RoomCreate(RoomBase):
-    pass
+    hotelId: int | None = None
 
 
 class RoomUpdate(BaseModel):
@@ -276,9 +276,11 @@ def create_room(
             status_code=400,
             detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
         )
-    existing_room = db.query(RoomModel).filter(RoomModel.number == room.number).first()
+    existing_room = (
+        db.query(RoomModel).filter(RoomModel.number == room.number, RoomModel.hotel_id == room.hotelId).first()
+    )
     if existing_room:
-        raise HTTPException(status_code=400, detail="Room with this number already exists")
+        raise HTTPException(status_code=400, detail="Room with this number already exists for this hotel")
 
     db_room = RoomModel(
         number=room.number,
@@ -288,6 +290,7 @@ def create_room(
         capacity=room.capacity,
         description=room.description,
         amenities=room.amenities,
+        hotel_id=room.hotelId,
     )
     db.add(db_room)
     db.commit()
@@ -314,11 +317,15 @@ def update_room(
         )
 
     if room_update.number and room_update.number != db_room.number:
-        existing_room = db.query(RoomModel).filter(RoomModel.number == room_update.number).first()
+        existing_room = (
+            db.query(RoomModel)
+            .filter(RoomModel.number == room_update.number, RoomModel.hotel_id == db_room.hotel_id)
+            .first()
+        )
         if existing_room:
-            raise HTTPException(status_code=400, detail="Room with this number already exists")
+            raise HTTPException(status_code=400, detail="Room with this number already exists for this hotel")
 
-    update_data = room_update.dict(exclude_unset=True)
+    update_data = room_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_room, field, value)
 
