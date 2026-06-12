@@ -17,6 +17,8 @@ from app.api.v1.staff import router as staff_router
 from app.api.v1.stripe import router as stripe_router
 from app.api.v1.tasks import router as tasks_router
 from app.api.v1.training import router as training_router
+from app.api.v1.register import router as register_router
+from app.api.v1.users import router as users_router
 from app.core.config import ALLOWED_ORIGINS, AUTH_JWT_SECRET, DEV_OWNER_TOKEN_ENABLED
 from app.core.limiter import limiter
 from app.core.logging import configure_logging, get_logger, new_request_id, request_id_var
@@ -95,6 +97,7 @@ app.add_middleware(
 # Routers
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(register_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(hotel_profile_router, prefix="/api/v1")
 app.include_router(rooms_router, prefix="/api/v1")
@@ -109,6 +112,7 @@ app.include_router(pricing_pipeline_router, prefix="/api/v1")
 app.include_router(inventory_setup_router, prefix="/api/v1")
 app.include_router(holds_router, prefix="/api/v1")
 app.include_router(staff_router, prefix="/api/v1")
+app.include_router(users_router, prefix="/api/v1")
 
 register_exception_handlers(app)
 

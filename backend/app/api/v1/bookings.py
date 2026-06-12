@@ -10,7 +10,9 @@ from app.models.guest_token import GuestToken as GuestTokenModel
 from app.models.hotel_profile import HotelProfile as HotelProfileModel
 from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
+from app.models.user import User as UserModel
 from app.security.auth import require_roles
+from app.security.tenancy import require_hotel_id
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import and_, or_, text
@@ -109,9 +111,15 @@ class Booking(BookingBase):
 @router.get("/bookings", response_model=list[Booking])
 def get_all_bookings(
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    bookings = db.query(BookingModel).all()
+    hotel_id = require_hotel_id(current_user, db)
+    bookings = (
+        db.query(BookingModel)
+        .join(RoomModel, BookingModel.room_id == RoomModel.id)
+        .filter(RoomModel.hotel_id == hotel_id)
+        .all()
+    )
     return [Booking.from_orm_with_dates(booking, include_token=True, db=db) for booking in bookings]
 
 
@@ -119,9 +127,15 @@ def get_all_bookings(
 def get_booking_by_id(
     booking_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    booking = (
+        db.query(BookingModel)
+        .join(RoomModel, BookingModel.room_id == RoomModel.id)
+        .filter(BookingModel.id == booking_id, RoomModel.hotel_id == hotel_id)
+        .first()
+    )
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     return Booking.from_orm_with_dates(booking, include_token=True, db=db)

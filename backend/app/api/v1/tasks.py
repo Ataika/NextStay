@@ -4,7 +4,9 @@ from app.core.task_utils import round_robin_assign
 from app.db.session import SessionLocal
 from app.models.room import Room as RoomModel
 from app.models.task import CleaningTask as TaskModel
+from app.models.user import User as UserModel
 from app.security.auth import require_roles
+from app.security.tenancy import require_hotel_id
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
@@ -14,6 +16,18 @@ router = APIRouter(tags=["tasks"])
 ALL_ROLES = ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF")
 VALID_PRIORITIES = {"Low", "Medium", "High", "Urgent"}
 VALID_STATUSES = {"Pending", "In Progress", "Completed"}
+
+
+def _get_task_in_hotel(db: Session, task_id: int, hotel_id: int) -> TaskModel:
+    task = (
+        db.query(TaskModel)
+        .join(RoomModel, TaskModel.room_id == RoomModel.id)
+        .filter(TaskModel.id == task_id, RoomModel.hotel_id == hotel_id)
+        .first()
+    )
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
 
 
 def get_db():
@@ -81,9 +95,14 @@ class Task(TaskBase):
 def get_all_tasks(
     room_id: int | None = Query(None, alias="room_id"),
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
-    query = db.query(TaskModel)
+    hotel_id = require_hotel_id(current_user, db)
+    query = (
+        db.query(TaskModel)
+        .join(RoomModel, TaskModel.room_id == RoomModel.id)
+        .filter(RoomModel.hotel_id == hotel_id)
+    )
     if room_id:
         query = query.filter(TaskModel.room_id == room_id)
     return [Task.from_orm_with_dates(t) for t in query.all()]
@@ -93,11 +112,10 @@ def get_all_tasks(
 def get_task_by_id(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
-    task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    hotel_id = require_hotel_id(current_user, db)
+    task = _get_task_in_hotel(db, task_id, hotel_id)
     return Task.from_orm_with_dates(task)
 
 
@@ -105,10 +123,11 @@ def get_task_by_id(
 def create_task(
     task: TaskCreate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
     """Create a cleaning task, set room to Cleaning, and auto-assign via round-robin."""
-    room = db.query(RoomModel).filter(RoomModel.id == task.roomId).first()
+    hotel_id = require_hotel_id(current_user, db)
+    room = db.query(RoomModel).filter(RoomModel.id == task.roomId, RoomModel.hotel_id == hotel_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -135,11 +154,10 @@ def assign_task(
     task_id: int,
     assign_data: TaskAssign,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
-    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    hotel_id = require_hotel_id(current_user, db)
+    db_task = _get_task_in_hotel(db, task_id, hotel_id)
 
     db_task.assigned_to = assign_data.staffId
     db_task.assigned_to_name = assign_data.staffName
@@ -153,12 +171,11 @@ def assign_task(
 def complete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
     """Complete cleaning task and set room back to Available."""
-    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    hotel_id = require_hotel_id(current_user, db)
+    db_task = _get_task_in_hotel(db, task_id, hotel_id)
 
     if db_task.status == "Completed":
         raise HTTPException(status_code=400, detail="Task is already completed.")
@@ -179,11 +196,10 @@ def complete_task(
 def delete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles(*ALL_ROLES)),
+    current_user: UserModel = Depends(require_roles(*ALL_ROLES)),
 ):
-    db_task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
-    if not db_task:
-        raise HTTPException(status_code=404, detail="Task not found")
+    hotel_id = require_hotel_id(current_user, db)
+    db_task = _get_task_in_hotel(db, task_id, hotel_id)
     db.delete(db_task)
     db.commit()
     return None

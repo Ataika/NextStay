@@ -69,6 +69,14 @@ class RequestOtpResponse(BaseModel):
     retryAfterSeconds: int | None = None
 
 
+class CheckEmailRequest(BaseModel):
+    email: EmailStr
+
+
+class CheckEmailResponse(BaseModel):
+    exists: bool = True
+
+
 # ---------------------------------------------------------------------------
 # DB helper
 # ---------------------------------------------------------------------------
@@ -242,6 +250,16 @@ def _send_otp_for_email(email: str, db: Session) -> RequestOtpResponse:
 # ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.post("/auth/check-email", response_model=CheckEmailResponse)
+def check_email(payload: CheckEmailRequest, db: Session = Depends(get_db)):
+    """Return 200 when the email belongs to an active user, else 404."""
+    email = normalize_email(payload.email)
+    user = db.query(UserModel).filter(UserModel.email == email, UserModel.is_active.is_(True)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="No account found for this email.")
+    return CheckEmailResponse(exists=True)
 
 
 @router.post("/auth/request-otp", response_model=RequestOtpResponse)

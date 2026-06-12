@@ -4,8 +4,10 @@ from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.room import Room as RoomModel
+from app.models.user import User as UserModel
 from app.security.auth import require_roles
-from fastapi import APIRouter, Depends, HTTPException
+from app.security.tenancy import require_hotel_id
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
@@ -160,6 +162,7 @@ def get_available_rooms(
     checkOut: str,
     category: str | None = None,
     capacity: int | None = None,
+    hotelId: int | None = Query(default=None, alias="hotelId"),
     db: Session = Depends(get_db),
 ):
     try:
@@ -181,6 +184,8 @@ def get_available_rooms(
     nights = (check_out_date - check_in_date).days
 
     query = db.query(RoomModel).filter(RoomModel.status == "Available")
+    if hotelId is not None:
+        query = query.filter(RoomModel.hotel_id == hotelId)
     if category:
         query = query.filter(RoomModel.category == category)
     if capacity:
@@ -245,9 +250,10 @@ def get_available_rooms(
 @router.get("/rooms", response_model=list[Room])
 def get_all_rooms(
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    rooms = db.query(RoomModel).all()
+    hotel_id = require_hotel_id(current_user, db)
+    rooms = db.query(RoomModel).filter(RoomModel.hotel_id == hotel_id).all()
     pricing_map = load_latest_room_pricing(db)
     return [serialize_room(room, pricing_map) for room in rooms]
 
@@ -256,9 +262,10 @@ def get_all_rooms(
 def get_room_by_id(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     pricing_map = load_latest_room_pricing(db)
@@ -269,18 +276,24 @@ def get_room_by_id(
 def create_room(
     room: RoomCreate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
+    hotel_id = require_hotel_id(current_user, db)
     if room.status not in VALID_ROOM_STATUSES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
         )
-    existing_room = db.query(RoomModel).filter(RoomModel.number == room.number).first()
+    existing_room = (
+        db.query(RoomModel)
+        .filter(RoomModel.hotel_id == hotel_id, RoomModel.number == room.number)
+        .first()
+    )
     if existing_room:
         raise HTTPException(status_code=400, detail="Room with this number already exists")
 
     db_room = RoomModel(
+        hotel_id=hotel_id,
         number=room.number,
         category=room.category,
         status=room.status,
@@ -301,9 +314,10 @@ def update_room(
     room_id: int,
     room_update: RoomUpdate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    db_room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
@@ -314,7 +328,11 @@ def update_room(
         )
 
     if room_update.number and room_update.number != db_room.number:
-        existing_room = db.query(RoomModel).filter(RoomModel.number == room_update.number).first()
+        existing_room = (
+            db.query(RoomModel)
+            .filter(RoomModel.hotel_id == hotel_id, RoomModel.number == room_update.number)
+            .first()
+        )
         if existing_room:
             raise HTTPException(status_code=400, detail="Room with this number already exists")
 
@@ -332,9 +350,10 @@ def update_room(
 def delete_room(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
-    db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    db_room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
 

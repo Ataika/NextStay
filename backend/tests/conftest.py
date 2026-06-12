@@ -26,6 +26,7 @@ from app.models import chat_message as _cm_mod  # noqa: F401
 from app.models import chat_participant as _cp_mod  # noqa: F401
 from app.models import email_otp as _otp_mod  # noqa: F401
 from app.models import guest_token as _gt_mod  # noqa: F401
+from app.models import hotel_invite as _hi_mod  # noqa: F401
 from app.models import hotel_profile as _hp_mod  # noqa: F401
 from app.models import room as _room_mod  # noqa: F401
 from app.models import task as _task_mod  # noqa: F401
@@ -54,10 +55,10 @@ def override_get_db():
 
 
 # Override every router's get_db with our SQLite one.
-from app.api.v1 import auth, bookings, chat, hotel_profile, rooms, staff, tasks  # noqa: E402
+from app.api.v1 import auth, bookings, chat, hotel_profile, register, rooms, staff, tasks, users  # noqa: E402
 from app.security import auth as security_auth  # noqa: E402
 
-for module in (auth, bookings, rooms, tasks, hotel_profile, staff, chat):
+for module in (auth, bookings, rooms, tasks, hotel_profile, staff, chat, users, register):
     app.dependency_overrides[module.get_db] = override_get_db
 
 app.dependency_overrides[security_auth.get_db] = override_get_db
@@ -144,16 +145,22 @@ def client():
 # ---------------------------------------------------------------------------
 
 
-def make_owner(db):
+def make_owner(db, email="owner@test.com", hotel_name="Test Hotel"):
     from app.api.v1.auth import hash_password
+    from app.models.hotel_profile import HotelProfile
     from app.models.user import User
 
+    hotel = HotelProfile(hotel_name=hotel_name)
+    db.add(hotel)
+    db.flush()
+
     user = User(
-        email="owner@test.com",
+        email=email,
         full_name="Test Owner",
         role="OWNER",
         is_active=True,
         password_hash=hash_password("Password1!"),
+        hotel_id=hotel.id,
     )
     db.add(user)
     db.commit()
@@ -161,10 +168,20 @@ def make_owner(db):
     return user
 
 
-def make_room(db, number="101", price=100.0, status="Available"):
+def make_room(db, number="101", price=100.0, status="Available", hotel_id=None):
+    from app.models.hotel_profile import HotelProfile
     from app.models.room import Room
 
+    if hotel_id is None:
+        hotel = db.query(HotelProfile).first()
+        if not hotel:
+            hotel = HotelProfile(hotel_name="Test Hotel")
+            db.add(hotel)
+            db.flush()
+        hotel_id = hotel.id
+
     room = Room(
+        hotel_id=hotel_id,
         number=number,
         category="Standard",
         status=status,

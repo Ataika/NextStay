@@ -1,11 +1,28 @@
 from tests.conftest import login_owner, make_owner
 
 
-def make_user(db, email="staff@test.com", role="STAFF", name="Staff User"):
+def make_user(db, email="staff@test.com", role="STAFF", name="Staff User", hotel_id=None):
     from app.api.v1.auth import hash_password
     from app.models.user import User
 
-    user = User(email=email, full_name=name, role=role, is_active=True, password_hash=hash_password("Password1!"))
+    if hotel_id is None:
+        from app.models.user import User as UserModel
+
+        existing = db.query(UserModel).filter(UserModel.hotel_id.isnot(None)).first()
+        if existing:
+            hotel_id = existing.hotel_id
+        else:
+            owner = make_owner(db)
+            hotel_id = owner.hotel_id
+
+    user = User(
+        email=email,
+        full_name=name,
+        role=role,
+        is_active=True,
+        password_hash=hash_password("Password1!"),
+        hotel_id=hotel_id,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
