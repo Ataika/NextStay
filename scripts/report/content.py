@@ -15,6 +15,7 @@ def write_all(rep) -> None:
     mockups(rep)
     data_bi_chapter(rep)
     testing(rep)
+    conclusion(rep)
 
 
 # --------------------------------------------------------------------------- #
@@ -103,17 +104,20 @@ def requirements(rep):
             ["FR-13", "Multi-hotel registry + two-way hotel-site synchronization (HMAC)", "Atai"],
             ["FR-14", "Data warehouse (stg/core/mart) + BI dashboards", "Atai"],
         ],
+        caption="Functional requirements (FR-1…FR-14).",
     )
     rep.h2("3.2 Non-Functional Requirements")
-    rep.bullets(
+    rep.table(
+        ["NFR", "Category", "Requirement"],
         [
-            "Security: JWT sessions with JTI revocation, email-OTP, HMAC-signed sync webhooks, role-gated APIs.",
-            "Performance: asynchronous pricing pipeline; indexed availability and payment lookups.",
-            "Usability: role-gated UI; token-only guest access without an account.",
-            "Maintainability: modular FastAPI routers, component-based frontend, "
-            "dbt-managed warehouse, IaC via Docker Compose.",
-            "Portability: SQL kept ANSI-compatible so dbt models run on both DuckDB (local) and PostgreSQL (prod).",
-        ]
+            ["NFR-1", "Security", "JWT with JTI revocation, email-OTP, HMAC-signed sync webhooks, role-gated APIs"],
+            ["NFR-2", "Performance", "Asynchronous pricing pipeline; indexed availability and payment lookups"],
+            ["NFR-3", "Usability", "Role-gated UI; token-only guest access without an account"],
+            ["NFR-4", "Maintainability", "Modular FastAPI routers, component-based FE, dbt warehouse, IaC via Compose"],
+            ["NFR-5", "Portability", "ANSI-compatible SQL — dbt runs on DuckDB (local) and PostgreSQL (prod)"],
+            ["NFR-6", "Testability", "4-layer test pyramid (unit/integration/data/system), 167 automated checks"],
+        ],
+        caption="Non-functional requirements.",
     )
 
 
@@ -140,6 +144,22 @@ def before_sprints(rep):
             ["Sprint 5", "Payments, Guest Portal & Polish", "~10 days"],
             ["Post-MVP", "Hotel-Sync Simulator, DWH, Airflow, Superset", "~10 days"],
         ],
+        caption="Sprint calendar.",
+    )
+    rep.figure(
+        """gantt
+  title NextStay Sprint Timeline
+  dateFormat YYYY-MM-DD
+  axisFormat %b %d
+  section Delivery
+  Sprint 1 — Auth            :s1, 2026-01-06, 10d
+  Sprint 2 — Booking core    :s2, after s1, 10d
+  Sprint 3 — Pricing (ML)    :s3, after s2, 12d
+  Sprint 4 — Staff & tasks   :s4, after s3, 10d
+  Sprint 5 — Payments/portal :s5, after s4, 10d
+  Post-MVP — Data/Sync/BI    :s6, after s5, 10d
+""",
+        "Figure 4.1 — Sprint timeline (Gantt).",
     )
     rep.h2("4.3 Product Backlog")
     rep.p("User stories derived from FR-1…FR-14, estimated in story points (SP).")
@@ -161,6 +181,7 @@ def before_sprints(rep):
             ["FR-13", "As an external hotel site I sync bookings two-way with the PMS (HMAC)", "13"],
             ["FR-14", "As a manager I view occupancy/RevPAR/loyalty dashboards", "8"],
         ],
+        caption="Product backlog — user stories and story points.",
     )
 
 
@@ -170,7 +191,7 @@ def sprints(rep):
     def sprint(num, title, goal, rows):
         rep.h2(f"Sprint {num} — {title}")
         rep.p(f"Sprint goal: {goal}")
-        rep.table(["Task", "Owner", "Days"], rows)
+        rep.table(["Task", "Owner", "Days"], rows, caption=f"Sprint {num} task breakdown.")
 
     sprint(
         1,
@@ -359,6 +380,21 @@ User "1" --> "*" AuthSession
 """,
         "Figure 6.5c — ML pricing pipeline.",
     )
+    rep.figure(
+        """sequenceDiagram
+  autonumber
+  participant G as Guest
+  participant API as Booking API
+  participant S as Stripe
+  G->>API: confirm booking
+  API->>S: create checkout session
+  S-->>G: hosted payment page
+  G->>S: pay
+  S->>API: webhook (payment_intent.succeeded)
+  API->>API: mark booking paid + store intent id
+""",
+        "Figure 6.5d — Stripe payment & webhook flow.",
+    )
 
     rep.h2("6.6 Deployment Diagram")
     rep.figure(
@@ -377,6 +413,34 @@ User "1" --> "*" AuthSession
   sup --> db
 """,
         "Figure 6.6 — Local deployment (Docker Compose).",
+    )
+
+    rep.h2("6.7 State Machines")
+    rep.figure(
+        """stateDiagram-v2
+  [*] --> Pending
+  Pending --> Confirmed
+  Confirmed --> Upcoming
+  Upcoming --> CheckedIn: check-in date
+  CheckedIn --> CheckedOut: checkout
+  Pending --> Cancelled
+  Confirmed --> Cancelled
+  Upcoming --> Cancelled
+  Pending --> Expired: hold lapses
+  CheckedOut --> [*]
+  Cancelled --> [*]
+  Expired --> [*]
+""",
+        "Figure 6.7a — Booking lifecycle state machine.",
+    )
+    rep.figure(
+        """stateDiagram-v2
+  [*] --> Pending: created on checkout
+  Pending --> InProgress: round-robin assign
+  InProgress --> Completed
+  Completed --> [*]
+""",
+        "Figure 6.7b — Housekeeping task state machine (task_utils).",
     )
 
 
@@ -399,6 +463,7 @@ def tools(rep):
             ["Sync simulator", "FastAPI + SQLite + vanilla HTML/JS (hotelsim)"],
             ["CI / Hooks", "pre-commit, Ruff, SQLFluff, GitHub Actions, Docker Compose"],
         ],
+        caption="Tools and technologies by layer.",
     )
 
 
@@ -418,6 +483,7 @@ def features(rep):
             ["Airflow ELT", "Nightly dbt orchestration", "Atai", "Post-MVP"],
             ["Superset BI", "Occupancy / RevPAR / loyalty dashboards", "Atai", "Post-MVP"],
         ],
+        caption="Implemented features.",
     )
 
 
@@ -506,6 +572,25 @@ def data_bi_chapter(rep):
 """,
         "Figure 10.3 — Warehouse data flow (OLTP → stg → core → mart → BI).",
     )
+    rep.figure(
+        """flowchart LR
+  sr[stg_rooms] --> dr[dim_rooms]
+  sr --> drt[dim_room_types]
+  sh[stg_hotels] --> dh[dim_hotels]
+  sb[stg_bookings] --> dg[dim_guests]
+  sb --> fct[fct_bookings]
+  sr --> fct
+  dd[dim_dates] --> mo[mart_occupancy]
+  dr --> mo
+  fct --> mo
+  mo --> mr[mart_revpar]
+  fct --> mr
+  dg --> ml[mart_loyalty]
+  fct --> ml
+  sr -.snapshot.-> scd[scd_rooms]
+""",
+        "Figure 10.3b — dbt model-level lineage.",
+    )
 
     rep.h2("10.4 Orchestration (Airflow)")
     rep.p(
@@ -578,6 +663,7 @@ def testing(rep):
             ["System / E2E", "Bidirectional sync, idempotency, auth (live stack)", "pytest + httpx", "4"],
             ["Total", "Automated checks", "—", "167"],
         ],
+        caption="Test inventory across the pyramid.",
     )
 
     rep.h2("11.3 System (End-to-End) Test Cases")
@@ -589,6 +675,7 @@ def testing(rep):
             ["E2E-3", "Same sync event delivered twice", "Second is ignored (duplicate_event_ignored); no dup"],
             ["E2E-4", "Event sent with an invalid sync token", "Rejected with HTTP 401"],
         ],
+        caption="System (end-to-end) test cases.",
     )
     rep.p(
         "Location: tests/system/test_e2e_hotel_sync.py. Run with the stack up: "
@@ -612,5 +699,49 @@ def testing(rep):
             "Warehouse data tests (dbt): 49 passed on DuckDB and PostgreSQL.",
             "System / E2E: 4 passed against the live Docker stack.",
             "Quality gates: pre-commit (Ruff, SQLFluff) + a GitHub Actions workflow run on every push.",
+        ]
+    )
+
+    rep.h2("11.6 Requirements Traceability")
+    rep.p("Links each functional requirement to the sprint that delivered it, its verifying test layer, and its owner.")
+    rep.table(
+        ["FR", "Sprint", "Verified by", "Owner"],
+        [
+            ["FR-1", "1", "Integration (test_auth)", "Dair"],
+            ["FR-2", "1", "Integration (role guards)", "Dair + Atai"],
+            ["FR-3", "2", "Integration (test_hotel_scoping/rooms)", "Dair"],
+            ["FR-4", "2", "Integration (test_bookings)", "Dair"],
+            ["FR-5", "5", "Manual + Stripe webhook", "Dair"],
+            ["FR-6", "3", "Unit + priceengine tests", "Dair"],
+            ["FR-7", "4", "Integration (test_staff/test_tasks)", "Dair"],
+            ["FR-8…12", "2–5", "Manual UI / frontend (planned, see #45)", "Turat"],
+            ["FR-13", "Post-MVP", "Integration + System E2E (E2E-1…4)", "Atai"],
+            ["FR-14", "Post-MVP", "dbt data tests (49) + freshness", "Atai"],
+        ],
+        caption="Requirements traceability (FR → sprint → test → owner).",
+    )
+
+
+def conclusion(rep):
+    rep.h1("12. Conclusion & Future Work")
+    rep.h2("12.1 Conclusion")
+    rep.p(
+        "NextStay delivers an integrated hotel PMS across five sprints plus a post-MVP data platform: "
+        "secure OTP/JWT auth, room inventory and booking with holds, an ML pricing engine, staff and task "
+        "management, Stripe payments, a token-gated guest portal, a multi-hotel two-way synchronization "
+        "simulator, a dbt data warehouse with Airflow orchestration, and Superset dashboards. Quality is "
+        "anchored by 167 automated checks across a four-layer test pyramid, all green, and the bidirectional "
+        "sync was validated end-to-end on PostgreSQL."
+    )
+    rep.h2("12.2 Future Work")
+    rep.p("Tracked as GitHub issues on the project repository:")
+    rep.bullets(
+        [
+            "Frontend automated tests (Vitest + RTL) — the main remaining test gap (#45).",
+            "Reconcile the multi-hotel/tenancy work across branches (#46) and unify init-db/bootstrap (#47).",
+            "Add report screenshots for the UI and the Superset dashboard (#48).",
+            "A CI-friendly integration test for the inbound sync handler on PostgreSQL (#49).",
+            "Clear remaining framework deprecation warnings (#51).",
+            "Large-data benchmarking of the warehouse marts.",
         ]
     )

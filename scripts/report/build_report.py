@@ -85,6 +85,7 @@ def _add_table_borders(table):
 # --------------------------------------------------------------------------- #
 class Report:
     def __init__(self, template: str | None):
+        self._table_no = 0
         self.doc = Document(template) if template else Document()
         if template:
             self._clear_body()  # keep the template's styles/theme/page setup, drop its content
@@ -126,6 +127,28 @@ class Report:
         team.add_run("Team: Dair (Backend) · Turat (Frontend) · Atai (Data Architecture & BI)").font.size = Pt(11)
         d.add_page_break()
 
+    def toc(self):
+        from docx.oxml import OxmlElement
+        from docx.oxml.ns import qn
+
+        self.doc.add_heading("Table of Contents", level=1)
+        para = self.doc.add_paragraph()
+        run = para.add_run()
+        begin = OxmlElement("w:fldChar")
+        begin.set(qn("w:fldCharType"), "begin")
+        instr = OxmlElement("w:instrText")
+        instr.set(qn("xml:space"), "preserve")
+        instr.text = 'TOC \\o "1-2" \\h \\z \\u'
+        sep = OxmlElement("w:fldChar")
+        sep.set(qn("w:fldCharType"), "separate")
+        placeholder = OxmlElement("w:t")
+        placeholder.text = "Right-click → Update Field to build the contents."
+        end = OxmlElement("w:fldChar")
+        end.set(qn("w:fldCharType"), "end")
+        for el in (begin, instr, sep, placeholder, end):
+            run._r.append(el)
+        self.doc.add_page_break()
+
     def h1(self, text: str):
         self.doc.add_heading(text, level=1)
 
@@ -145,7 +168,13 @@ class Report:
             except KeyError:
                 self.doc.add_paragraph(f"•  {it}")  # template lacks the List Bullet style
 
-    def table(self, headers: list[str], rows: list[list[str]]):
+    def table(self, headers: list[str], rows: list[list[str]], caption: str | None = None):
+        if caption:
+            self._table_no += 1
+            cap = self.doc.add_paragraph()
+            cr = cap.add_run(f"Table {self._table_no} — {caption}")
+            cr.italic = True
+            cr.font.size = Pt(9)
         t = self.doc.add_table(rows=1, cols=len(headers))
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
         styled = False
@@ -200,6 +229,7 @@ def build(template: str | None):
 
     rep = Report(template)
     rep.title_page()
+    rep.toc()
     write_all(rep)
     rep.save()
     print(f"Report written: {OUT}")
