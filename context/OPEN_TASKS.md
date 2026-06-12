@@ -23,16 +23,16 @@ backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиес�
 - **Dair (Backend):** T-04, T-07, T-08 (+ соведение T-03, T-06).
 - **Turat (Frontend):** T-02, помощь по T-05 (UI-скриншоты).
 
-## GitHub Issues (заведены, Ataika/NextStay)
-- T-02 → [#45](https://github.com/Ataika/NextStay/issues/45) — gew1nn (Turat), P1
-- T-03 → [#46](https://github.com/Ataika/NextStay/issues/46) — Ataika + ItzDair, P1
-- T-04 → [#47](https://github.com/Ataika/NextStay/issues/47) — ItzDair + Ataika, P2
-- T-05 → [#48](https://github.com/Ataika/NextStay/issues/48) — Ataika, P2
-- T-06 → [#49](https://github.com/Ataika/NextStay/issues/49) — Ataika + ItzDair, P2
-- T-07 → [#50](https://github.com/Ataika/NextStay/issues/50) — ItzDair, P2
-- T-08 → [#51](https://github.com/Ataika/NextStay/issues/51) — ItzDair, P3
-- T-09 → [#52](https://github.com/Ataika/NextStay/issues/52) — Ataika, P3
-- T-10 → [#53](https://github.com/Ataika/NextStay/issues/53) — Ataika, P3
+## GitHub Issues (Ataika/NextStay) — статус
+- ✅ T-07 → [#50](https://github.com/Ataika/NextStay/issues/50) CI backend pytest — **CLOSED** (`d5345ef`)
+- ✅ T-09 → [#52](https://github.com/Ataika/NextStay/issues/52) Airflow dbt image — **CLOSED** (`58f2370`)
+- ✅ T-10 → [#53](https://github.com/Ataika/NextStay/issues/53) dbt freshness/snapshots — **CLOSED** (`d5345ef`; large-data = future)
+- 🟡 T-04 → [#47](https://github.com/Ataika/NextStay/issues/47) init-db/bootstrap — PARTIAL (fresh-init done; unify pending #46)
+- ⬜ T-02 → [#45](https://github.com/Ataika/NextStay/issues/45) FE tests — gew1nn (Turat), P1
+- ⬜ T-03 → [#46](https://github.com/Ataika/NextStay/issues/46) reconcile origin/latest — Ataika+ItzDair, P1 (blocked)
+- ⬜ T-05 → [#48](https://github.com/Ataika/NextStay/issues/48) report screenshots — Ataika, P2 (ручное)
+- ⬜ T-06 → [#49](https://github.com/Ataika/NextStay/issues/49) inbound integration test — Ataika+ItzDair, P2 (покрыто E2E; нужен CI-fixture)
+- ⬜ T-08 → [#51](https://github.com/Ataika/NextStay/issues/51) deprecations — ItzDair, P3 (после #46)
 
 (T-01 — идемпотентность системных тестов — ✅ DONE, без issue.)
 
