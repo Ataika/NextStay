@@ -2,6 +2,15 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Системные E2E-тесты + глава «Testing» в отчёте
+
+- **`tests/system/test_e2e_hotel_sync.py`** (pytest+httpx, против живого Docker-стека): book→PMS, cancel→site, идемпотентность, invalid-token 401. Само-скип если стек не поднят (unit-CI не ломается). **4 passed** на живом стеке.
+- Пирамида тестов: unit + integration (backend 101, hotelsim 13) + dbt data tests (49) + system (4) = **167 автоматических проверок**.
+- Отчёт: добавлена **глава 11 «System Testing»** (стратегия-пирамида + диаграмма, инвентарь, E2E-кейсы, data-quality, результаты/CI). Отчёт теперь 11 разделов, 13 диаграмм.
+- Отчёт стилизован под `soft.docx` (как шаблон, тело очищено). Генерация: `build_report.py --template soft.docx`.
+
+**Дальше:** скриншоты в отчёт (разделы 9, 10.5, 11) — руки Атая; интеграция `origin/latest` — с разрабами.
+
 ## 2026-06-12 — Отчёт .docx (генератор + диаграммы)
 
 - `scripts/report/build_report.py` + `content.py`: генерируют `docs/report/NextStay_Report.docx` — полный отчёт по структуре Даира (разделы 1–9) + глава 10 «Data Architecture, Sync & BI» (всё, что построили).
