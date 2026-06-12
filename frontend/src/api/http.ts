@@ -51,7 +51,11 @@ http.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Handle other errors
+    // Avoid toast spam when the client hits API rate limits
+    if (error.response?.status === 429) {
+      return Promise.reject(error);
+    }
+
     const errorMessage = getErrorMessage(error);
     toast.error(errorMessage);
 
