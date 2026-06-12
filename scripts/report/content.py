@@ -142,11 +142,25 @@ def before_sprints(rep):
         ],
     )
     rep.h2("4.3 Product Backlog")
-    rep.p(
-        "User stories were derived from FR-1…FR-14 and estimated in story points. Examples: "
-        "“As a guest I can log in with an email OTP so that I can access the portal securely” (FR-1, 5pts); "
-        "“As an owner I can train a per-hotel pricing model so that prices adapt to demand” (FR-6, 13pts); "
-        "“As a manager I can see occupancy and RevPAR dashboards so that I can plan” (FR-14, 8pts)."
+    rep.p("User stories derived from FR-1…FR-14, estimated in story points (SP).")
+    rep.table(
+        ["FR", "User story", "SP"],
+        [
+            ["FR-1", "As a user I log in via email OTP and receive a JWT so access is secure", "5"],
+            ["FR-2", "As an admin I have role-based access so permissions are enforced", "3"],
+            ["FR-3", "As staff I create/read/update/delete rooms and set up inventory", "5"],
+            ["FR-4", "As a guest I check availability and hold a room before paying", "8"],
+            ["FR-5", "As a guest I pay via Stripe so my booking is confirmed", "8"],
+            ["FR-6", "As an owner I train a per-hotel model and publish dynamic prices", "13"],
+            ["FR-7", "As a manager I schedule shifts and auto-assign housekeeping tasks", "8"],
+            ["FR-8", "As an admin I see a dashboard with KPIs and quick links", "5"],
+            ["FR-9", "As a guest I access my stay details by token without logging in", "5"],
+            ["FR-10", "As a guest I complete booking with success/cancel pages", "3"],
+            ["FR-11", "As staff I start my shift and see my assigned tasks", "5"],
+            ["FR-12", "As a manager I view bookings/revenue reports", "5"],
+            ["FR-13", "As an external hotel site I sync bookings two-way with the PMS (HMAC)", "13"],
+            ["FR-14", "As a manager I view occupancy/RevPAR/loyalty dashboards", "8"],
+        ],
     )
 
 
@@ -372,15 +386,16 @@ def tools(rep):
         ["Layer", "Technology"],
         [
             ["Backend", "Python 3.11/3.12, FastAPI, Uvicorn"],
-            ["Auth", "JWT (python-jose), bcrypt/passlib, HMAC OTP"],
-            ["ORM / Migrations", "SQLAlchemy, raw SQL migrations + startup bootstrap"],
-            ["Database", "PostgreSQL 15 (prod), SQLite (tests), DuckDB (dbt local)"],
+            ["Auth", "JWT (python-jose), bcrypt/passlib, HMAC email-OTP"],
+            ["ORM / Migrations", "SQLAlchemy; raw-SQL migrations + startup bootstrap (no Alembic in use)"],
+            ["Database", "PostgreSQL 15 (prod), SQLite (unit tests), DuckDB (dbt local)"],
             ["ML / Pricing", "scikit-learn, pandas, numpy"],
             ["Payments", "Stripe"],
             ["Warehouse", "dbt Core (dbt-postgres / dbt-duckdb)"],
             ["Orchestration", "Apache Airflow"],
             ["BI", "Apache Superset"],
-            ["Frontend", "React 19, TypeScript, Vite, Zustand, React Router"],
+            ["Frontend", "React 19, TypeScript, Vite"],
+            ["FE state / routing / styling", "Zustand, React Router v6, Tailwind CSS"],
             ["Sync simulator", "FastAPI + SQLite + vanilla HTML/JS (hotelsim)"],
             ["CI / Hooks", "pre-commit, Ruff, SQLFluff, GitHub Actions, Docker Compose"],
         ],
