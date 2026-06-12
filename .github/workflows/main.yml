@@ -20,6 +20,26 @@ jobs:
       - name: Lint Backend
         run: flake8 backend --count --exit-zero --max-line-length=127 --statistics
 
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install backend deps
+        run: |
+          pip install -r backend/requirements.txt
+          pip install pytest httpx
+      - name: Backend unit/integration tests (in-memory SQLite)
+        run: |
+          cd backend
+          python -m pytest tests -q
+      - name: Hotel simulator tests
+        run: |
+          PYTHONPATH="$PWD" python -m pytest hotelsim/tests -q
+
   frontend-quality:
     runs-on: ubuntu-latest
     steps:
