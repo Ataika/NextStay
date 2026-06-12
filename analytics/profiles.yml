@@ -1,12 +1,16 @@
 dbt_nexstay:
+  target: postgres
   outputs:
-    dev:
+    postgres:
       type: postgres
-      threads: 1
-      host: nextstay_db_clean
-      port: 5432
-      user: admin
-      pass: nextstay_secure_pass
-      dbname: nextstay_db_v2
+      threads: 4
+      host: "{{ env_var('DBT_PG_HOST', 'db') }}"
+      port: "{{ env_var('DBT_PG_PORT', 5432) | int }}"
+      user: "{{ env_var('DBT_PG_USER', 'nextstay') }}"
+      pass: "{{ env_var('DBT_PG_PASS', 'nextstay') }}"
+      dbname: "{{ env_var('DBT_PG_DBNAME', 'nextstay') }}"
       schema: stg
-  target: dev
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('DBT_DUCKDB_PATH', '/opt/airflow/dbt/dev.duckdb') }}"
+      threads: 4

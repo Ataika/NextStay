@@ -58,7 +58,15 @@ services:
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER:-nextstay}:${DB_PASSWORD:-nextstay}@db:5432/${DB_NAME:-nextstay}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - DBT_PROFILES_DIR=/opt/airflow/dbt
+      # dbt is installed into the Airflow image at startup so the DAG can run it.
+      - _PIP_ADDITIONAL_REQUIREMENTS=dbt-postgres==1.9.0
+      - DBT_PG_HOST=db
+      - DBT_PG_PORT=5432
+      - DBT_PG_USER=${DB_USER:-nextstay}
+      - DBT_PG_PASS=${DB_PASSWORD:-nextstay}
+      - DBT_PG_DBNAME=${DB_NAME:-nextstay}
     volumes:
       - ./analytics/dags:/opt/airflow/dags
       - ./analytics/dbt:/opt/airflow/dbt
