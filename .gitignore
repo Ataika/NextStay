@@ -44,3 +44,9 @@ backend/priceengine/data/*.db
 backend/priceengine/data/*.db-shm
 backend/priceengine/data/*.db-wal
 backend/priceengine/synthetic_hotel_pricing.csv
+
+# hotelsim local SQLite store
+hotelsim.db
+hotelsim/*.db
+hotelsim/*.db-shm
+hotelsim/*.db-wal
