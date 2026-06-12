@@ -23,4 +23,17 @@ backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиес�
 - **Dair (Backend):** T-04, T-07, T-08 (+ соведение T-03, T-06).
 - **Turat (Frontend):** T-02, помощь по T-05 (UI-скриншоты).
 
-> Обновлять статусы здесь по ходу. При желании завести как GitHub Issues — см. README/попросить Atai.
+## GitHub Issues (заведены, Ataika/NextStay)
+- T-02 → [#45](https://github.com/Ataika/NextStay/issues/45) — gew1nn (Turat), P1
+- T-03 → [#46](https://github.com/Ataika/NextStay/issues/46) — Ataika + ItzDair, P1
+- T-04 → [#47](https://github.com/Ataika/NextStay/issues/47) — ItzDair + Ataika, P2
+- T-05 → [#48](https://github.com/Ataika/NextStay/issues/48) — Ataika, P2
+- T-06 → [#49](https://github.com/Ataika/NextStay/issues/49) — Ataika + ItzDair, P2
+- T-07 → [#50](https://github.com/Ataika/NextStay/issues/50) — ItzDair, P2
+- T-08 → [#51](https://github.com/Ataika/NextStay/issues/51) — ItzDair, P3
+- T-09 → [#52](https://github.com/Ataika/NextStay/issues/52) — Ataika, P3
+- T-10 → [#53](https://github.com/Ataika/NextStay/issues/53) — Ataika, P3
+
+(T-01 — идемпотентность системных тестов — ✅ DONE, без issue.)
+
+> Обновлять статусы здесь и в GitHub Issues по ходу.
