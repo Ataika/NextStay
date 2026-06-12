@@ -54,9 +54,29 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA pricing GRANT SELECT ON TABLES TO superset_ro
 -- ------------------------------------------
 -- These tables are used directly by the backend.
 
+-- Hotel registry (multi-hotel) — must exist before rooms (FK target).
+CREATE TABLE IF NOT EXISTS hotels (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(150) NOT NULL,
+    webhook_url VARCHAR(500),
+    hmac_secret VARCHAR(255),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Seed a default hotel (id=1) wired to the local hotel-site simulator,
+-- so the bidirectional sync demo works on a fresh `docker compose up`.
+INSERT INTO hotels (id, code, name, webhook_url, hmac_secret, active)
+VALUES (1, 'GRAND_BISHKEK', 'Grand Bishkek', 'http://hotelsim:8090/webhook', 'dev-hotel-hmac-secret', TRUE)
+ON CONFLICT (id) DO NOTHING;
+
+SELECT setval(pg_get_serial_sequence('hotels', 'id'), (SELECT MAX(id) FROM hotels));
+
 CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
-    number VARCHAR(10) UNIQUE NOT NULL,
+    hotel_id INTEGER REFERENCES hotels (id),
+    number VARCHAR(10) NOT NULL,
     category VARCHAR(50) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'Available',
     price FLOAT NOT NULL,
@@ -65,8 +85,18 @@ CREATE TABLE IF NOT EXISTS rooms (
     amenities JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    CONSTRAINT rooms_status_chk CHECK (status IN ('Available', 'Occupied', 'Cleaning', 'Maintenance', 'Dirty'))
+    CONSTRAINT rooms_status_chk CHECK (status IN ('Available', 'Occupied', 'Cleaning', 'Maintenance', 'Dirty')),
+    CONSTRAINT uq_rooms_hotel_number UNIQUE (hotel_id, number)
 );
+
+-- Seed rooms for hotel 1 matching the simulator inventory (101/102/201),
+-- so external bookings from the hotel site map to a real PMS room out of the box.
+INSERT INTO rooms (hotel_id, number, category, status, price, capacity)
+VALUES
+    (1, '101', 'Standard', 'Available', 100.0, 2),
+    (1, '102', 'Deluxe', 'Available', 150.0, 2),
+    (1, '201', 'Suite', 'Available', 250.0, 4)
+ON CONFLICT (hotel_id, number) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS bookings (
     id SERIAL PRIMARY KEY,
@@ -130,13 +160,15 @@ CREATE INDEX IF NOT EXISTS idx_guest_tokens_booking_id ON guest_tokens(booking_i
 
 CREATE TABLE IF NOT EXISTS hotel_sync_events (
     id SERIAL PRIMARY KEY,
-    hotel_id INTEGER NOT NULL DEFAULT 1,
+    hotel_id INTEGER NOT NULL DEFAULT 1 REFERENCES hotels (id),
     external_event_id TEXT NOT NULL UNIQUE,
     source TEXT NOT NULL DEFAULT 'hotel_site_simulator',
     event_type TEXT NOT NULL,
     payload JSONB NOT NULL,
     status TEXT NOT NULL DEFAULT 'received',
     error TEXT,
+    origin TEXT NOT NULL DEFAULT 'HOTEL',
+    revision INTEGER NOT NULL DEFAULT 0,
     booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     processed_at TIMESTAMPTZ,
@@ -153,7 +185,7 @@ CREATE INDEX IF NOT EXISTS idx_hotel_sync_events_booking
 
 CREATE TABLE IF NOT EXISTS hotel_channel_bookings (
     id SERIAL PRIMARY KEY,
-    hotel_id INTEGER NOT NULL DEFAULT 1,
+    hotel_id INTEGER NOT NULL DEFAULT 1 REFERENCES hotels (id),
     external_booking_id TEXT NOT NULL,
     booking_id INTEGER REFERENCES bookings(id) ON DELETE SET NULL,
     room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
@@ -176,34 +208,12 @@ CREATE INDEX IF NOT EXISTS idx_hotel_channel_bookings_booking
 CREATE INDEX IF NOT EXISTS idx_hotel_channel_bookings_room_dates
     ON hotel_channel_bookings(room_id, check_in, check_out);
 
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    full_name VARCHAR(120) NOT NULL,
-    role VARCHAR(20) NOT NULL,
-    password_hash VARCHAR(255),
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    last_login_at TIMESTAMPTZ,
-    chat_wallpaper VARCHAR(500),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT users_role_chk CHECK (role IN ('OWNER', 'STAFF'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-
-CREATE TABLE IF NOT EXISTS auth_sessions (
-    id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_jti VARCHAR(64) NOT NULL UNIQUE,
-    issued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at TIMESTAMPTZ NOT NULL,
-    revoked_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_auth_sessions_expires_at ON auth_sessions(expires_at);
+-- NOTE: `users` and `auth_sessions` are intentionally NOT created here.
+-- The backend owns them via SQLAlchemy create_all (full, current column set incl.
+-- preferred_language / login-security), and the migration
+-- backend/migrations/add_users_and_auth_sessions.sql seeds admin/staff/lizett.
+-- Creating a stale `users` here previously broke fresh startups (UndefinedColumn
+-- on the seed referencing columns this DDL lacked).
 
 CREATE TABLE IF NOT EXISTS email_otps (
     id SERIAL PRIMARY KEY,
@@ -222,23 +232,7 @@ CREATE INDEX IF NOT EXISTS idx_email_otps_email_created_at
 CREATE INDEX IF NOT EXISTS idx_email_otps_expires_at
     ON email_otps (expires_at);
 
-INSERT INTO users (email, full_name, role, password_hash, is_active)
-VALUES
-    (
-        'admin@nextstay.com',
-        'Admin User',
-        'OWNER',
-        'ad86f7b12998e74610480a33cf5b63c65c7aa71806294ead8c1797b442f75302:48e4ba4a91cdc7623318d17ec51ad56c883f84c56ffdc00e19b09418c987e0f3',
-        TRUE
-    ),
-    (
-        'staff@nextstay.com',
-        'Staff User',
-        'STAFF',
-        'e1ebe27883cf319856064b6aca5d5c4d4cc6e90b1de3ef4f8f54a5cdc8e630ab:f396d335e4118707bcb1c242e247a30039efac0ad4c837be21b657ea052d6889',
-        TRUE
-    )
-ON CONFLICT (email) DO NOTHING;
+-- (User seed moved to backend/migrations/add_users_and_auth_sessions.sql.)
 
 -- ------------------------------------------
 -- 3) DWH ENUMS (Standardized Analytical Values)
