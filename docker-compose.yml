@@ -53,15 +53,16 @@ services:
       - backend
 
   airflow:
-    image: apache/airflow:2.7.1-python3.10
+    build:
+      context: ./analytics/airflow
+      dockerfile: Dockerfile
     container_name: nextstay_airflow
     environment:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER:-nextstay}:${DB_PASSWORD:-nextstay}@db:5432/${DB_NAME:-nextstay}
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - DBT_PROFILES_DIR=/opt/airflow/dbt
-      # dbt is installed into the Airflow image at startup so the DAG can run it.
-      - _PIP_ADDITIONAL_REQUIREMENTS=dbt-postgres==1.9.0
+      # dbt is baked into the image (analytics/airflow/Dockerfile).
       - DBT_PG_HOST=db
       - DBT_PG_PORT=5432
       - DBT_PG_USER=${DB_USER:-nextstay}
