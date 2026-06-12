@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: dim_dates
+    description: "Date spine 2026 for time-based analytics."
+    columns:
+      - name: date_key
+        tests: [unique, not_null]
+  - name: dim_hotels
+    columns:
+      - name: hotel_id
+        tests: [unique, not_null]
+  - name: dim_room_types
+    columns:
+      - name: room_type_key
+        tests: [unique, not_null]
+  - name: dim_rooms
+    columns:
+      - name: room_id
+        tests: [unique, not_null]
+      - name: hotel_id
+        tests:
+          - relationships:
+              to: ref('dim_hotels')
+              field: hotel_id
+  - name: dim_guests
+    columns:
+      - name: guest_email
+        tests: [unique, not_null]
+  - name: fct_bookings
+    description: "Booking-grain fact: revenue, nights, status."
+    columns:
+      - name: booking_id
+        tests: [unique, not_null]
+      - name: room_id
+        tests:
+          - relationships:
+              to: ref('dim_rooms')
+              field: room_id
+      - name: booking_status
+        tests:
+          - accepted_values:
+              values: ['Pending', 'Confirmed', 'Upcoming', 'Checked-in', 'Checked-out', 'Cancelled', 'Expired']
