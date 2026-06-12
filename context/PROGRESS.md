@@ -2,6 +2,16 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Fresh-init починен: `docker compose up` поднимается в ОДИН шаг
+
+**Сделано (коммит `ff91bea`), проверено `down -v && up -d`:**
+- `scripts/init-db.sql` переработан: создаёт `hotels` (+seed id=1, webhook→hotelsim), `rooms.hotel_id` + `UNIQUE(hotel_id, number)` (+seed 101/102/201 hotel 1), `origin/revision` + FK на `hotel_sync_events`/`hotel_channel_bookings`.
+- **Убраны устаревшие `users`/`auth_sessions` create+seed из init-db** — их строит backend `create_all` (все колонки) + сидит `add_users_and_auth_sessions.sql` (admin/staff/lizett). Это устранило краш `UndefinedColumn` на свежем томе.
+- Проверка: `down -v && up -d` → backend health 200 без ручных шагов; hotels/rooms/users на месте; smoke e2e (бронь→PMS, отмена→hotelsim) — оба прошли.
+- Раннбук `docs/E2E_HOTEL_SYNC_DEMO.md` раздел 0 обновлён (теперь «один шаг»).
+
+**Дальше:** Airflow DAG для ELT (опц.) / отчёт (Word + Mermaid). При интеграции `origin/latest` свериться по `init-db`/rooms.hotel_id (обе ветки трогают).
+
 ## 2026-06-12 — E2E на живом Postgres ПРОЙДЕН + dbt build на Postgres зелёный
 
 **Подняли стек в Docker (db+backend+hotelsim) и прогнали e2e:**
