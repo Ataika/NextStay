@@ -86,6 +86,19 @@ def table(doc, headers, rows, caption=None):
     doc.add_paragraph()
 
 
+def image(doc, path, caption):
+    if not Path(path).exists():
+        return
+    doc.add_picture(str(path), width=Inches(6.2))
+    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cap = doc.add_paragraph()
+    cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cr = cap.add_run(caption)
+    cr.italic = True
+    cr.font.size = Pt(9)
+    doc.add_paragraph()
+
+
 def figure(doc, code, caption):
     png = render_mermaid(code)
     if png:
@@ -103,7 +116,10 @@ def build():
     from scripts.report.integrate_content import add_chapters
 
     doc = Document(str(SOFT))
-    helpers = dict(chapter=chapter, subsection=subsection, body=body, bullets=bullets, table=table, figure=figure)
+    helpers = dict(
+        chapter=chapter, subsection=subsection, body=body, bullets=bullets,
+        table=table, figure=figure, image=image,
+    )
     add_chapters(doc, helpers)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(OUT))

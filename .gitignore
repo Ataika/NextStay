@@ -60,3 +60,6 @@ analytics/dbt/dev.duckdb
 analytics/dbt/target/
 analytics/dbt/dbt_packages/
 analytics/dbt/logs/
+
+# report screenshots (regenerated from the running stack)
+scripts/report/screenshots/

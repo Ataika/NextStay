@@ -7,15 +7,20 @@ Chapter numbers continue the base report (which ends at 12. Conclusions):
 
 from __future__ import annotations
 
+from pathlib import Path
+
+SHOTS = Path(__file__).resolve().parent / "screenshots"
+
 
 def add_chapters(doc, h):
-    ch, sub, body, bullets, table, figure = (
+    ch, sub, body, bullets, table, figure, image = (
         h["chapter"],
         h["subsection"],
         h["body"],
         h["bullets"],
         h["table"],
         h["figure"],
+        h["image"],
     )
 
     # --------------------------------------------------------------- Chapter 13
@@ -93,6 +98,11 @@ def add_chapters(doc, h):
 """,
         "Figure 13.3 — Outbound sync: PMS → hotel website (anti-echo).",
     )
+    image(
+        doc,
+        SHOTS / "hotelsim.png",
+        "Figure 13.3b — Hotel-site simulator (live): rooms and bookings; PMS cancellations show as 'cancelled'.",
+    )
 
     sub(doc, "13.3 Data Warehouse (dbt)")
     body(
@@ -128,13 +138,22 @@ def add_chapters(doc, h):
 """,
         "Figure 13.5 — Airflow ELT DAG (nextstay_dbt_elt).",
     )
+    image(
+        doc,
+        SHOTS / "airflow.png",
+        "Figure 13.5b — Airflow run of nextstay_dbt_elt: seed → run → snapshot → test, all succeeded.",
+    )
 
     sub(doc, "13.5 Business Intelligence (Superset)")
     body(
         doc,
         "Superset connects to the warehouse and exposes the marts as datasets on the 'NextStay — Hotel "
-        "Analytics' dashboard: occupancy by date, RevPAR by date, and guest loyalty tiers. "
-        "[INSERT SCREENSHOT: Superset dashboard from http://localhost:8088 — see notes.]",
+        "Analytics' dashboard: occupancy by date, RevPAR by date, and guest loyalty tiers.",
+    )
+    image(
+        doc,
+        SHOTS / "superset.png",
+        "Figure 13.6 — Superset dashboard 'NextStay — Hotel Analytics' (occupancy, RevPAR, loyalty).",
     )
 
     sub(doc, "13.6 End-to-End Validation")
