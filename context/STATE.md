@@ -81,7 +81,9 @@
 
 - ✅ **Phase 1 (мульти-отель, фундамент БД)** — модель `Hotel`, реестр `POST/GET /hotel-sync/hotels`, `rooms.hotel_id` + `UNIQUE(hotel_id, number)`, миграция `migrate_add_hotels.sql`. 85 тестов. Коммиты `90feb54`…`b7da024`.
 - ✅ **Phase 2 (HMAC + двусторонняя)** — `hotel_sync_security` (HMAC), `sync_publisher` (PMS→отель), inbound `authorize_inbound`, outbound-хук в `bookings.py`, hotel-scoping, `origin`/`revision`, анти-эхо (call-site). 101 тест. Коммиты `a7867b8`…`78b07bf`. Флаг `HOTEL_SYNC_HMAC_ENABLED` (default off → token fallback).
-- ❌ **Phase 3** — сервис `hotelsim` (FastAPI + vanilla мини-сайт + SQLite + `POST /webhook` + генератор трафика + подписанные исходящие на PMS) + docker-compose (порт 8090) + e2e. Перенос из ревью: отклонять пустой `hmac_secret` при регистрации; проверить inbound на Postgres.
+- ✅ **Phase 3 (сервис hotelsim)** — `hotelsim/` пакет: signing/config/store/pms_client/app/generator + vanilla мини-сайт + Dockerfile + сервис в docker-compose (порт 8090). 13 тестов. Коммиты `15de66d`…`164329f`. Подпись интероперабельна с PMS, анти-эхо соблюдён.
+- ⚠️ **`origin/latest`** (main + 3 коммита тиммейта) — мульти-арендность (register/users/invites/permissions/tenancy) + НЕЗАВИСИМЫЙ `hotel_id` на rooms. Пересекается с нашей Phase 1‑2. НЕ интегрировано — решить стратегию.
+- ⬜ Остаток: интеграция `origin/latest`; e2e-демо на Postgres; отклонять пустой `hmac_secret` при регистрации; отчёт (Word + Mermaid).
 
 ## Главные пробелы (приоритеты Атая)
 

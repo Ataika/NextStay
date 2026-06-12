@@ -2,6 +2,20 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Phase 3 РЕАЛИЗОВАНА (сервис hotelsim + мини-сайт) + найдено обновление ветки
+
+**Сделано (TDD, 5 задач), 13 тестов hotelsim проходят:**
+- **Task 1** `15de66d` — `hotelsim/`: `signing.py` (HMAC, идентичен PMS), `config.py`, `store.py` (SQLite: rooms/bookings/inbound_events).
+- **Task 2** `d68dd7f` — `pms_client.py`: `build_event`/`send_event` (подпись + POST на PMS, инъектируемый poster).
+- **Task 3** `88bc579` — `app.py`: FastAPI (мини-сайт `/`, `/api/rooms|bookings|events`, `/api/book` → локальная бронь + push в PMS, `/api/cancel/{id}`, `/webhook` приёмник с verify_signature → `apply_inbound_event`). `send_event` на module-scope (monkeypatch-friendly). `.gitignore`: hotelsim.db.
+- **Task 4** `736aa61` — `static/index.html`: vanilla мини-сайт (rooms/booking/cancel/inbound events, esc() против XSS).
+- **Task 5** `164329f` — `generator.py` (чистый `choose_action` + `run`), `requirements.txt`, `Dockerfile`, сервис `hotelsim` в `docker-compose.yml` (порт 8090, `PMS_BASE_URL=http://backend:8000/api/v1`).
+- Финальное ревью: ✅ Ready. Подпись интероперабельна с PMS; анти-эхо (webhook→store, без re-emit). Одно «замечание» ревью оказалось ложным (перепутаны направления: hotelsim→PMS `externalBookingId` верхним уровнем; PMS→hotelsim — под `data`; приёмник читает `data` — верно).
+
+**⚠️ ОБНОВЛЕНИЕ ВЕТКИ (надо учесть, НЕ ИНТЕГРИРОВАНО):** появилась удалённая ветка **`origin/latest`** = `origin/main` + 3 коммита (тиммейт). Это НЕ только фронт — там целый слой **мульти-арендности**: `register.py`, `users.py`, `hotel_invite`, `permissions.py`, `tenancy.py`, RegisterPage/TeamPage, i18n, и **`add_hotel_id_to_rooms.sql` + правка `room.py` (они НЕЗАВИСИМО добавили `hotel_id` к rooms!)**. Пересечения с нашей Phase 1‑2: `room.py`, `rooms.py`, `bookings.py`, `conftest.py`, `main.py`, `models/__init__.py`. Наша ветка впереди main на 24, `origin/latest` впереди main на 3; общая база `819b257`. **Требует аккуратной реконсиляции (дублирующийся hotel_id) — решение по стратегии за Атаем.** `hotelsim/` изолирован, на него не влияет.
+
+**Дальше:** решить стратегию интеграции `origin/latest` (merge сейчас / ждать слияния в main / cherry-pick). Затем: наполнение отчёта (Word + Mermaid), e2e-демо на Postgres.
+
 ## 2026-06-12 — Phase 2 РЕАЛИЗОВАНА (HMAC + двусторонняя синхронизация)
 
 **Сделано (subagent-driven, TDD, 5 задач + фиксы ревью), 101 тест проходит:**
