@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: mart_occupancy
+    description: "Occupied vs available room-nights and occupancy rate per hotel x date."
+    columns:
+      - name: hotel_id
+        tests: [not_null]
+      - name: date_key
+        tests: [not_null]
+      - name: occupancy_rate
+        tests: [not_null]
+  - name: mart_revpar
+    description: "Revenue per available room (RevPAR) per hotel x date."
+    columns:
+      - name: hotel_id
+        tests: [not_null]
+      - name: revpar
+        tests: [not_null]
+  - name: mart_loyalty
+    description: "Guest loyalty: lifetime bookings, value, tier."
+    columns:
+      - name: guest_email
+        tests: [unique, not_null]
+      - name: loyalty_tier
+        tests:
+          - accepted_values:
+              values: ['New', 'Returning', 'VIP']
