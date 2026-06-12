@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: stg_rooms
+    description: "Staging view of rooms (mirrors public.rooms). Source: seed_rooms (duckdb) / rooms (postgres prod)."
+    columns:
+      - name: room_id
+        tests: [unique, not_null]
+      - name: hotel_id
+        tests: [not_null]
+  - name: stg_bookings
+    description: "Staging view of bookings. guest_email lowercased; dates cast to date."
+    columns:
+      - name: booking_id
+        tests: [unique, not_null]
+      - name: room_id
+        tests: [not_null]
+  - name: stg_hotels
+    description: "Staging view of the hotels registry."
+    columns:
+      - name: hotel_id
+        tests: [unique, not_null]
