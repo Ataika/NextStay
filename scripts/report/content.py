@@ -14,6 +14,7 @@ def write_all(rep) -> None:
     features(rep)
     mockups(rep)
     data_bi_chapter(rep)
+    testing(rep)
 
 
 # --------------------------------------------------------------------------- #
@@ -516,5 +517,85 @@ def data_bi_chapter(rep):
         "exercised end-to-end: a booking made on the hotel website appeared in the PMS with a channel "
         "mapping and a processed sync event; a cancellation in the PMS propagated back to the hotel site; "
         "duplicate events were ignored idempotently; an invalid token/signature was rejected with HTTP 401; "
-        "and the dbt warehouse rebuilt green on PostgreSQL, feeding the Superset dashboards."
+        "and the dbt warehouse rebuilt green on PostgreSQL, feeding the Superset dashboards. These checks "
+        "are automated as system tests — see Chapter 11."
+    )
+
+
+def testing(rep):
+    rep.h1("11. System Testing")
+    rep.h2("11.1 Test Strategy")
+    rep.p(
+        "Testing follows the classic pyramid: many fast unit tests at the base, fewer integration tests "
+        "that exercise the API and database together, data-quality tests over the warehouse, and a thin "
+        "layer of end-to-end system tests that drive the whole running stack. All layers are automated and "
+        "gated by pre-commit and CI; the warehouse layer is checked by dbt, and the system layer is skipped "
+        "automatically when the Dockerised stack is not running, so it never blocks the unit pipeline."
+    )
+    rep.figure(
+        """flowchart TB
+  E2E["System / E2E (4) — live Docker stack via httpx"]:::top
+  DATA["Data tests (49) — dbt: unique/not_null/relationships/accepted_values/range"]:::data
+  INT["Integration (114) — FastAPI TestClient + SQLite (backend 101, hotelsim 13)"]:::int
+  UNIT["Unit — pure functions: HMAC, publisher, generator, task state machine"]:::unit
+  E2E --> DATA --> INT --> UNIT
+  classDef top fill:#c53030,color:#fff
+  classDef data fill:#2b6cb0,color:#fff
+  classDef int fill:#2f855a,color:#fff
+  classDef unit fill:#6b46c1,color:#fff
+""",
+        "Figure 11.1 — Test pyramid (counts as of the latest run).",
+    )
+
+    rep.h2("11.2 Test Inventory")
+    rep.table(
+        ["Layer", "Scope", "Tooling", "Count"],
+        [
+            ["Unit", "HMAC, sync publisher, generator, task state machine", "pytest", "incl. below"],
+            [
+                "Integration",
+                "Backend API + DB (auth, rooms, bookings, staff, tasks, sync)",
+                "pytest + TestClient",
+                "101",
+            ],
+            ["Integration", "Hotel simulator (store, signing, client, app, generator)", "pytest + TestClient", "13"],
+            ["Data quality", "Warehouse keys, FKs, accepted values, occupancy range", "dbt test", "49"],
+            ["System / E2E", "Bidirectional sync, idempotency, auth (live stack)", "pytest + httpx", "4"],
+            ["Total", "Automated checks", "—", "167"],
+        ],
+    )
+
+    rep.h2("11.3 System (End-to-End) Test Cases")
+    rep.table(
+        ["#", "Scenario", "Expected result"],
+        [
+            ["E2E-1", "Guest books on the hotel website", "Booking + active channel mapping appear in the PMS"],
+            ["E2E-2", "Admin cancels the booking in the PMS", "Signed webhook cancels the booking on the hotel site"],
+            ["E2E-3", "Same sync event delivered twice", "Second is ignored (duplicate_event_ignored); no dup"],
+            ["E2E-4", "Event sent with an invalid sync token", "Rejected with HTTP 401"],
+        ],
+    )
+    rep.p(
+        "Location: tests/system/test_e2e_hotel_sync.py. Run with the stack up: "
+        "`docker compose up -d db backend hotelsim` then `pytest tests/system -q`. The suite is "
+        "self-skipping when the stack is unreachable."
+    )
+
+    rep.h2("11.4 Data-Quality Tests")
+    rep.p(
+        "dbt enforces 49 tests across the warehouse: primary-key uniqueness and not-null on every "
+        "dimension/fact key, referential-integrity (relationships) from facts to dimensions, accepted-values "
+        "on booking and loyalty status fields, and a custom singular test asserting occupancy_rate stays "
+        "within [0, 1]. The suite is green on both the DuckDB (local) and PostgreSQL (prod) targets."
+    )
+
+    rep.h2("11.5 Results & Continuous Integration")
+    rep.bullets(
+        [
+            "Backend integration: 101 passed.",
+            "Hotel simulator: 13 passed.",
+            "Warehouse data tests (dbt): 49 passed on DuckDB and PostgreSQL.",
+            "System / E2E: 4 passed against the live Docker stack.",
+            "Quality gates: pre-commit (Ruff, SQLFluff) + a GitHub Actions workflow run on every push.",
+        ]
     )
