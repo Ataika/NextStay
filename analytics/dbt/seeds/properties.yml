@@ -1,0 +1,13 @@
+version: 2
+seeds:
+  - name: seed_bookings
+    config:
+      column_types:
+        check_in: timestamp
+        check_out: timestamp
+        created_at: timestamp
+        amount_paid: double
+  - name: seed_rooms
+    config:
+      column_types:
+        price: double

@@ -1,0 +1,6 @@
+id,guest_name,guest_email,room_id,room_number,check_in,check_out,status,created_at,amount_paid
+1,Alice,alice@example.com,1,101,2026-06-01,2026-06-04,Checked-out,2026-05-20,300.0
+2,Bob,bob@example.com,2,102,2026-06-02,2026-06-05,Checked-in,2026-05-22,450.0
+3,Alice,alice@example.com,3,201,2026-06-10,2026-06-12,Confirmed,2026-06-01,500.0
+4,Carol,carol@example.com,4,101,2026-06-03,2026-06-06,Cancelled,2026-05-25,270.0
+5,Alice,alice@example.com,1,101,2026-07-01,2026-07-03,Upcoming,2026-06-15,200.0

@@ -50,3 +50,10 @@ hotelsim.db
 hotelsim/*.db
 hotelsim/*.db-shm
 hotelsim/*.db-wal
+
+# dbt local dev (duckdb verify) + artifacts
+analytics/.dbt-venv/
+analytics/dbt/dev.duckdb
+analytics/dbt/target/
+analytics/dbt/dbt_packages/
+analytics/dbt/logs/

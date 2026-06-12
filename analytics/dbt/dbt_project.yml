@@ -31,6 +31,16 @@ clean-targets:         # directories to be removed by `dbt clean`
 # files using the `{{ config(...) }}` macro.
 models:
   dbt_nexstay:
-    # Config indicated by + and applies to all files under models/example/
-    example:
+    staging:
       +materialized: view
+      +schema: stg
+    core:
+      +materialized: table
+      +schema: core
+    mart:
+      +materialized: table
+      +schema: mart
+
+seeds:
+  dbt_nexstay:
+    +schema: raw
