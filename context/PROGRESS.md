@@ -2,6 +2,18 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Airflow ELT + Superset дашборды (живой стек)
+
+**Airflow:** DAG `nextstay_dbt_elt` (`analytics/dags/dbt_elt_dag.py`): `dbt seed→run→snapshot→test` на postgres-таргете, ночью 03:00. dbt ставится в airflow на старте (`_PIP_ADDITIONAL_REQUIREMENTS`), коннект к `db:5432` через `DBT_PG_*`. Проверено `airflow dags test` → все таски SUCCESS, dbt 33 теста PASS. Коммит `0611098`.
+
+**dbt staging → живой OLTP:** staging читает `public.*` на postgres-таргете и seeds на duckdb (через `target.type`), так что витрины отражают реальные брони e2e. Коммит `67acf3a`.
+
+**Superset:** образ собирается с драйвером Postgres (`analytics/superset/Dockerfile` — psycopg2-binary, базовый образ 6.0.0 его не содержит; ставится через `uv`). `scripts/bootstrap_superset.py` (REST API, идемпотентно): connection «NextStay Warehouse» → datasets `stg_mart.mart_occupancy/revpar/loyalty` → 3 чарта → дашборд «NextStay — Hotel Analytics» с раскладкой. Проверено: датасеты интроспектированы, `POST /chart/data` отдаёт живые строки.
+
+**Сейчас подняты:** db, backend, hotelsim, airflow (8080), superset (8088, admin/admin). Dashboard: Dashboards → NextStay — Hotel Analytics.
+
+**Дальше:** отчёт (Word + Mermaid). Durable: при свежем старте `docker compose up -d --build superset airflow` + `superset init` + `scripts/bootstrap_superset.py` (см. `docs/E2E_HOTEL_SYNC_DEMO.md` §6–7).
+
 ## 2026-06-12 — Fresh-init починен: `docker compose up` поднимается в ОДИН шаг
 
 **Сделано (коммит `ff91bea`), проверено `down -v && up -d`:**

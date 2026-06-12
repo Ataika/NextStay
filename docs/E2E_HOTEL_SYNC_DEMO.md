@@ -99,6 +99,18 @@ analytics/.dbt-venv/bin/dbt build \
 > Для prod-варианта «из живого OLTP» — переключить staging на `{{ source(...) }}` к `public.*`
 > (мелкий follow-up; см. план DWH, раздел Notes).
 
+## 6. Airflow (оркестрация ELT)
+- DAG `nextstay_dbt_elt` (`analytics/dags/dbt_elt_dag.py`): `dbt seed → run → snapshot → test` на postgres-таргете, ночью в 03:00.
+- Airflow ставит dbt на старте (`_PIP_ADDITIONAL_REQUIREMENTS=dbt-postgres`), подключается к `db:5432` через `DBT_PG_*`.
+- Запуск разово: `docker exec nextstay_airflow airflow dags test nextstay_dbt_elt 2026-08-01` (все таски SUCCESS, dbt-тесты PASS). UI: http://localhost:8080.
+
+## 7. Superset (дашборды)
+- Образ собирается с драйвером Postgres (`analytics/superset/Dockerfile` — psycopg2-binary; базовый образ его не содержит).
+- Инициализация (один раз): `docker exec nextstay_superset superset db upgrade && ... fab create-admin ... && ... superset init`.
+- Бутстрап подключения/датасетов/чартов/дашборда: `python scripts/bootstrap_superset.py` (идемпотентно).
+  Создаёт: connection «NextStay Warehouse» → datasets `stg_mart.mart_occupancy/мart_revpar/mart_loyalty` → 3 чарта → дашборд «NextStay — Hotel Analytics» с раскладкой.
+- UI: http://localhost:8088 (admin/admin) → Dashboards → NextStay — Hotel Analytics.
+
 ## Критерии успеха
 - [ ] Бронь с сайта отеля появляется в PMS (`bookings` + `hotel_channel_bookings.active`)
 - [ ] `hotel_sync_events` фиксирует событие со `status=processed`

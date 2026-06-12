@@ -80,7 +80,9 @@ services:
         condition: service_healthy
 
   superset:
-    image: apache/superset:latest
+    build:
+      context: ./analytics/superset
+      dockerfile: Dockerfile
     container_name: nextstay_superset
     restart: always
     ports:
