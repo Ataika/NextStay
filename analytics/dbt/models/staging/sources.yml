@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: oltp
+    description: "Live OLTP source-of-truth tables (PostgreSQL prod target)."
+    schema: public
+    tables:
+      - name: rooms
+      - name: bookings
+      - name: hotels

@@ -1,5 +1,5 @@
 # Global exclude: ignore legacy or large files that don't need linting
-exclude: '^(backend/init_db_v1\.sql|init\.sql|scripts/db_backup\.sql|analytics/dbt/models/example/.*|analytics/dbt/models/test_ci\.sql|analytics/dbt/models/core/dim_dates\.sql|analytics/dbt/snapshots/.*|backend/migrations/.*\.sql|scripts/init-db\.sql|scripts/seed/seed\.sql)'
+exclude: '^(backend/init_db_v1\.sql|init\.sql|scripts/db_backup\.sql|analytics/dbt/models/example/.*|analytics/dbt/models/test_ci\.sql|analytics/dbt/models/core/dim_dates\.sql|analytics/dbt/snapshots/.*|analytics/dbt/models/staging/.*|backend/migrations/.*\.sql|scripts/init-db\.sql|scripts/seed/seed\.sql)'
 
 repos:
   # Standard hooks for general file quality

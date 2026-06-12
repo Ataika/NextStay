@@ -1,5 +1,9 @@
 with source as (
+    {% if target.type == 'postgres' %}
+    select * from {{ source('oltp', 'bookings') }}
+    {% else %}
     select * from {{ ref('seed_bookings') }}
+    {% endif %}
 )
 
 select
