@@ -6,8 +6,8 @@ seeds:
         check_in: timestamp
         check_out: timestamp
         created_at: timestamp
-        amount_paid: double
+        amount_paid: double precision
   - name: seed_rooms
     config:
       column_types:
-        price: double
+        price: double precision

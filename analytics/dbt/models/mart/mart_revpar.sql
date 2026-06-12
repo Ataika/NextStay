@@ -20,6 +20,6 @@ select
     occ.date_key,
     occ.available_rooms,
     coalesce(rev.room_revenue, 0) as room_revenue,
-    round(coalesce(rev.room_revenue, 0) / nullif(occ.available_rooms, 0), 2) as revpar
+    round(cast(coalesce(rev.room_revenue, 0) / nullif(occ.available_rooms, 0) as numeric), 2) as revpar
 from occ
 left join revenue as rev on occ.hotel_id = rev.hotel_id and occ.date_key = rev.date_key
