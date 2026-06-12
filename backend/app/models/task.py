@@ -1,5 +1,5 @@
 from app.db.base import Base
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 
@@ -15,4 +15,7 @@ class CleaningTask(Base):
     assigned_to_name = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
-    notes = Column(String(500), nullable=True)
+    notes = Column(Text, nullable=True)
+    task_type = Column(String(30), nullable=False, default="cleaning")
+    due_at = Column(DateTime(timezone=True), nullable=True)
+    checklist = Column(JSON, nullable=True)

@@ -85,7 +85,8 @@ _STAFF_DDL = [
         phone           TEXT,
         hire_date       DATE,
         is_active       INTEGER NOT NULL DEFAULT 1,
-        annual_days_off INTEGER NOT NULL DEFAULT 20
+        annual_days_off INTEGER NOT NULL DEFAULT 20,
+        hotel_id        INTEGER
     )
     """,
     """

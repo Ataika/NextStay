@@ -1,6 +1,11 @@
 // Mock API for working without backend
 import { mockRooms, type Room } from "../mocks/rooms";
-import { mockTasks, type CleaningTask } from "../mocks/tasks";
+import {
+  DEFAULT_TASK_CHECKLIST_LABELS,
+  mockTasks,
+  type CleaningTask,
+  type CreateTaskPayload,
+} from "../mocks/tasks";
 import { getGuestByToken, type GuestToken } from "../mocks/guest";
 import { mockBookings, type Booking } from "../mocks/bookings";
 
@@ -66,19 +71,48 @@ export const mockApi = {
       return mockTasks.filter((task) => task.roomId === roomId);
     },
 
-    create: async (roomId: number, roomNumber: string, priority: "Low" | "Medium" | "High" = "Medium", notes?: string): Promise<CleaningTask> => {
+    create: async (payload: CreateTaskPayload): Promise<CleaningTask> => {
       await delay(400);
+      const isPlanned = payload.dueAt ? new Date(payload.dueAt) > new Date() : false;
+      const labels = payload.checklistItems?.filter(Boolean) ?? [...DEFAULT_TASK_CHECKLIST_LABELS];
       const newTask: CleaningTask = {
         id: Math.max(...mockTasks.map((t) => t.id), 0) + 1,
-        roomId,
-        roomNumber,
-        status: "Pending",
-        priority,
+        roomId: payload.roomId,
+        roomNumber: payload.roomNumber,
+        status: isPlanned ? "Pending" : payload.staffId ? "In Progress" : "Pending",
+        priority: payload.priority ?? "Medium",
+        taskType: payload.taskType ?? "cleaning",
+        assignedTo: payload.staffId,
+        assignedToName: payload.staffName,
         createdAt: new Date().toISOString(),
-        notes,
+        dueAt: payload.dueAt ?? null,
+        notes: payload.notes,
+        checklist: labels.map((label, index) => ({
+          id: String(index),
+          label,
+          checked: false,
+        })),
       };
       mockTasks.push(newTask);
       return newTask;
+    },
+
+    updateChecklistItem: async (taskId: number, itemId: string, checked: boolean): Promise<CleaningTask> => {
+      await delay(200);
+      const task = mockTasks.find((t) => t.id === taskId);
+      if (!task) throw new Error("Task not found");
+      if (!task.checklist?.length) {
+        task.checklist = DEFAULT_TASK_CHECKLIST_LABELS.map((label, index) => ({
+          id: String(index),
+          label,
+          checked: false,
+        }));
+      }
+      task.checklist = task.checklist.map((item) =>
+        item.id === itemId ? { ...item, checked } : item
+      );
+      if (task.status === "Pending") task.status = "In Progress";
+      return task;
     },
 
     update: async (id: number, data: Partial<CleaningTask>): Promise<CleaningTask> => {

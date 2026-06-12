@@ -1,14 +1,44 @@
+export type TaskType = "cleaning" | "maintenance" | "inventory" | "guest_request";
+export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
+
+export interface TaskChecklistItem {
+  id: string;
+  label: string;
+  checked: boolean;
+}
+
+export const DEFAULT_TASK_CHECKLIST_LABELS = [
+  "Cleaning room",
+  "Change bedding",
+  "Refill mini bar",
+] as const;
+
 export interface CleaningTask {
   id: number;
   roomId: number;
   roomNumber: string;
   status: "Pending" | "In Progress" | "Completed";
-  priority: "Low" | "Medium" | "High";
+  priority: TaskPriority;
+  taskType?: TaskType;
   assignedTo?: number; // staff ID
   assignedToName?: string;
   createdAt: string;
   completedAt?: string;
+  dueAt?: string | null;
   notes?: string;
+  checklist?: TaskChecklistItem[];
+}
+
+export interface CreateTaskPayload {
+  roomId: number;
+  roomNumber: string;
+  priority?: TaskPriority;
+  taskType?: TaskType;
+  notes?: string;
+  dueAt?: string;
+  staffId?: number;
+  staffName?: string;
+  checklistItems?: string[];
 }
 
 export const mockTasks: CleaningTask[] = [

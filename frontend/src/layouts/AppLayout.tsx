@@ -9,17 +9,25 @@ export default function AppLayout() {
   const role = useAuthStore((s) => s.role);
   const { t } = useI18n();
 
-  const mobileNavItems = [
-    { path: "/admin",    label: "Rooms",   roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-    { path: "/bookings", label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-    { path: "/staff",    label: "Tasks",   roles: ["STAFF"] },
-    { path: "/chat",     label: "Chat",    roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
-    { path: "/settings", label: "Settings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
-  ].filter((item) => !role || item.roles.includes(role as string));
+  const mobileNavItems = role === "STAFF"
+    ? [
+        { path: "/staff/tasks", label: "Tasks" },
+        { path: "/staff", label: "Overview", exact: true },
+        { path: "/chat", label: "Chat" },
+        { path: "/settings", label: "Settings" },
+      ]
+    : [
+        { path: "/admin", label: "Rooms", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+        { path: "/bookings", label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+        { path: "/chat", label: "Chat", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
+        { path: "/settings", label: "Settings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
+      ].filter((item) => !role || item.roles.includes(role as string));
+
   const labels: Record<string, string> = {
     Rooms: t("sidebar.rooms"),
     Bookings: t("sidebar.bookings"),
-    Tasks: t("sidebar.tasks"),
+    Overview: t("staff.tabOverview"),
+    Tasks: t("staff.tabTasks"),
     Chat: t("sidebar.chat"),
     Settings: t("sidebar.settings"),
   };
@@ -46,7 +54,9 @@ export default function AppLayout() {
         <div className="md:hidden fixed bottom-0 left-0 right-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 z-40">
           <div className="flex items-center justify-around text-sm">
             {mobileNavItems.map((item) => {
-              const isActive = location.pathname.startsWith(item.path);
+              const isActive = "exact" in item && item.exact
+                ? location.pathname === item.path
+                : location.pathname.startsWith(item.path);
               return (
                 <Link
                   key={item.path}

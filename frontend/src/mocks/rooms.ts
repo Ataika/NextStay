@@ -12,6 +12,11 @@ export interface Room {
   capacity: number;
   description?: string;
   amenities?: string[];
+  photoUrl?: string | null;
+  areaSqm?: number | null;
+  bedType?: string | null;
+  viewType?: string | null;
+  floor?: number | null;
 }
 
 export const mockRooms: Room[] = [

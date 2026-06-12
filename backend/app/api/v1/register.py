@@ -188,7 +188,7 @@ def register_staff(payload: RegisterStaffRequest, db: Session = Depends(get_db))
     db.add(user)
     db.commit()
     db.refresh(user)
-    ensure_staff_profile(db, name=full_name, email=email, role="cleaner")
+    ensure_staff_profile(db, name=full_name, email=email, role="cleaner", hotel_id=invite.hotel_id)
     return _issue_login(db, user)
 
 

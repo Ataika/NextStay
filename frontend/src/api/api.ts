@@ -153,11 +153,11 @@ export const tasksApi = {
     return response.data;
   },
 
-  create: async (roomId: number, roomNumber: string, priority: "Low" | "Medium" | "High" = "Medium", notes?: string): Promise<CleaningTask> => {
+  create: async (payload: import("../mocks/tasks").CreateTaskPayload): Promise<CleaningTask> => {
     if (USE_MOCK_API && !shouldUseLiveOwnerApi()) {
-      return mockApi.tasks.create(roomId, roomNumber, priority, notes);
+      return mockApi.tasks.create(payload);
     }
-    const response = await http.post("/tasks", { roomId, roomNumber, priority, notes });
+    const response = await http.post("/tasks", payload);
     return response.data;
   },
 
@@ -166,6 +166,18 @@ export const tasksApi = {
       return mockApi.tasks.assign(taskId, staffId, staffName);
     }
     const response = await http.patch(`/tasks/${taskId}/assign`, { staffId, staffName });
+    return response.data;
+  },
+
+  updateChecklistItem: async (
+    taskId: number,
+    itemId: string,
+    checked: boolean
+  ): Promise<CleaningTask> => {
+    if (USE_MOCK_API && !shouldUseLiveOwnerApi()) {
+      return mockApi.tasks.updateChecklistItem(taskId, itemId, checked);
+    }
+    const response = await http.patch(`/tasks/${taskId}/checklist`, { itemId, checked });
     return response.data;
   },
 

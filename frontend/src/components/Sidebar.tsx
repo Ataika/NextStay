@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore, canAccessEngine } from "../store/authStore";
+import { useTaskNotifications } from "../hooks/useTaskNotifications";
 import { useI18n } from "../i18n";
 import type { UserRole } from "../store/authStore";
 
@@ -7,18 +8,33 @@ interface SidebarItem {
   path: string;
   label: string;
   roles: UserRole[];
+  exact?: boolean;
+  badge?: "tasks";
 }
 
-const items: SidebarItem[] = [
-  { path: "/admin",         label: "Rooms",    roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/bookings",      label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/team",          label: "Team",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/reports",       label: "Reports",  roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/staff",         label: "Tasks",    roles: ["STAFF"] },
-  { path: "/chat",          label: "Chat",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
+const adminItems: SidebarItem[] = [
+  { path: "/admin",    label: "Rooms",    roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/bookings", label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/team",     label: "Team",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/reports",  label: "Reports",  roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/chat",     label: "Chat",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+];
+
+const staffItems: SidebarItem[] = [
+  { path: "/staff/tasks",     label: "Overview", roles: ["STAFF"] },
+  { path: "/staff",           label: "Tasks",    roles: ["STAFF"], exact: true, badge: "tasks" },
+  { path: "/staff/schedule",  label: "Schedule", roles: ["STAFF"] },
+  { path: "/staff/calendar",  label: "Calendar", roles: ["STAFF"] },
+  { path: "/staff/hours",     label: "Hours",    roles: ["STAFF"] },
+  { path: "/chat",            label: "Chat",     roles: ["STAFF"] },
 ];
 
 const ENGINE_PATHS = ["/engine", "/inventory-setup", "/pricing-lab", "/model-training", "/engine-tuning"];
+
+function isItemActive(pathname: string, path: string, exact?: boolean): boolean {
+  if (exact) return pathname === path || pathname === `${path}/`;
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
 
 export default function Sidebar() {
   const location = useLocation();
@@ -26,16 +42,24 @@ export default function Sidebar() {
   const role = useAuthStore((s) => s.role);
   const name = useAuthStore((s) => s.name);
   const { t } = useI18n();
+  const { activeTaskCount, hasUrgentTask } = useTaskNotifications();
 
+  const isStaff = role === "STAFF";
+  const items = isStaff ? staffItems : adminItems;
   const visibleItems = role ? items.filter((i) => i.roles.includes(role)) : [];
   const engineActive = ENGINE_PATHS.some((p) => location.pathname.startsWith(p));
   const showEngine = canAccessEngine(role);
+
   const labels: Record<string, string> = {
     Rooms: t("sidebar.rooms"),
     Bookings: t("sidebar.bookings"),
     Team: t("sidebar.team"),
     Reports: t("sidebar.reports"),
-    Tasks: t("sidebar.tasks"),
+    Overview: t("staff.tabOverview"),
+    Tasks: t("staff.tabTasks"),
+    Schedule: t("staff.tabSchedule"),
+    Calendar: t("staff.tabCalendar"),
+    Hours: t("staff.tabHours"),
     Chat: t("sidebar.chat"),
   };
 
@@ -43,19 +67,25 @@ export default function Sidebar() {
     <aside className="w-56 bg-gray-800 dark:bg-gray-900 text-gray-300 dark:text-gray-400 flex-shrink-0 h-full overflow-y-auto border-r border-gray-700 dark:border-gray-800">
       <div className="p-3 min-h-full flex flex-col">
         <h2 className="text-base font-semibold mb-1 text-gray-200 dark:text-gray-300">NextStay</h2>
-        {name && (
+        {name && !isStaff && (
           <p className="text-xs text-gray-500 dark:text-gray-600 mb-4 truncate">{name}</p>
         )}
+        {isStaff && <div className="mb-4" />}
 
         <nav className="flex-1">
           <ul className="space-y-0.5">
             {visibleItems.map((item) => {
-              const isActive = location.pathname.startsWith(item.path);
+              const isActive = isItemActive(location.pathname, item.path, item.exact);
+              const showBadge = item.badge === "tasks" && activeTaskCount > 0;
+              const badgeClass = hasUrgentTask
+                ? "bg-red-500 text-white"
+                : "bg-amber-400 text-amber-950";
+
               return (
                 <li key={item.path}>
                   <Link
                     to={item.path}
-                    className={`relative block px-2.5 py-1.5 text-xs transition-colors rounded-md ${
+                    className={`relative flex items-center justify-between px-2.5 py-1.5 text-xs transition-colors rounded-md ${
                       isActive
                         ? "text-white font-medium bg-white/10"
                         : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
@@ -65,6 +95,13 @@ export default function Sidebar() {
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 bg-blue-500 rounded-r" />
                     )}
                     <span className="pl-1">{labels[item.label] ?? item.label}</span>
+                    {showBadge && (
+                      <span
+                        className={`min-w-[1.125rem] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center tabular-nums ${badgeClass}`}
+                      >
+                        {activeTaskCount}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );
@@ -93,7 +130,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Settings link */}
         <div className="pt-3 border-t border-gray-700 dark:border-gray-800">
           <button
             onClick={() => navigate("/settings")}

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
 import AdminPage from "../pages/admin/AdminPage";
@@ -47,6 +47,39 @@ export default function AppRouter() {
           />
           <Route
             path="/staff"
+            element={
+              <ProtectedRoute allowedRoles={["STAFF"]}>
+                <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/tasks"
+            element={
+              <ProtectedRoute allowedRoles={["STAFF"]}>
+                <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/staff/overview" element={<Navigate to="/staff" replace />} />
+          <Route
+            path="/staff/schedule"
+            element={
+              <ProtectedRoute allowedRoles={["STAFF"]}>
+                <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/calendar"
+            element={
+              <ProtectedRoute allowedRoles={["STAFF"]}>
+                <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/hours"
             element={
               <ProtectedRoute allowedRoles={["STAFF"]}>
                 <StaffPage />

@@ -32,7 +32,7 @@ export default function Header() {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifRef   = useRef<HTMLDivElement>(null);
 
-  const { unseenTasks, pendingTasks, markAllSeen } = useTaskNotifications();
+  const { unseenTasks, pendingTasks, markAllSeen, notificationMode } = useTaskNotifications();
   const { language, t, roleLabel, priorityLabel } = useI18n();
 
   // Close dropdowns on outside click
@@ -136,15 +136,21 @@ export default function Header() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-gray-900 dark:text-white">
-                            {t("header.newTask", { room: task.roomNumber })}
+                            {notificationMode === "completed"
+                              ? t("header.taskCompleted", { room: task.roomNumber })
+                              : t("header.newTask", { room: task.roomNumber })}
                           </p>
                           {task.notes && (
                             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{task.notes}</p>
                           )}
                           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                            {task.assignedToName
-                              ? t("header.assignedTo", { name: task.assignedToName })
-                              : t("header.unassigned")}
+                            {notificationMode === "completed"
+                              ? task.assignedToName
+                                ? t("header.completedBy", { name: task.assignedToName })
+                                : t("header.unassigned")
+                              : task.assignedToName
+                                ? t("header.assignedTo", { name: task.assignedToName })
+                                : t("header.unassigned")}
                           </p>
                         </div>
                         <span className={`shrink-0 mt-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${PRIORITY_COLOR[task.priority] ?? PRIORITY_COLOR.Low}`}>

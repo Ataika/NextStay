@@ -343,7 +343,10 @@ def update_booking(
 
     if status_changing_to == "Checked-out":
         room = db.query(RoomModel).filter(RoomModel.id == db_booking.room_id).first()
-        staff_id, staff_name = round_robin_assign(db)
+        if room and room.hotel_id:
+            staff_id, staff_name = round_robin_assign(db, room.hotel_id)
+        else:
+            staff_id, staff_name = None, None
         cleaning_task = TaskModel(
             room_id=db_booking.room_id,
             room_number=db_booking.room_number,

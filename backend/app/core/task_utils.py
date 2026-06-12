@@ -5,14 +5,21 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
-def round_robin_assign(db: Session) -> tuple[int | None, str | None]:
+def round_robin_assign(db: Session, hotel_id: int) -> tuple[int | None, str | None]:
     """Return (staff_id, staff_name) for the next cleaner in round-robin order.
 
     Picks the active cleaner who follows the last-assigned cleaner by ID.
     Returns (None, None) if no active cleaners exist.
     """
     rows = db.execute(
-        text("SELECT id, name FROM staff_members WHERE role = 'cleaner' AND is_active = TRUE ORDER BY id")
+        text(
+            """
+            SELECT id, name FROM staff_members
+            WHERE role = 'cleaner' AND is_active = TRUE AND hotel_id = :hotel_id
+            ORDER BY id
+            """
+        ),
+        {"hotel_id": hotel_id},
     ).fetchall()
 
     if not rows:

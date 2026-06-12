@@ -144,7 +144,13 @@ def create_team_user(
     db.commit()
     db.refresh(user)
     if normalize_role(payload.role) == "STAFF":
-        ensure_staff_profile(db, name=user.full_name, email=user.email, role="cleaner")
+        ensure_staff_profile(
+            db,
+            name=user.full_name,
+            email=user.email,
+            role="cleaner",
+            hotel_id=hotel_id,
+        )
     return _to_team_user(user)
 
 

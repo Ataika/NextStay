@@ -15,3 +15,8 @@ class Room(Base):
     capacity = Column(Integer, nullable=False, default=2)
     description = Column(Text, nullable=True)
     amenities = Column(JSON, nullable=True)  # Use JSON instead of ARRAY for compatibility
+    photo_url = Column(String(500), nullable=True)
+    area_sqm = Column(Integer, nullable=True)
+    bed_type = Column(String(50), nullable=True)
+    view_type = Column(String(50), nullable=True)
+    floor = Column(Integer, nullable=True)

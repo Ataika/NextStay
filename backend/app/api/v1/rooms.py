@@ -16,6 +16,19 @@ router = APIRouter(tags=["rooms"])
 logger = get_logger(__name__)
 
 VALID_ROOM_STATUSES = {"Available", "Occupied", "Cleaning", "Out of Service"}
+ACCEPTED_ROOM_STATUSES = VALID_ROOM_STATUSES | {"Maintenance"}
+
+
+def normalize_status_for_db(status: str) -> str:
+    if status == "Maintenance":
+        return "Out of Service"
+    return status
+
+
+def normalize_status_for_api(status: str) -> str:
+    if status == "Out of Service":
+        return "Maintenance"
+    return status
 
 
 def get_db():
@@ -34,6 +47,11 @@ class RoomBase(BaseModel):
     capacity: int = Field(..., ge=1)
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    areaSqm: int | None = Field(None, ge=1)
+    bedType: str | None = None
+    viewType: str | None = None
+    floor: int | None = Field(None, ge=0)
 
 
 class RoomCreate(RoomBase):
@@ -48,6 +66,11 @@ class RoomUpdate(BaseModel):
     capacity: int | None = Field(None, ge=1)
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    areaSqm: int | None = Field(None, ge=1)
+    bedType: str | None = None
+    viewType: str | None = None
+    floor: int | None = Field(None, ge=0)
 
 
 class Room(RoomBase):
@@ -143,17 +166,43 @@ def serialize_room(room: RoomModel, pricing_map: dict[str, dict] | None = None) 
         id=room.id,
         number=room.number,
         category=room.category,
-        status=room.status,
+        status=normalize_status_for_api(room.status),
         price=room.price,
         capacity=room.capacity,
         description=room.description,
         amenities=room.amenities if room.amenities else [],
+        photoUrl=room.photo_url,
+        areaSqm=room.area_sqm,
+        bedType=room.bed_type,
+        viewType=room.view_type,
+        floor=room.floor,
         dynamicPrice=pricing_info.get("dynamicPrice"),
         priceSource=pricing_info.get("priceSource"),
         pricingStayDate=pricing_info.get("pricingStayDate"),
         pricingSnapshotDate=pricing_info.get("pricingSnapshotDate"),
         pricingStatus=pricing_info.get("pricingStatus"),
     )
+
+
+def _room_payload_to_model_fields(payload: dict) -> dict:
+    field_map = {
+        "photoUrl": "photo_url",
+        "areaSqm": "area_sqm",
+        "bedType": "bed_type",
+        "viewType": "view_type",
+    }
+    model_fields: dict = {}
+    for key, value in payload.items():
+        if key == "status" and value is not None:
+            if value not in ACCEPTED_ROOM_STATUSES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
+                )
+            model_fields["status"] = normalize_status_for_db(value)
+            continue
+        model_fields[field_map.get(key, key)] = value
+    return model_fields
 
 
 @router.get("/rooms/available", response_model=AvailabilityResponse)
@@ -279,10 +328,10 @@ def create_room(
     current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
     hotel_id = require_hotel_id(current_user, db)
-    if room.status not in VALID_ROOM_STATUSES:
+    if room.status not in ACCEPTED_ROOM_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
+            detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
         )
     existing_room = (
         db.query(RoomModel)
@@ -296,11 +345,16 @@ def create_room(
         hotel_id=hotel_id,
         number=room.number,
         category=room.category,
-        status=room.status,
+        status=normalize_status_for_db(room.status),
         price=room.price,
         capacity=room.capacity,
         description=room.description,
         amenities=room.amenities,
+        photo_url=room.photoUrl,
+        area_sqm=room.areaSqm,
+        bed_type=room.bedType,
+        view_type=room.viewType,
+        floor=room.floor,
     )
     db.add(db_room)
     db.commit()
@@ -321,10 +375,10 @@ def update_room(
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if room_update.status is not None and room_update.status not in VALID_ROOM_STATUSES:
+    if room_update.status is not None and room_update.status not in ACCEPTED_ROOM_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
+            detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
         )
 
     if room_update.number and room_update.number != db_room.number:
@@ -337,7 +391,8 @@ def update_room(
             raise HTTPException(status_code=400, detail="Room with this number already exists")
 
     update_data = room_update.dict(exclude_unset=True)
-    for field, value in update_data.items():
+    model_fields = _room_payload_to_model_fields(update_data)
+    for field, value in model_fields.items():
         setattr(db_room, field, value)
 
     db.commit()
