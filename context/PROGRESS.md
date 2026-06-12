@@ -2,6 +2,15 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — Отчёт .docx (генератор + диаграммы)
+
+- `scripts/report/build_report.py` + `content.py`: генерируют `docs/report/NextStay_Report.docx` — полный отчёт по структуре Даира (разделы 1–9) + глава 10 «Data Architecture, Sync & BI» (всё, что построили).
+- Mermaid-диаграммы рендерятся в PNG через **mermaid.ink** (pako-формат, без локального mermaid-cli) и встраиваются как фигуры (12 шт: class, use-case, component, ER, booking/OTP sequence, pricing pipeline, deployment, sync inbound/outbound, DWH flow, Airflow DAG).
+- Итог: 10 разделов, 12 диаграмм, 9 таблиц, ~148 параграфов. Под стилистику можно переиспользовать Word Атая как шаблон: `--template <их.docx>` (или env `REPORT_TEMPLATE`).
+- `scripts/report/figures/` — в gitignore (регенерируется).
+
+**Дальше:** Атай кладёт свой Word → перегенерю с `--template` под стиль; вставить реальные скриншоты (раздел 9 + 10.5). Прочее — по необходимости.
+
 ## 2026-06-12 — Airflow ELT + Superset дашборды (живой стек)
 
 **Airflow:** DAG `nextstay_dbt_elt` (`analytics/dags/dbt_elt_dag.py`): `dbt seed→run→snapshot→test` на postgres-таргете, ночью 03:00. dbt ставится в airflow на старте (`_PIP_ADDITIONAL_REQUIREMENTS`), коннект к `db:5432` через `DBT_PG_*`. Проверено `airflow dags test` → все таски SUCCESS, dbt 33 теста PASS. Коммит `0611098`.

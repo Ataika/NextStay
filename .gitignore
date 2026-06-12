@@ -51,6 +51,9 @@ hotelsim/*.db
 hotelsim/*.db-shm
 hotelsim/*.db-wal
 
+# report: rendered mermaid figures (regenerated from scripts/report/content.py)
+scripts/report/figures/
+
 # dbt local dev (duckdb verify) + artifacts
 analytics/.dbt-venv/
 analytics/dbt/dev.duckdb
