@@ -2,6 +2,20 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — E2E на живом Postgres ПРОЙДЕН + dbt build на Postgres зелёный
+
+**Подняли стек в Docker (db+backend+hotelsim) и прогнали e2e:**
+- ⚠️ На свежей БД backend падал: `prepare_database` сидит юзеров с колонками, которых нет в `users` из устаревшего `init-db.sql` (`preferred_language`, `failed_login_attempts`). Это пред-существующий баг main (фикс — в неинтегрированной `origin/latest`, «migration backfill»). Обход: дропнул `users`/`auth_sessions` → `create_all` пересоздал из моделей → миграции применились чисто. Применил `migrate_add_hotels.sql` + `migrate_add_sync_origin.sql` (наши scripts/-миграции не входят в bootstrap), задал webhook отелю id=1. Всё задокументировано в `docs/E2E_HOTEL_SYNC_DEMO.md` (раздел 0).
+- ✅ **Сценарий A:** бронь 101 на мини-сайте отеля → в PMS появилась бронь (Upcoming, "Synced from hotel_site_simulator", гость-токен), `hotel_channel_bookings`=active, `hotel_sync_events`=processed.
+- ✅ **Сценарий B:** отмена брони в PMS → подписанный webhook → hotelsim проверил подпись и отменил локальную бронь; во входящих событиях `booking_cancelled` (origin=PMS).
+- ✅ Идемпотентность: повтор `eventId` → `duplicate_event_ignored` (без дубля). Неверный токен → **401**.
+- ✅ **dbt build на ЖИВОМ Postgres: PASS=49, ERROR=0** (и DuckDB 49). Поправил переносимость: seed `double`→`double precision`, `round(...)`→`round(cast(... as numeric),2)` (Postgres не имеет `round(double,int)`). Витрины на Postgres дают корректные данные (occupancy 0.33/0.67; loyalty alice=VIP, carol=New). Коммит `8ad8329`.
+- dbt на Postgres кладёт модели в схемы `stg_*` (префикс target-схемы) — НЕ конфликтует с `core/mart` из init-db.
+
+**Для разрабов (при интеграции origin/latest):** свести init-db/bootstrap, чтобы свежий `docker compose up` поднимался без ручных шагов; перенести `hotel_id`/`hotels`/origin-revision в init или bootstrap.
+
+**Дальше:** чистота/порядок миграций (включая wiring наших scripts/-миграций в bootstrap); Airflow DAG (опц.); отчёт (Word + Mermaid).
+
 ## 2026-06-12 — DWH (dbt core + mart) РЕАЛИЗОВАН, `dbt build` зелёный (49 PASS)
 
 **Сделано (6 задач), верифицировано `dbt build` на DuckDB — PASS=49, ERROR=0:**

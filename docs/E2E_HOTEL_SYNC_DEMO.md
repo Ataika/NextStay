@@ -7,6 +7,29 @@
 - Docker Desktop запущен (`open -a Docker`).
 - Порты свободны: 5433 (db), 8000 (backend), 8090 (hotelsim), 5173 (frontend), 8080/8088 (airflow/superset).
 
+## 0. ⚠️ Известная проблема свежей инициализации (до интеграции origin/latest)
+
+На чистом томе backend падает на старте: `prepare_database()` сидит юзеров с колонками
+(`preferred_language`, `failed_login_attempts`, …), которых нет в `users`, созданной устаревшим
+`scripts/init-db.sql` → `UndefinedColumn`. Это пред-существующий баг main (его чинит «migration backfill»
+в неинтегрированной ветке `origin/latest`). Обходной путь (проверено):
+```bash
+# пересоздать users/auth_sessions из ORM-моделей (create_all достроит все колонки)
+docker exec nextstay_db_clean psql -U nextstay -d nextstay -c \
+  "DROP TABLE IF EXISTS auth_sessions CASCADE; DROP TABLE IF EXISTS users CASCADE;"
+docker restart nextstay_backend     # create_all + миграции применятся чисто
+```
+Затем применить схему hotel-sync (наши миграции из scripts/ не входят в bootstrap):
+```bash
+docker exec -i nextstay_db_clean psql -U nextstay -d nextstay < scripts/migrate_add_hotels.sql
+docker exec -i nextstay_db_clean psql -U nextstay -d nextstay < scripts/migrate_add_sync_origin.sql
+# задать webhook отелю id=1 (для обратной синхронизации) + секрет
+docker exec nextstay_db_clean psql -U nextstay -d nextstay -c \
+  "UPDATE hotels SET code='GRAND_BISHKEK', webhook_url='http://hotelsim:8090/webhook', hmac_secret='dev-hotel-hmac-secret' WHERE id=1;"
+```
+> TODO (с разрабами при интеграции origin/latest): свести `init-db.sql`/bootstrap так, чтобы свежий
+> `docker compose up` поднимался без ручных шагов, и добавить `hotel_id`/`hotels`/origin-revision в init.
+
 ## 1. Поднять стек
 ```bash
 cd ~/Desktop/NextStay-hotel-sync
