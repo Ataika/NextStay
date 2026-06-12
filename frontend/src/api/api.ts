@@ -223,6 +223,19 @@ export const authApi = {
     };
   },
 
+  checkEmail: async (email: string) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const normalized = email.trim().toLowerCase();
+      if (normalized === "staff@nextstay.com" || normalized.endsWith("@nextstay.com") || normalized.includes("@")) {
+        return { exists: true as const };
+      }
+      throw new Error("No account found for this email.");
+    }
+    const response = await http.post("/auth/check-email", { email });
+    return response.data as { exists: boolean };
+  },
+
   passwordLogin: async (email: string, password: string) => {
     const response = await http.post("/auth/login", { email, password });
     return response.data as { token: string; role: string; user: { id: number; email: string; name: string } };
@@ -292,6 +305,81 @@ export const authApi = {
     prefs: { chat_wallpaper?: string | null; preferred_language?: "en" | "it" }
   ): Promise<{ chat_wallpaper: string | null; preferred_language: "en" | "it" }> => {
     const res = await http.patch("/auth/me/preferences", prefs);
+    return res.data;
+  },
+};
+
+export const registerApi = {
+  registerOwner: async (data: {
+    hotel_name: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    password: string;
+    birth_year: number;
+    gender: string;
+  }) => {
+    const res = await http.post("/auth/register/owner", data);
+    return res.data as { token: string; role: string; user: { id: number; email: string; name: string } };
+  },
+
+  verifyInvite: async (code: string) => {
+    const res = await http.post("/auth/register/verify-invite", { code });
+    return res.data as { valid: boolean; email: string; hotel_name: string };
+  },
+
+  registerStaff: async (data: {
+    code: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    password: string;
+    birth_year: number;
+    gender: string;
+  }) => {
+    const res = await http.post("/auth/register/staff", data);
+    return res.data as { token: string; role: string; user: { id: number; email: string; name: string } };
+  },
+};
+
+export interface TeamUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+}
+
+export const usersApi = {
+  list: async (): Promise<TeamUser[]> => {
+    const res = await http.get("/users");
+    return res.data;
+  },
+
+  create: async (data: {
+    email: string;
+    full_name: string;
+    role: string;
+    password: string;
+  }): Promise<TeamUser> => {
+    const res = await http.post("/users", data);
+    return res.data;
+  },
+
+  update: async (
+    id: number,
+    data: { full_name?: string; role?: string; is_active?: boolean },
+  ): Promise<TeamUser> => {
+    const res = await http.patch(`/users/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await http.delete(`/users/${id}`);
+  },
+
+  invite: async (email: string): Promise<{ message: string }> => {
+    const res = await http.post("/users/invite", { email });
     return res.data;
   },
 };
@@ -613,19 +701,6 @@ export const staffApi = {
     return res.data;
   },
 
-  heartbeat: async (): Promise<void> => {
-    await http.post("/staff/heartbeat");
-  },
-
-  getShiftCode: async (): Promise<{ code: string; expires_in: number }> => {
-    const res = await http.get("/staff/shift-code");
-    return res.data;
-  },
-
-  startShift: async (code: string): Promise<{ started_at: string }> => {
-    const res = await http.post("/staff/shift-start", { code });
-    return res.data;
-  },
 };
 
 // ---------------------------------------------------------------------------

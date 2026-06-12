@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { tasksApi, staffApi } from "../../api/api";
 import { useI18n } from "../../i18n";
 import type { CleaningTask } from "../../mocks/tasks";
@@ -73,45 +72,6 @@ type ShiftType = keyof typeof SHIFT_CONFIG;
 const MONTH_HOURS = 160;
 
 // ---------------------------------------------------------------------------
-// ShiftTimer — running clock since login, heartbeat every 2 min
-// ---------------------------------------------------------------------------
-
-function ShiftTimer({ loginTime }: { loginTime: string }) {
-  const { t } = useI18n();
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const start = new Date(loginTime).getTime();
-    const tick  = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [loginTime]);
-
-  // Heartbeat every 2 minutes keeps the session verified
-  useEffect(() => {
-    const id = setInterval(() => { void staffApi.heartbeat().catch(() => {}); }, 120_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-
-  return (
-    <div className="flex items-center gap-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
-      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-green-600 dark:text-green-500 font-semibold">{t("shifts.active")}</p>
-        <p className="text-sm font-bold text-green-800 dark:text-green-300 tabular-nums leading-none mt-0.5">
-          {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Progress bar
 // ---------------------------------------------------------------------------
 
@@ -133,11 +93,9 @@ type StatusFilter   = CleaningTask["status"] | "All";
 type PriorityFilter = CleaningTask["priority"] | "All";
 
 export default function StaffPage() {
-  const navigate    = useNavigate();
   const { locale, priorityLabel, roleLabel: translateRoleLabel, shiftLabel, t } = useI18n();
   const authName    = useAuthStore((s) => s.name);
   const authEmail   = useAuthStore((s) => s.email);
-  const loginTime   = useAuthStore((s) => s.loginTime);
   const setStaffId  = useAuthStore((s) => s.setStaffId);
 
   const [tab, setTab] = useState<Tab>("tasks");
@@ -338,7 +296,6 @@ export default function StaffPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          {loginTime && <ShiftTimer loginTime={loginTime} />}
           {profile && (
             <div className="text-right">
               <p className="text-xs text-gray-400">{t("staff.thisMonth")}</p>
@@ -349,22 +306,6 @@ export default function StaffPage() {
           )}
         </div>
       </div>
-
-      {/* Shift start prompt */}
-      {!loginTime && (
-        <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t("staff.shiftNotStarted")}</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t("staff.shiftNotStartedPrompt")}</p>
-          </div>
-          <button
-            onClick={() => navigate("/shift-start")}
-            className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
-          >
-            {t("staff.startShift")}
-          </button>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import type { Room } from "../../mocks/rooms";
-import { tasksApi, roomsApi, bookingsApi } from "../../api/api";
+import { tasksApi, roomsApi, bookingsApi, hotelProfileApi } from "../../api/api";
 import type { CleaningTask } from "../../mocks/tasks";
 import type { Booking } from "../../mocks/bookings";
 import { useAuthStore, canManageEngine } from "../../store/authStore";
@@ -49,6 +49,7 @@ export default function AdminPage() {
   const [showRoomDetailsModal, setShowRoomDetailsModal] = useState(false);
   const [roomDetailsView, setRoomDetailsView] = useState<"details" | "edit" | "cleaning">("details");
   const [loading, setLoading] = useState(true);
+  const [hotelName, setHotelName] = useState("");
   const [amenitiesInput, setAmenitiesInput] = useState("");
   const [roomForm, setRoomForm] = useState<Omit<Room, "id">>({
     number: "",
@@ -64,6 +65,7 @@ export default function AdminPage() {
     loadTasks();
     loadRooms();
     loadBookings();
+    void hotelProfileApi.get().then((profile) => setHotelName(profile.hotel_name)).catch(() => {});
   }, []);
 
   const loadRooms = async () => {
@@ -374,7 +376,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={t("admin.title")}
+        title={hotelName || t("admin.title")}
         subtitle={t("admin.subtitle")}
         action={
           canAdmin ? (

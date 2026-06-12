@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
+import RegisterPage from "../pages/RegisterPage";
 import AdminPage from "../pages/admin/AdminPage";
 import StaffPage from "../pages/staff/StaffPage";
 import ChatPage from "../pages/staff/ChatPage";
-import ShiftStartPage from "../pages/staff/ShiftStartPage";
 import GuestPage from "../pages/guest/GuestPage";
 import NextStayPage from "../pages/NextStayPage";
 import BookingPage from "../pages/booking/BookingPage";
@@ -16,7 +16,7 @@ import ModelTrainingPage from "../pages/admin/ModelTrainingPage";
 import PricingConfigPage from "../pages/admin/PricingConfigPage";
 import InventorySetupPage from "../pages/admin/InventorySetupPage";
 import EngineHubPage from "../pages/admin/EngineHubPage";
-import StaffPlannerPage from "../pages/admin/StaffPlannerPage";
+import TeamPage from "../pages/admin/TeamPage";
 import SettingsPage from "../pages/SettingsPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import AppLayout from "../layouts/AppLayout";
@@ -29,6 +29,7 @@ export default function AppRouter() {
       <Routes>
         <Route path="/" element={<IndexRedirect />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route path="/book" element={<BookingPage />} />
         <Route path="/nextstay" element={<NextStayPage />} />
         <Route path="/booking/success" element={<BookingSuccessPage />} />
@@ -57,14 +58,6 @@ export default function AppRouter() {
             element={
               <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"]}>
                 <ChatPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/shift-start"
-            element={
-              <ProtectedRoute allowedRoles={["STAFF"]}>
-                <ShiftStartPage />
               </ProtectedRoute>
             }
           />
@@ -125,10 +118,10 @@ export default function AppRouter() {
             }
           />
           <Route
-            path="/staff-planner"
+            path="/team"
             element={
               <ProtectedRoute allowedRoles={["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"]}>
-                <StaffPlannerPage />
+                <TeamPage />
               </ProtectedRoute>
             }
           />

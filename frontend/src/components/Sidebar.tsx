@@ -12,7 +12,7 @@ interface SidebarItem {
 const items: SidebarItem[] = [
   { path: "/admin",         label: "Rooms",    roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
   { path: "/bookings",      label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/staff-planner", label: "Staff",    roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/team",          label: "Team",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
   { path: "/reports",       label: "Reports",  roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
   { path: "/staff",         label: "Tasks",    roles: ["STAFF"] },
   { path: "/chat",          label: "Chat",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER", "STAFF"] },
@@ -33,7 +33,7 @@ export default function Sidebar() {
   const labels: Record<string, string> = {
     Rooms: t("sidebar.rooms"),
     Bookings: t("sidebar.bookings"),
-    Staff: t("sidebar.staff"),
+    Team: t("sidebar.team"),
     Reports: t("sidebar.reports"),
     Tasks: t("sidebar.tasks"),
     Chat: t("sidebar.chat"),
