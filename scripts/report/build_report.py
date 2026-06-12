@@ -64,16 +64,43 @@ def _json_str(s: str) -> str:
     return json.dumps(s)
 
 
+def _add_table_borders(table):
+    """Add single black gridlines to a table whose document lacks a table style."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    tbl_pr = table._tbl.tblPr
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement(f"w:{edge}")
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), "4")
+        el.set(qn("w:color"), "999999")
+        borders.append(el)
+    tbl_pr.append(borders)
+
+
 # --------------------------------------------------------------------------- #
 # docx helpers
 # --------------------------------------------------------------------------- #
 class Report:
     def __init__(self, template: str | None):
         self.doc = Document(template) if template else Document()
-        if not template:
+        if template:
+            self._clear_body()  # keep the template's styles/theme/page setup, drop its content
+        else:
             normal = self.doc.styles["Normal"]
             normal.font.name = "Calibri"
             normal.font.size = Pt(11)
+
+    def _clear_body(self):
+        from docx.oxml.ns import qn
+
+        body = self.doc.element.body
+        for child in list(body):
+            if child.tag == qn("w:sectPr"):
+                continue  # preserve section/page configuration
+            body.remove(child)
 
     def title_page(self):
         d = self.doc
@@ -113,15 +140,24 @@ class Report:
 
     def bullets(self, items: list[str]):
         for it in items:
-            self.doc.add_paragraph(it, style="List Bullet")
+            try:
+                self.doc.add_paragraph(it, style="List Bullet")
+            except KeyError:
+                self.doc.add_paragraph(f"•  {it}")  # template lacks the List Bullet style
 
     def table(self, headers: list[str], rows: list[list[str]]):
         t = self.doc.add_table(rows=1, cols=len(headers))
         t.alignment = WD_TABLE_ALIGNMENT.CENTER
-        try:
-            t.style = "Light Grid Accent 1"
-        except KeyError:
-            t.style = "Table Grid"
+        styled = False
+        for style_name in ("Light Grid Accent 1", "Table Grid"):
+            try:
+                t.style = style_name
+                styled = True
+                break
+            except KeyError:
+                continue  # style not defined in this (template) document — try next
+        if not styled:
+            _add_table_borders(t)  # fallback so the table still has visible gridlines
         for i, h in enumerate(headers):
             cell = t.rows[0].cells[i]
             cell.text = ""
