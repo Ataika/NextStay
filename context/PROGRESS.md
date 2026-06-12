@@ -2,6 +2,20 @@
 
 > Новые записи сверху. Формат: дата · что сделали · что дальше.
 
+## 2026-06-12 — DWH (dbt core + mart) РЕАЛИЗОВАН, `dbt build` зелёный (49 PASS)
+
+**Сделано (6 задач), верифицировано `dbt build` на DuckDB — PASS=49, ERROR=0:**
+- **Setup** `6ffc02f` — отдельный venv `analytics/.dbt-venv` (dbt-core 1.11 + duckdb + postgres); `profiles.yml` с таргетами **duckdb** (локальная проверка, default) и **postgres** (prod, под docker-compose); `dbt_project.yml` материализации по слоям; сиды `seed_hotels/rooms/bookings` (зеркало реальной OLTP-схемы); удалены example-модели + сломанный `test_ci.sql` (разблокировало `dbt parse`).
+- **Staging** `07a4feb` — починен `stg_rooms` (был под вымышленную схему!), добавлены `stg_bookings`, `stg_hotels` + тесты.
+- **Core** `4743145` — `dim_dates` (спайн через `dbt.date_spine`), `dim_hotels`, `dim_room_types`, `dim_rooms`, `dim_guests`, `fct_bookings` (грануляр брони, revenue/nights/realized) + тесты (unique/not_null/relationships/accepted_values). **SCD2**: `snapshots/scd_rooms.sql` (check-стратегия на price/status/category).
+- **Mart** `2422f4e` — `mart_occupancy` (occupancy_rate), `mart_revpar` (per-night allocation), `mart_loyalty`.
+- **Фиксы ревью** `f227d4d` — loyalty-tier по реализованным броням; singular-тест occupancy∈[0,1]; date_key not_null на revpar.
+- Финальное ревью: ✅ Ready, вся аналитическая математика (occupancy/RevPAR/SCD2) проверена корректной; портируемость DuckDB↔Postgres подтверждена.
+
+**Важно по запуску:** dbt здесь гоняется на **DuckDB** (docker/Postgres недоступны). Prod-таргет postgres готов: `docker compose up -d db` → загрузить OLTP → `dbt build --target postgres`. pre-commit sqlfluff исключает `dim_dates.sql`+`snapshots/` (их jinja-темплейтер не парсит).
+
+**Дальше (бэклог DB-зоны):** e2e-демо hotel-sync на Postgres; чистота/порядок миграций; Airflow DAG для ELT (если нужно); наполнение отчёта (Word + Mermaid: ER, DWH-flow, sequence). Не забыть: интеграция `origin/latest` (ждём разрабов).
+
 ## 2026-06-12 — Phase 3 РЕАЛИЗОВАНА (сервис hotelsim + мини-сайт) + найдено обновление ветки
 
 **Сделано (TDD, 5 задач), 13 тестов hotelsim проходят:**

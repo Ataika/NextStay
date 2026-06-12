@@ -42,14 +42,17 @@
 ✅ `configs/` — feature_schema_v1, pricing_rules_v1, serving_config_v1
 📄 `PROJECT_DOCUMENTATION.md`, `MINIMAL_STACK.md`
 
-## DWH / dbt (`analytics/dbt/`) — ГЛАВНЫЙ ПРОБЕЛ Атая
+## DWH / dbt (`analytics/dbt/`) — ✅ ПОСТРОЕН (dbt build PASS=49)
 
-🟡 `models/staging/`: только `stg_rooms.sql` + `sources.yml` (заготовка)
-🟡 `models/example/`: дефолтные `my_first/second_dbt_model.sql` (мусор из init — убрать)
-❌ `models/core/` (dim_hotels, dim_room_types, dim_dates, SCD) — **не построено**
-❌ `models/mart/` (occupancy, loyalty, RevPAR) — **не построено**
-❌ `seeds/`, `snapshots/`, `tests/` — пусто
-✅ `dbt_project.yml`, `profiles.yml`, `Dockerfile.dbt`
+✅ `models/staging/`: `stg_rooms` (починен под реальную схему), `stg_bookings`, `stg_hotels` + тесты
+✅ `models/core/`: `dim_dates`, `dim_hotels`, `dim_room_types`, `dim_rooms`, `dim_guests`, `fct_bookings` + тесты
+✅ `snapshots/scd_rooms.sql`: SCD2 истории номеров (price/status)
+✅ `models/mart/`: `mart_occupancy`, `mart_revpar`, `mart_loyalty` + тесты; `tests/assert_occupancy_rate_in_range.sql`
+✅ `seeds/`: seed_hotels/rooms/bookings (зеркало OLTP)
+✅ `profiles.yml`: duckdb (локальная проверка) + postgres (prod); `dbt_project.yml` материализации по слоям
+✅ Удалены example-модели + сломанный `test_ci.sql`
+🟡 Запуск на Postgres (prod) — после `docker compose up -d db` + загрузки OLTP (здесь проверено на DuckDB)
+🟡 dbt-venv: `analytics/.dbt-venv` (gitignored); команды через `--project-dir/--profiles-dir --target duckdb`
 
 ## BI / Superset
 
