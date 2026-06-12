@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NextStay — Hotel Site Simulator</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 880px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+    h1 { margin-bottom: .25rem; }
+    .room, .booking { border: 1px solid #ddd; border-radius: 8px; padding: .75rem 1rem; margin: .5rem 0; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .booking.cancelled { opacity: .55; }
+    button { cursor: pointer; border: 1px solid #2b6cb0; background: #2b6cb0; color: #fff; border-radius: 6px; padding: .35rem .7rem; }
+    button:disabled { background: #aaa; border-color: #aaa; cursor: not-allowed; }
+    button.cancel { background: #c53030; border-color: #c53030; }
+    .muted { color: #777; font-size: .85rem; }
+    .badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 999px; background: #edf2f7; }
+    section { margin-top: 1.75rem; }
+  </style>
+</head>
+<body>
+  <h1>🏨 Hotel Site Simulator</h1>
+  <p class="muted">External hotel website — bookings sync into NextStay PMS; PMS-side changes appear here automatically.</p>
+
+  <section>
+    <h2>Rooms</h2>
+    <div id="rooms"></div>
+  </section>
+
+  <section>
+    <h2>Bookings</h2>
+    <div id="bookings"></div>
+  </section>
+
+  <section>
+    <h2>Inbound PMS events</h2>
+    <div id="events"></div>
+  </section>
+
+  <script>
+    async function j(url, opts) {
+      const r = await fetch(url, opts);
+      return r.json();
+    }
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"]/g, (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    }
+
+    async function refresh() {
+      const rooms = await j("/api/rooms");
+      document.getElementById("rooms").innerHTML = rooms.map((r) =>
+        `<div class="room"><span><b>${esc(r.number)}</b> — ${esc(r.category)}
+          <span class="badge">$${esc(r.price)}</span> <span class="badge">${esc(r.status)}</span></span>
+          <button onclick="book('${esc(r.number)}')" ${r.status !== "Available" ? "disabled" : ""}>Book</button></div>`
+      ).join("") || '<p class="muted">No rooms.</p>';
+
+      const bookings = await j("/api/bookings");
+      document.getElementById("bookings").innerHTML = bookings.map((b) =>
+        `<div class="booking ${b.status === "cancelled" ? "cancelled" : ""}">
+          <span>${esc(b.room_number)} — ${esc(b.guest_name)} — <b>${esc(b.status)}</b></span>
+          ${b.status === "active" ? `<button class="cancel" onclick="cancelBooking('${esc(b.external_id)}')">Cancel</button>` : ""}
+        </div>`
+      ).join("") || '<p class="muted">No bookings yet.</p>';
+
+      const events = await j("/api/events");
+      document.getElementById("events").innerHTML = events.map((e) =>
+        `<div class="muted">${esc(e.received_at)} — ${esc(e.event_type)}</div>`
+      ).join("") || '<p class="muted">No inbound events yet.</p>';
+    }
+
+    async function book(number) {
+      await j("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomNumber: number,
+          guestName: "Walk-in Guest",
+          guestEmail: "guest@example.com",
+          checkIn: "2026-07-01T14:00:00Z",
+          checkOut: "2026-07-03T12:00:00Z",
+          amountPaid: 180,
+        }),
+      });
+      refresh();
+    }
+
+    async function cancelBooking(id) {
+      await fetch("/api/cancel/" + encodeURIComponent(id), { method: "POST" });
+      refresh();
+    }
+
+    refresh();
+    setInterval(refresh, 4000);
+  </script>
+</body>
+</html>

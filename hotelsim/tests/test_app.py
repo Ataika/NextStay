@@ -73,3 +73,12 @@ def test_webhook_applies_valid_cancel(monkeypatch):
 
     bookings = client.get("/api/bookings").json()
     assert any(b["external_id"] == ext_id and b["status"] == "cancelled" for b in bookings)
+
+
+def test_index_serves_html(monkeypatch):
+    sent = []
+    client = _client(monkeypatch, sent)
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "Hotel" in resp.text
