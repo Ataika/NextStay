@@ -7,12 +7,25 @@ propagates back to the hotel site; plus idempotency and auth rejection.
 
 from __future__ import annotations
 
+import random
 import uuid
+from datetime import date, timedelta
 
 from tests.system.conftest import ADMIN, PMS, SIM, TOKEN
 
 
-def _book_on_site(client, room="101", ci="2026-09-01T14:00:00Z", co="2026-09-03T12:00:00Z"):
+def _unique_dates(nights: int = 2):
+    """Return a unique (check_in, check_out) far-future window so repeated test
+    runs never collide with bookings left in the live DB by earlier runs."""
+    start = date(2027, 1, 1) + timedelta(days=random.randint(0, 1000))
+    ci = start.isoformat()
+    co = (start + timedelta(days=nights)).isoformat()
+    return f"{ci}T14:00:00Z", f"{co}T12:00:00Z"
+
+
+def _book_on_site(client, room="101", ci=None, co=None):
+    if ci is None:
+        ci, co = _unique_dates()
     r = client.post(
         f"{SIM}/api/book",
         json={
@@ -35,7 +48,7 @@ def _pms_channel_row(client, external_id):
 
 
 def test_booking_on_hotel_site_appears_in_pms(client):
-    ext = _book_on_site(client, room="101", ci="2026-09-01T14:00:00Z", co="2026-09-03T12:00:00Z")
+    ext = _book_on_site(client, room="101")
     row = _pms_channel_row(client, ext)
     assert row is not None, "channel mapping not found in PMS"
     assert row["status"] == "active"
@@ -47,7 +60,7 @@ def test_booking_on_hotel_site_appears_in_pms(client):
 
 
 def test_cancel_in_pms_propagates_to_hotel_site(client):
-    ext = _book_on_site(client, room="102", ci="2026-10-05T14:00:00Z", co="2026-10-07T12:00:00Z")
+    ext = _book_on_site(client, room="102")
     row = _pms_channel_row(client, ext)
     assert row and row["bookingId"]
     # cancel in the PMS (admin) -> outbound signed webhook to the hotel site
@@ -62,6 +75,7 @@ def test_cancel_in_pms_propagates_to_hotel_site(client):
 
 def test_duplicate_event_is_idempotent(client):
     event_id = f"systest-{uuid.uuid4().hex[:10]}"
+    ci, co = _unique_dates()
     payload = {
         "eventId": event_id,
         "hotelId": 1,
@@ -72,8 +86,8 @@ def test_duplicate_event_is_idempotent(client):
         "roomNumber": "201",
         "guestName": "Idem Guest",
         "guestEmail": "idem@example.com",
-        "checkIn": "2026-11-01T14:00:00Z",
-        "checkOut": "2026-11-02T12:00:00Z",
+        "checkIn": ci,
+        "checkOut": co,
         "amountPaid": 150,
     }
     hdr = {"X-Hotel-Sync-Token": TOKEN}
