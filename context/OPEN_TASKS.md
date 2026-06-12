@@ -36,4 +36,11 @@ backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиес�
 
 (T-01 — идемпотентность системных тестов — ✅ DONE, без issue.)
 
+## Завершённые Atai-блоки (closed issues, DONE)
+- [#54](https://github.com/Ataika/NextStay/issues/54) — Hotel-sync simulator (Phases 1–3) ✅
+- [#55](https://github.com/Ataika/NextStay/issues/55) — DWH (dbt stg/core/mart + SCD2) ✅
+- [#56](https://github.com/Ataika/NextStay/issues/56) — Airflow ELT DAG ✅
+- [#57](https://github.com/Ataika/NextStay/issues/57) — Superset (connection + datasets + dashboard) ✅
+- [#58](https://github.com/Ataika/NextStay/issues/58) — Report generator (.docx + diagrams + Testing chapter) ✅
+
 > Обновлять статусы здесь и в GitHub Issues по ходу.
