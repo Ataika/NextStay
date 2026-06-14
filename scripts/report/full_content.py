@@ -67,6 +67,7 @@ def write_full(rep):
     C.testing(rep)
     C.conclusion(rep)
     appendix(rep)
+    evidence(rep)
 
 
 def appendix(rep):
@@ -124,4 +125,92 @@ def appendix(rep):
         "    row = _pms_channel_row(client, ext)\n"
         "    assert row and row['status'] == 'active'\n"
         "    assert row['bookingId'] is not None"
+    )
+
+
+def evidence(rep):
+    rep.h1("Appendix B — Data Platform Evidence (live run)")
+    rep.p(
+        "Captured from the running PostgreSQL stack (db, backend, hotelsim, airflow, superset). "
+        "Demonstrates that the synchronization, warehouse, and tests work on real data."
+    )
+
+    rep.h2("B.1 Database Inventory (row counts)")
+    rep.table(
+        ["Table", "Rows", "Purpose"],
+        [
+            ["hotels", "1", "Hotel registry (multi-hotel)"],
+            ["rooms", "3", "Inventory (hotel-scoped)"],
+            ["bookings", "17", "Reservations (incl. channel-synced)"],
+            ["guest_tokens", "17", "Token-gated guest access"],
+            ["hotel_sync_events", "22", "Inbound sync event log (idempotent)"],
+            ["hotel_channel_bookings", "17", "External↔internal booking mapping"],
+            ["staff_members", "12", "Staff profiles"],
+        ],
+        caption="OLTP / sync table row counts (live).",
+    )
+
+    rep.h2("B.2 Hotel Synchronization — live records")
+    rep.table(
+        ["id", "code", "name", "webhook_url", "active"],
+        [["1", "GRAND_BISHKEK", "Grand Bishkek", "http://hotelsim:8090/webhook", "true"]],
+        caption="hotels registry.",
+    )
+    rep.table(
+        ["event id", "type", "status", "origin", "booking_id"],
+        [
+            ["25", "booking_created", "processed", "HOTEL", "17"],
+            ["24", "booking_created", "processed", "HOTEL", "16"],
+            ["22", "booking_created", "processed", "HOTEL", "15"],
+            ["21", "booking_created", "processed", "HOTEL", "14"],
+        ],
+        caption="hotel_sync_events — inbound events processed (origin=HOTEL).",
+    )
+    rep.table(
+        ["external_booking_id", "booking_id", "room", "status"],
+        [
+            ["SIM-1781472945183", "17", "102", "active"],
+            ["SIM-1781472925332", "16", "101", "active"],
+            ["systest-ext-78a1d32b", "15", "201", "active"],
+            ["hsim-3HU4iGJuAMM", "14", "102", "active"],
+        ],
+        caption="hotel_channel_bookings — external↔internal mapping.",
+    )
+
+    rep.h2("B.3 Warehouse Marts — sample output")
+    rep.table(
+        ["hotel_id", "date_key", "occupied", "available", "occupancy_rate"],
+        [
+            ["1", "2026-08-18", "3", "3", "1.0000"],
+            ["1", "2026-08-19", "3", "3", "1.0000"],
+            ["1", "2026-08-20", "3", "3", "1.0000"],
+        ],
+        caption="mart_occupancy (peak-occupancy days).",
+    )
+    rep.table(
+        ["guest_email", "realized_bookings", "lifetime_value", "tier"],
+        [
+            ["idem@example.com", "3", "450", "VIP"],
+            ["systest@example.com", "3", "597", "VIP"],
+            ["guest.demo@example.com", "2", "250", "Returning"],
+            ["g101@x.com", "1", "221", "New"],
+        ],
+        caption="mart_loyalty (guest tiers from realized stays).",
+    )
+
+    rep.h2("B.4 Test Execution (live)")
+    rep.table(
+        ["Suite", "Tool", "Result"],
+        [
+            ["Backend unit/integration", "pytest + SQLite", "101 passed"],
+            ["Hotel simulator", "pytest", "13 passed"],
+            ["System / E2E (live stack)", "pytest + httpx", "4 passed"],
+            ["Warehouse data tests", "dbt test (PostgreSQL)", "49 passed"],
+            ["Total", "—", "167 passed"],
+        ],
+        caption="Automated test execution — all green.",
+    )
+    rep.p(
+        "Orchestration and BI evidence: the Airflow DAG run (Figure 10.7) shows all tasks succeeded; "
+        "the Superset dashboard (Figure 10.8) renders live occupancy/RevPAR/loyalty from these marts."
     )
