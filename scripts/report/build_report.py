@@ -28,7 +28,7 @@ from docx.shared import Inches, Pt, RGBColor
 
 ROOT = Path(__file__).resolve().parents[2]
 FIG_DIR = Path(__file__).resolve().parent / "figures"
-OUT = ROOT / "docs" / "report" / "NextStay_Report.docx"
+OUT = Path(os.getenv("REPORT_OUT", str(ROOT / "docs" / "report" / "NextStay_Report.docx")))
 
 ACCENT = RGBColor(0x2B, 0x6C, 0xB0)
 
@@ -215,6 +215,29 @@ class Report:
         cr.italic = True
         cr.font.size = Pt(9)
         self.doc.add_paragraph()
+
+    def image(self, path, caption: str):
+        from pathlib import Path as _P
+
+        if not _P(path).exists():
+            ph = self.doc.add_paragraph()
+            pr = ph.add_run(f"[screenshot pending: {caption}]")
+            pr.italic = True
+            return
+        self.doc.add_picture(str(path), width=Inches(6.2))
+        self.doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        cap = self.doc.add_paragraph()
+        cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        cr = cap.add_run(caption)
+        cr.italic = True
+        cr.font.size = Pt(9)
+        self.doc.add_paragraph()
+
+    def code(self, text: str):
+        p = self.doc.add_paragraph()
+        run = p.add_run(text)
+        run.font.name = "Consolas"
+        run.font.size = Pt(8.5)
 
     def save(self):
         OUT.parent.mkdir(parents=True, exist_ok=True)
