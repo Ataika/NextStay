@@ -154,8 +154,6 @@ async def stripe_webhook(
 
     if event["type"] == "checkout.session.completed":
         handle_checkout_session_completed(event["data"]["object"], db, background_tasks)
-    elif event["type"] == "payment_intent.succeeded":
-        handle_payment_intent_succeeded(event["data"]["object"], db)
 
     return {"status": "success"}
 
@@ -212,7 +210,3 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
         )
 
     logger.info("Booking %d confirmed via Stripe webhook.", booking_id)
-
-
-def handle_payment_intent_succeeded(payment_intent: dict, db: Session):
-    pass

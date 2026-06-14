@@ -230,7 +230,7 @@ def get_available_rooms(
     db: Session = Depends(get_db),
 ):
     try:
-        check_in_date, check_out_date, nights = parse_booking_dates(checkIn, checkOut)
+        check_in_date, check_out_date, _ = parse_booking_dates(checkIn, checkOut)
     except (ValueError, AttributeError) as err:
         raise HTTPException(
             status_code=400,

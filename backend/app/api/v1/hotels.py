@@ -25,7 +25,6 @@ class AvailableHotelResponse(BaseModel):
     address: str | None = None
     minPricePerNight: float
     availableRoomCount: int
-    nights: int
 
 
 class AvailableHotelsResponse(BaseModel):
@@ -41,7 +40,7 @@ def get_available_hotels(
     db: Session = Depends(get_db),
 ):
     try:
-        check_in_date, check_out_date, nights = parse_booking_dates(checkIn, checkOut)
+        check_in_date, check_out_date, _ = parse_booking_dates(checkIn, checkOut)
     except (ValueError, AttributeError) as err:
         raise HTTPException(
             status_code=400,
@@ -77,7 +76,6 @@ def get_available_hotels(
                 address=profile.address,
                 minPricePerNight=round(min_price, 2),
                 availableRoomCount=len(available_rooms),
-                nights=nights,
             )
         )
 

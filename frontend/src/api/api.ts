@@ -891,7 +891,6 @@ export interface AvailableHotel {
   address: string | null;
   minPricePerNight: number;
   availableRoomCount: number;
-  nights: number;
 }
 
 export const hotelsApi = {

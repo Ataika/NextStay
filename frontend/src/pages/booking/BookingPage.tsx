@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { roomsApi, bookingsApi, stripeApi, holdsApi, hotelsApi } from "../../api/api";
 import type { HoldResponse, AvailableHotel } from "../../api/api";
 import Button from "../../ui/Button";
@@ -51,7 +50,6 @@ function toIsoDateTime(date: string, hour: "checkIn" | "checkOut"): string {
 
 export default function BookingPage() {
   const { t, locale } = useI18n();
-  const navigate = useNavigate();
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [step, setStep] = useState<BookingStep>("dates");
@@ -64,12 +62,9 @@ export default function BookingPage() {
   const [bookingData, setBookingData] = useState({
     guestName: "",
     email: "",
-    phone: "",
     specialRequests: "",
   });
   const [submitting, setSubmitting] = useState(false);
-  const [bookingComplete, setBookingComplete] = useState(false);
-  const [guestToken, setGuestToken] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   const [activeHold, setActiveHold] = useState<HoldResponse | null>(null);
@@ -289,123 +284,6 @@ export default function BookingPage() {
       setSubmitting(false);
     }
   };
-
-  const handleAccessRoom = () => {
-    if (guestToken) {
-      navigate(`/guest/${guestToken}`);
-    }
-  };
-
-  // Booking complete screen
-  if (bookingComplete && guestToken) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center px-4 py-8">
-        <Card className="max-w-2xl w-full" padding="lg">
-          <div className="text-center mb-6">
-            <div className="inline-block bg-green-100 dark:bg-green-900/30 rounded-full p-4 mb-4">
-              <svg
-                className="w-16 h-16 text-green-600 dark:text-green-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-              {t("bookingPage.bookingConfirmed")}
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mb-6">
-              {t("bookingPage.reservationCreated")}
-            </p>
-          </div>
-
-          {selectedRoom && (
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                {t("bookingPage.bookingDetails")}
-              </h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">{t("bookingPage.guestLabel")}</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {bookingData.guestName}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">{t("bookingPage.roomLabel")}</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {selectedRoom.number} ({selectedRoom.category})
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">{t("bookingPage.checkInLabel2")}</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(checkIn).toLocaleDateString(locale, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">{t("bookingPage.checkOutLabel2")}</span>
-                  <span className="font-medium text-gray-900 dark:text-white">
-                    {new Date(checkOut).toLocaleDateString(locale, {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">{t("bookingPage.totalLabel")}</span>
-                  <span className="font-bold text-lg text-blue-600 dark:text-blue-400">
-                    ${selectedRoom.totalPrice.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <Button variant="primary" fullWidth size="lg" onClick={handleAccessRoom}>
-              {t("bookingPage.accessRoom")}
-            </Button>
-            <Button
-              variant="secondary"
-              fullWidth
-              onClick={() => {
-                setBookingComplete(false);
-                setCheckIn("");
-                setCheckOut("");
-                resetFlow();
-                setBookingData({
-                  guestName: "",
-                  email: "",
-                  phone: "",
-                  specialRequests: "",
-                });
-              }}
-            >
-              {t("bookingPage.bookAnother")}
-            </Button>
-          </div>
-
-          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-            <p className="text-sm text-blue-800 dark:text-blue-300">
-              {t("bookingPage.tipSaveLink")}
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
@@ -787,7 +665,7 @@ export default function BookingPage() {
             <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-gray-900 dark:text-white">
-                  Room {selectedRoom.number}
+                  {t("bookingPage.roomNumber", { number: selectedRoom.number })}
                 </span>
                 <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
                   ${selectedRoom.totalPrice.toFixed(2)}
@@ -795,7 +673,8 @@ export default function BookingPage() {
               </div>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {new Date(checkIn).toLocaleDateString(locale)} -{" "}
-                {new Date(checkOut).toLocaleDateString(locale)} ({selectedRoom.nights} nights)
+                {new Date(checkOut).toLocaleDateString(locale)} ({selectedRoom.nights}{" "}
+                {selectedRoom.nights !== 1 ? t("bookingPage.nightsPlural") : t("bookingPage.nights")})
               </p>
             </div>
 
@@ -828,21 +707,6 @@ export default function BookingPage() {
                 required
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                 placeholder={t("bookingPage.emailPlaceholder")}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t("bookingPage.phoneOptional")}
-              </label>
-              <input
-                type="tel"
-                value={bookingData.phone}
-                onChange={(e) =>
-                  setBookingData({ ...bookingData, phone: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                placeholder="+1 (555) 123-4567"
               />
             </div>
 
