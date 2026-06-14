@@ -8,6 +8,7 @@ class HotelProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     hotel_name = Column(String(255), nullable=False, default="My Hotel")
+    city = Column(String(100), nullable=True)
     address = Column(Text, nullable=True)
     lat = Column(Double, nullable=True)
     lng = Column(Double, nullable=True)

@@ -86,9 +86,12 @@ export const roomsApi = {
     return response.data;
   },
 
-  getAvailable: async (checkIn: string, checkOut: string, category?: string, capacity?: number) => {
+  getAvailable: async (
+    checkIn: string,
+    checkOut: string,
+    options?: { category?: string; capacity?: number; hotelId?: number },
+  ) => {
     if (USE_MOCK_API) {
-      // Mock implementation - return all available rooms
       const rooms = await mockApi.rooms.getAll();
       return {
         availableRooms: rooms.filter(r => r.status === "Available"),
@@ -97,8 +100,9 @@ export const roomsApi = {
       };
     }
     const params = new URLSearchParams({ checkIn, checkOut });
-    if (category) params.append("category", category);
-    if (capacity) params.append("capacity", capacity.toString());
+    if (options?.category) params.append("category", options.category);
+    if (options?.capacity) params.append("capacity", options.capacity.toString());
+    if (options?.hotelId) params.append("hotelId", options.hotelId.toString());
     const response = await http.get(`/rooms/available?${params.toString()}`);
     return response.data;
   },
@@ -855,6 +859,7 @@ export const chatApi = {
 export interface HotelProfileData {
   id: number;
   hotel_name: string;
+  city: string | null;
   address: string | null;
   lat: number | null;
   lng: number | null;
@@ -876,6 +881,24 @@ export const hotelProfileApi = {
   update: async (data: Partial<Omit<HotelProfileData, "id">>): Promise<HotelProfileData> => {
     const res = await http.patch("/hotel/profile", data);
     return res.data;
+  },
+};
+
+export interface AvailableHotel {
+  id: number;
+  hotelName: string;
+  city: string | null;
+  address: string | null;
+  minPricePerNight: number;
+  availableRoomCount: number;
+  nights: number;
+}
+
+export const hotelsApi = {
+  getAvailable: async (checkIn: string, checkOut: string): Promise<{ hotels: AvailableHotel[]; checkIn: string; checkOut: string }> => {
+    const params = new URLSearchParams({ checkIn, checkOut });
+    const response = await http.get(`/hotels/available?${params.toString()}`);
+    return response.data;
   },
 };
 

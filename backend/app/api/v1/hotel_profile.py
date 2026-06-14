@@ -26,6 +26,7 @@ def get_db():
 class HotelProfileOut(BaseModel):
     id: int
     hotel_name: str
+    city: str | None = None
     address: str | None
     lat: float | None
     lng: float | None
@@ -43,6 +44,7 @@ class HotelProfileOut(BaseModel):
 
 class HotelProfileUpdate(BaseModel):
     hotel_name: str | None = Field(None, min_length=1, max_length=255)
+    city: str | None = Field(None, max_length=100)
     address: str | None = None
     lat: float | None = Field(None, ge=-90, le=90)
     lng: float | None = Field(None, ge=-180, le=180)

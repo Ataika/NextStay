@@ -4,14 +4,14 @@ from uuid import uuid4
 
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
-from app.models.booking import Booking as BookingModel
 from app.models.room import Room as RoomModel
+from app.services.room_availability import get_available_rooms_for_stay, parse_booking_dates
 from app.models.user import User as UserModel
 from app.security.auth import require_roles
 from app.security.tenancy import require_hotel_id
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["rooms"])
@@ -104,6 +104,10 @@ class AvailableRoomResponse(BaseModel):
     capacity: int
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    bedType: str | None = None
+    viewType: str | None = None
+    areaSqm: int | None = None
     totalPrice: float
     nights: int
 
@@ -226,8 +230,7 @@ def get_available_rooms(
     db: Session = Depends(get_db),
 ):
     try:
-        check_in_date = datetime.fromisoformat(checkIn.replace("Z", "+00:00"))
-        check_out_date = datetime.fromisoformat(checkOut.replace("Z", "+00:00"))
+        check_in_date, check_out_date, nights = parse_booking_dates(checkIn, checkOut)
     except (ValueError, AttributeError) as err:
         raise HTTPException(
             status_code=400,
@@ -241,51 +244,14 @@ def get_available_rooms(
     if check_out_date <= check_in_date:
         raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
 
-    nights = (check_out_date - check_in_date).days
-
-    query = db.query(RoomModel).filter(RoomModel.status == "Available")
-    if hotelId is not None:
-        query = query.filter(RoomModel.hotel_id == hotelId)
-    if category:
-        query = query.filter(RoomModel.category == category)
-    if capacity:
-        query = query.filter(RoomModel.capacity >= capacity)
-
-    all_rooms = query.all()
-
-    conflicting_bookings = (
-        db.query(BookingModel)
-        .filter(
-            and_(
-                BookingModel.status.in_(["Upcoming", "Checked-in"]),
-                or_(
-                    and_(BookingModel.check_in >= check_in_date, BookingModel.check_in < check_out_date),
-                    and_(BookingModel.check_out > check_in_date, BookingModel.check_out <= check_out_date),
-                    and_(BookingModel.check_in <= check_in_date, BookingModel.check_out >= check_out_date),
-                ),
-            )
-        )
-        .all()
+    available_rooms, nights = get_available_rooms_for_stay(
+        db,
+        check_in_date,
+        check_out_date,
+        hotel_id=hotelId,
+        category=category,
+        capacity=capacity,
     )
-
-    conflicting_room_ids = {booking.room_id for booking in conflicting_bookings}
-
-    held_rows = db.execute(
-        text(
-            """
-            SELECT DISTINCT room_id FROM room_holds
-            WHERE expires_at > :now
-              AND check_in < :check_out
-              AND check_out > :check_in
-            """
-        ),
-        {"now": datetime.now(), "check_in": check_in_date, "check_out": check_out_date},
-    ).fetchall()
-    held_room_ids = {row[0] for row in held_rows}
-
-    available_rooms = [
-        room for room in all_rooms if room.id not in conflicting_room_ids and room.id not in held_room_ids
-    ]
 
     return AvailabilityResponse(
         availableRooms=[
@@ -297,6 +263,10 @@ def get_available_rooms(
                 capacity=room.capacity,
                 description=room.description,
                 amenities=room.amenities if room.amenities else [],
+                photoUrl=room.photo_url,
+                bedType=room.bed_type,
+                viewType=room.view_type,
+                areaSqm=room.area_sqm,
                 totalPrice=round(room.price * nights, 2),
                 nights=nights,
             )

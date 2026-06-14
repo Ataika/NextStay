@@ -14,6 +14,8 @@ MIGRATION_ORDER = [
     "add_email_otps.sql",
     "add_stripe_fields.sql",
     "add_hotel_profile.sql",
+    "add_city_to_hotel_profile.sql",
+    "add_room_holds.sql",
     "add_chat_messages.sql",
     "add_chat_conversations.sql",
     "add_chat_wallpaper_to_users.sql",

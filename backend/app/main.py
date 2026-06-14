@@ -9,6 +9,7 @@ from app.api.v1.guest import router as guest_router
 from app.api.v1.health import router as health_router
 from app.api.v1.holds import router as holds_router
 from app.api.v1.hotel_profile import router as hotel_profile_router
+from app.api.v1.hotels import router as hotels_router
 from app.api.v1.inventory_setup import router as inventory_setup_router
 from app.api.v1.pricing_config import router as pricing_config_router
 from app.api.v1.pricing_lab import router as pricing_lab_router
@@ -102,6 +103,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(register_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(hotel_profile_router, prefix="/api/v1")
+app.include_router(hotels_router, prefix="/api/v1")
 app.include_router(rooms_router, prefix="/api/v1")
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(bookings_router, prefix="/api/v1")

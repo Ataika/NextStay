@@ -1,6 +1,7 @@
 import stripe
 from app.core.config import FRONTEND_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 from app.core.logging import get_logger
+from app.core.utils import count_stay_nights
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
 from app.models.room import Room as RoomModel
@@ -52,7 +53,7 @@ async def create_checkout_session(request: CreateCheckoutSessionRequest, db: Ses
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    nights = (booking.check_out - booking.check_in).days
+    nights = count_stay_nights(booking.check_in, booking.check_out)
     total_amount = room.price * nights
 
     try:
@@ -102,19 +103,28 @@ def confirm_and_get_booking(session_id: str, db: Session = Depends(get_db)):
         session = stripe.checkout.Session.retrieve(session_id)
     except stripe.error.StripeError as err:
         raise HTTPException(status_code=400, detail=f"Invalid session: {str(err)}") from err
-    if session.get("payment_status") != "paid":
+
+    payment_status = getattr(session, "payment_status", None)
+    if payment_status != "paid":
         raise HTTPException(status_code=400, detail="Payment not completed for this session.")
-    booking_id = int(session["metadata"]["booking_id"])
+
+    metadata = getattr(session, "metadata", None) or {}
+    booking_id_raw = metadata.get("booking_id") if isinstance(metadata, dict) else getattr(metadata, "booking_id", None)
+    if not booking_id_raw:
+        raise HTTPException(status_code=400, detail="Booking reference missing from Stripe session.")
+    booking_id = int(booking_id_raw)
+
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
     if booking.status == "Pending":
         booking.status = "Confirmed"
-        booking.stripe_payment_intent_id = session.get("payment_intent")
-        booking.amount_paid = (session.get("amount_total") or 0) / 100
+        booking.stripe_payment_intent_id = getattr(session, "payment_intent", None)
+        amount_total = getattr(session, "amount_total", None) or 0
+        booking.amount_paid = amount_total / 100
         room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
         if room:
-            nights = (booking.check_out - booking.check_in).days
+            nights = count_stay_nights(booking.check_in, booking.check_out)
             booking.amount_paid = room.price * nights
         db.commit()
         db.refresh(booking)
@@ -164,7 +174,7 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
 
     room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
     if room:
-        nights = (booking.check_out - booking.check_in).days
+        nights = count_stay_nights(booking.check_in, booking.check_out)
         booking.amount_paid = room.price * nights
 
     db.commit()
