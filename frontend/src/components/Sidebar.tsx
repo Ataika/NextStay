@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore, canAccessEngine } from "../store/authStore";
 import { useTaskNotifications } from "../hooks/useTaskNotifications";
+import { useChatNotifications } from "../hooks/useChatNotifications";
 import { useI18n } from "../i18n";
 import type { UserRole } from "../store/authStore";
 
@@ -9,7 +10,7 @@ interface SidebarItem {
   label: string;
   roles: UserRole[];
   exact?: boolean;
-  badge?: "tasks";
+  badge?: "tasks" | "chat";
 }
 
 const adminItems: SidebarItem[] = [
@@ -17,7 +18,7 @@ const adminItems: SidebarItem[] = [
   { path: "/bookings", label: "Bookings", roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
   { path: "/team",     label: "Team",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
   { path: "/reports",  label: "Reports",  roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
-  { path: "/chat",     label: "Chat",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"] },
+  { path: "/chat",     label: "Chat",     roles: ["OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"], badge: "chat" },
 ];
 
 const staffItems: SidebarItem[] = [
@@ -26,7 +27,7 @@ const staffItems: SidebarItem[] = [
   { path: "/staff/schedule",  label: "Schedule", roles: ["STAFF"] },
   { path: "/staff/calendar",  label: "Calendar", roles: ["STAFF"] },
   { path: "/staff/hours",     label: "Hours",    roles: ["STAFF"] },
-  { path: "/chat",            label: "Chat",     roles: ["STAFF"] },
+  { path: "/chat",            label: "Chat",     roles: ["STAFF"], badge: "chat" },
 ];
 
 const ENGINE_PATHS = ["/engine", "/inventory-setup", "/pricing-lab", "/model-training", "/engine-tuning"];
@@ -43,6 +44,7 @@ export default function Sidebar() {
   const name = useAuthStore((s) => s.name);
   const { t } = useI18n();
   const { activeTaskCount, hasUrgentTask } = useTaskNotifications();
+  const { unreadCount: chatUnreadCount } = useChatNotifications();
 
   const isStaff = role === "STAFF";
   const items = isStaff ? staffItems : adminItems;
@@ -77,9 +79,11 @@ export default function Sidebar() {
             {visibleItems.map((item) => {
               const isActive = isItemActive(location.pathname, item.path, item.exact);
               const showBadge = item.badge === "tasks" && activeTaskCount > 0;
+              const showChatBadge = item.badge === "chat" && chatUnreadCount > 0;
               const badgeClass = hasUrgentTask
                 ? "bg-red-500 text-white"
                 : "bg-amber-400 text-amber-950";
+              const chatBadgeClass = "bg-blue-500 text-white";
 
               return (
                 <li key={item.path}>
@@ -100,6 +104,13 @@ export default function Sidebar() {
                         className={`min-w-[1.125rem] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center tabular-nums ${badgeClass}`}
                       >
                         {activeTaskCount}
+                      </span>
+                    )}
+                    {showChatBadge && (
+                      <span
+                        className={`min-w-[1.125rem] h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center tabular-nums ${chatBadgeClass}`}
+                      >
+                        {chatUnreadCount > 99 ? "99+" : chatUnreadCount}
                       </span>
                     )}
                   </Link>

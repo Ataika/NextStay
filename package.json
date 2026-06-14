@@ -1,0 +1,12 @@
+{
+  "name": "nextstay",
+  "private": true,
+  "scripts": {
+    "dev": "docker compose up db backend frontend",
+    "dev:detached": "docker compose up -d db backend frontend",
+    "dev:db": "docker compose up -d db",
+    "dev:stop": "docker compose stop backend frontend",
+    "dev:down": "docker compose down",
+    "dev:logs": "docker compose logs -f backend frontend"
+  }
+}

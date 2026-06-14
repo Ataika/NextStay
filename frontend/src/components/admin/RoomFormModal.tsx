@@ -3,7 +3,8 @@ import type { Room } from "../../mocks/rooms";
 import Modal from "../../ui/Modal";
 import Button from "../../ui/Button";
 import { useI18n } from "../../i18n";
-import { getAmenityIcon, inferRoomFloor } from "../../utils/roomDisplay";
+import { roomsApi } from "../../api/api";
+import { getAmenityIcon, inferRoomFloor, resolveMediaUrl } from "../../utils/roomDisplay";
 import {
   BED_TYPE_OPTIONS,
   CUSTOM_CATEGORY_OPTION,
@@ -74,7 +75,11 @@ export default function RoomFormModal({
   const [useCustomCategory, setUseCustomCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [showDetails, setShowDetails] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoUrlInputRef = useRef<HTMLInputElement>(null);
+  const photoFileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -123,11 +128,59 @@ export default function RoomFormModal({
       toast.error(t("admin.photoLimit", { count: String(MAX_ROOM_PHOTOS) }));
       return;
     }
-    setPhotoUrls((prev) => [...prev, url]);
+    setPhotoUrls((prev) => {
+      const next = [...prev, url];
+      setForm((f) => ({ ...f, photoUrl: f.photoUrl ?? url }));
+      return next;
+    });
     setPhotoInput("");
-    if (photoUrls.length === 0) {
-      setForm((prev) => ({ ...prev, photoUrl: url }));
+  };
+
+  const uploadPhotoFiles = async (files: FileList | File[]) => {
+    const fileList = Array.from(files);
+    if (fileList.length === 0) return;
+
+    const remaining = MAX_ROOM_PHOTOS - photoUrls.length;
+    if (remaining <= 0) {
+      toast.error(t("admin.photoLimit", { count: String(MAX_ROOM_PHOTOS) }));
+      return;
     }
+
+    setUploadingPhotos(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of fileList.slice(0, remaining)) {
+        if (!file.type.startsWith("image/")) {
+          toast.error(t("admin.photoInvalidType"));
+          continue;
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+          toast.error(t("admin.photoTooLarge"));
+          continue;
+        }
+        const url = await roomsApi.uploadPhoto(file);
+        uploaded.push(url);
+      }
+
+      if (uploaded.length === 0) return;
+
+      setPhotoUrls((prev) => {
+        const next = [...prev, ...uploaded].slice(0, MAX_ROOM_PHOTOS);
+        setForm((f) => ({ ...f, photoUrl: f.photoUrl ?? next[0] ?? null }));
+        return next;
+      });
+      toast.success(t("admin.photoUploadSuccess"));
+    } catch {
+      toast.error(t("admin.photoUploadFailed"));
+    } finally {
+      setUploadingPhotos(false);
+      if (photoFileInputRef.current) photoFileInputRef.current.value = "";
+    }
+  };
+
+  const handlePhotoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) void uploadPhotoFiles(files);
   };
 
   const removePhoto = (index: number) => {
@@ -302,21 +355,31 @@ export default function RoomFormModal({
             </h3>
             <div
               className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-5 text-center bg-gray-50/50 dark:bg-gray-900/30 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 transition-colors"
-              onClick={() => fileInputRef.current?.focus()}
+              onClick={() => photoFileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                toast(t("admin.photoUrlHint"));
+                if (e.dataTransfer.files.length > 0) {
+                  void uploadPhotoFiles(e.dataTransfer.files);
+                }
               }}
             >
               <p className="text-2xl mb-2">📷</p>
               <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                {t("admin.uploadPhotos")}
+                {uploadingPhotos ? t("admin.photoUploading") : t("admin.uploadPhotos")}
               </p>
               <p className="text-xs text-gray-500 mt-1">{t("admin.photoDropHint")}</p>
-              <div className="mt-3 flex gap-2 max-w-md mx-auto">
+              <input
+                ref={photoFileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={handlePhotoFileChange}
+              />
+              <div className="mt-3 flex gap-2 max-w-md mx-auto" onClick={(e) => e.stopPropagation()}>
                 <input
-                  ref={fileInputRef}
+                  ref={photoUrlInputRef}
                   type="url"
                   value={photoInput}
                   onChange={(e) => setPhotoInput(e.target.value)}
@@ -324,17 +387,16 @@ export default function RoomFormModal({
                   placeholder="https://..."
                   className="flex-1 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                 />
-                <Button type="button" size="sm" variant="secondary" onClick={addPhotoUrl}>
+                <Button type="button" size="sm" variant="secondary" onClick={addPhotoUrl} disabled={uploadingPhotos}>
                   +
                 </Button>
               </div>
-              <input type="file" accept="image/*" className="hidden" />
             </div>
             {photoUrls.length > 0 && (
               <div className="flex gap-2 mt-3 flex-wrap">
                 {photoUrls.map((url, index) => (
-                  <div key={url} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  <div key={`${url}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                    <img src={resolveMediaUrl(url)} alt="" className="w-full h-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removePhoto(index)}
@@ -347,8 +409,9 @@ export default function RoomFormModal({
                 {photoUrls.length < MAX_ROOM_PHOTOS && (
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.focus()}
-                    className="w-16 h-16 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-400 text-xl"
+                    onClick={() => photoFileInputRef.current?.click()}
+                    disabled={uploadingPhotos}
+                    className="w-16 h-16 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-gray-400 text-xl disabled:opacity-50"
                   >
                     +
                   </button>

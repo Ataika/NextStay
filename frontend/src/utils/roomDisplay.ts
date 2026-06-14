@@ -36,8 +36,16 @@ const AMENITY_ICONS: Record<string, string> = {
   Terrace: "🌴",
 };
 
+export function resolveMediaUrl(url: string): string {
+  if (!url) return url;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+  const origin = apiBase.replace(/\/api\/v1\/?$/, "");
+  return `${origin}${url.startsWith("/") ? url : `/${url}`}`;
+}
+
 export function getRoomPhotoUrl(room: Room): string {
-  if (room.photoUrl) return room.photoUrl;
+  if (room.photoUrl) return resolveMediaUrl(room.photoUrl);
   return CATEGORY_PHOTOS[room.category] ?? CATEGORY_PHOTOS.Standard;
 }
 

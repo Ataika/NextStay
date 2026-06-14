@@ -1,4 +1,6 @@
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
@@ -7,13 +9,22 @@ from app.models.room import Room as RoomModel
 from app.models.user import User as UserModel
 from app.security.auth import require_roles
 from app.security.tenancy import require_hotel_id
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["rooms"])
 logger = get_logger(__name__)
+
+ROOM_PHOTOS_DIR = Path(__file__).resolve().parents[3] / "uploads" / "rooms"
+MAX_ROOM_PHOTO_BYTES = 5 * 1024 * 1024
+ALLOWED_ROOM_PHOTO_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
 
 VALID_ROOM_STATUSES = {"Available", "Occupied", "Cleaning", "Out of Service"}
 ACCEPTED_ROOM_STATUSES = VALID_ROOM_STATUSES | {"Maintenance"}
@@ -399,6 +410,36 @@ def update_room(
     db.refresh(db_room)
     pricing_map = load_latest_room_pricing(db)
     return serialize_room(db_room, pricing_map)
+
+
+class RoomPhotoUploadResponse(BaseModel):
+    url: str
+
+
+@router.post("/rooms/upload-photo", response_model=RoomPhotoUploadResponse, status_code=201)
+async def upload_room_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+):
+    require_hotel_id(current_user, db)
+    content_type = (file.content_type or "").lower()
+    extension = ALLOWED_ROOM_PHOTO_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPEG, PNG, WebP, or GIF.")
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(payload) > MAX_ROOM_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image is too large. Maximum size is 5 MB.")
+
+    ROOM_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}{extension}"
+    destination = ROOM_PHOTOS_DIR / filename
+    destination.write_bytes(payload)
+
+    return RoomPhotoUploadResponse(url=f"/api/v1/uploads/rooms/{filename}")
 
 
 @router.delete("/rooms/{room_id}", status_code=204)

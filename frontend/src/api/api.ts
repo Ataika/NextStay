@@ -125,6 +125,15 @@ export const roomsApi = {
     }
     await http.delete(`/rooms/${id}`);
   },
+
+  uploadPhoto: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await http.post("/rooms/upload-photo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data.url as string;
+  },
 };
 
 // Tasks API
@@ -780,6 +789,7 @@ export interface ChatConversation {
   participants: ChatParticipant[];
   last_message_preview: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export interface ChatUserOption {
@@ -831,6 +841,10 @@ export const chatApi = {
 
   deleteMessage: async (messageId: number): Promise<void> => {
     await http.delete(`/chat/messages/${messageId}`);
+  },
+
+  markConversationRead: async (conversationId: number): Promise<void> => {
+    await http.post(`/chat/conversations/${conversationId}/read`);
   },
 };
 

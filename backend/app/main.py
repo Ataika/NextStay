@@ -1,5 +1,6 @@
 import os
 import sys
+from pathlib import Path
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.bookings import router as bookings_router
@@ -26,6 +27,7 @@ from app.db.bootstrap import prepare_database
 from app.exceptions import register_exception_handlers
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -115,6 +117,11 @@ app.include_router(staff_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 
 register_exception_handlers(app)
+
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "uploads"
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+(UPLOADS_DIR / "rooms").mkdir(parents=True, exist_ok=True)
+app.mount("/api/v1/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 @app.on_event("startup")

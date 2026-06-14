@@ -50,6 +50,7 @@ function upsertConversation(conversations: ChatConversation[], next: ChatConvers
 
 export function useChat() {
   const token = useAuthStore((state) => state.token);
+  const userId = useAuthStore((state) => state.userId);
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [messagesByConversation, setMessagesByConversation] = useState<MessagesByConversation>({});
@@ -64,6 +65,7 @@ export function useChat() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unmounted = useRef(false);
   const onlineRef = useRef<OnlineUser[]>([]);
+  const activeConversationIdRef = useRef<number | null>(null);
 
   // Purge expired typing indicators every second
   useEffect(() => {
@@ -93,16 +95,36 @@ export function useChat() {
     });
   }, []);
 
+  const markConversationRead = useCallback(async (conversationId: number) => {
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === conversationId
+          ? { ...conversation, unread_count: 0 }
+          : conversation
+      )
+    );
+    try {
+      await chatApi.markConversationRead(conversationId);
+      window.dispatchEvent(new CustomEvent("chat-unread-changed"));
+    } catch {
+      /* keep optimistic UI */
+    }
+  }, []);
+
   const loadMessages = useCallback(async (conversationId: number, force = false) => {
-    if (!force && messagesByConversation[conversationId]) return;
+    if (!force && messagesByConversation[conversationId]) {
+      void markConversationRead(conversationId);
+      return;
+    }
     setLoadingMessages(true);
     try {
       const msgs = await chatApi.getMessages(conversationId, 100);
       setMessagesByConversation((current) => ({ ...current, [conversationId]: msgs }));
+      await markConversationRead(conversationId);
     } finally {
       setLoadingMessages(false);
     }
-  }, [messagesByConversation]);
+  }, [markConversationRead, messagesByConversation]);
 
   useEffect(() => {
     if (!token) {
@@ -130,6 +152,10 @@ export function useChat() {
     })();
     return () => { cancelled = true; };
   }, [refreshConversations, token]);
+
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
 
   useEffect(() => {
     if (!activeConversationId) return;
@@ -208,6 +234,9 @@ export function useChat() {
 
         if (type === "message") {
           const message = data as unknown as ChatMessageItem;
+          const isActiveConversation = message.conversation_id === activeConversationIdRef.current;
+          const isOwnMessage = message.sender_id === userId;
+
           setMessagesByConversation((current) => {
             const existing = current[message.conversation_id] ?? [];
             if (existing.some((item) => item.id === message.id)) return current;
@@ -223,12 +252,22 @@ export function useChat() {
                   ? `${message.sender_name}: ${message.content}`
                   : message.content,
               last_message_at: message.created_at,
+              unread_count:
+                isActiveConversation || isOwnMessage
+                  ? 0
+                  : (target.unread_count ?? 0) + 1,
             };
             return upsertConversation(
               current.map((c) => (c.id === updated.id ? updated : c)),
               updated,
             );
           });
+
+          if (isActiveConversation && !isOwnMessage) {
+            void markConversationRead(message.conversation_id);
+          } else if (!isOwnMessage) {
+            window.dispatchEvent(new CustomEvent("chat-unread-changed"));
+          }
         }
       } catch {
         // Ignore malformed frames
@@ -242,7 +281,7 @@ export function useChat() {
     };
 
     ws.onerror = () => { ws.close(); };
-  }, [refreshConversations, token]);
+  }, [markConversationRead, refreshConversations, token, userId]);
 
   useEffect(() => {
     unmounted.current = false;
@@ -262,7 +301,8 @@ export function useChat() {
 
   const selectConversation = useCallback((conversationId: number) => {
     setActiveConversationId(conversationId);
-  }, []);
+    void markConversationRead(conversationId);
+  }, [markConversationRead]);
 
   const openDirectConversation = useCallback(async (userId: number) => {
     const conversation = await chatApi.openDirectConversation(userId);
@@ -329,6 +369,10 @@ export function useChat() {
 
   const activeMessages = activeConversationId ? (messagesByConversation[activeConversationId] ?? []) : [];
   const activeTyping = activeConversationId ? (typing[activeConversationId] ?? []) : [];
+  const totalUnreadCount = useMemo(
+    () => conversations.reduce((sum, conversation) => sum + (conversation.unread_count ?? 0), 0),
+    [conversations],
+  );
 
   return {
     conversations,
@@ -340,6 +384,7 @@ export function useChat() {
     connected,
     loadingConversations,
     loadingMessages,
+    totalUnreadCount,
     selectConversation,
     openDirectConversation,
     createGroupConversation,
@@ -347,6 +392,7 @@ export function useChat() {
     sendTyping,
     editMessage,
     deleteMessage,
+    markConversationRead,
     refreshConversations,
   };
 }
