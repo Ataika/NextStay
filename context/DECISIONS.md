@@ -27,6 +27,12 @@
 - **Решение:** строим dbt-модели: `core` (dim_hotels, dim_room_types, dim_dates + SCD) и `mart` (occupancy, RevPAR, loyalty) поверх OLTP→STG.
 - **Обоснование:** разблокирует Superset-дашборды и даёт материал для отчёта; чисто DB-зона Атая.
 
+## 0006 — origin/latest интегрирован: единая сущность отеля (hotels канонична, hotel_profile = 1:1) (2026-06-15)
+- **Контекст:** настало время свести проект в целое (#46/T-03). `origin/latest` (7 коммитов Dair: tenancy `hotel_profile`+`hotel_invite`, chat, register/login, i18n, rate-limit, большой реворк фронта) разошёлся с нашей веткой; обе независимо добавили `rooms.hotel_id`, но FK смотрел в разные таблицы (`hotels` vs `hotel_profile`) — отменяет решение 0004.
+- **Решение:** полный двусторонний `git merge origin/latest` в `atai/hotel-sync-simulator` (merge-коммит `4e2dc67`, два родителя). Архитектура «отеля» — **единая сущность**: `hotels` канонична (идентичность + sync-конфиг), `rooms/users/staff.hotel_id → hotels.id`; `hotel_profile` — её **1:1 shared-PK расширение** (`hotel_profile.id` IS `hotels.id`, FK → hotels). Регистрация создаёт строку `hotels`, затем `HotelProfile(id=hotels.id)`. 10 конфликтов разрешены; rooms API теперь hotel-scoped через tenancy (`require_hotel_id`), а не через `hotelId` из тела. SQL-миграции живого стека перенацелены на `hotels(id)`.
+- **Обоснование:** канон на `hotels` сохраняет наш готовый DWH (`dim_hotels`), отчёт и 167 прежних тестов нетронутыми, при этом принимая всю tenancy/chat/фронт Dair. Shared-PK даёт чистую 1:1 без переписывания 5 scope-lookup’ов Dair (значение scope = `hotels.id` = `hotel_profile.id`). Бэкап: ветка `atai/pre-latest-merge-backup`, тег `pre-latest-merge`.
+- **Тесты:** backend 120, hotelsim 13, dbt 49 (=182) зелёные; ruff чист; фронт-импорты консистентны. **Открыто:** e2e на живом стеке (нужна пересборка backend-образа + свежая БД); ветка не запушена.
+
 <!-- Шаблон новой записи:
 ## NNNN — Заголовок (YYYY-MM-DD)
 - **Контекст:**

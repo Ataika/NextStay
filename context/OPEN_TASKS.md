@@ -1,7 +1,8 @@
 # NextStay — Open Tasks (по ответственным)
 
-Состояние тестов на 2026-06-12: **167 автоматических проверок зелёные** —
-backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиеся недочёты/пробелы.
+Состояние тестов на 2026-06-15 (после merge origin/latest, коммит `4e2dc67`): **182 автоматических
+проверки зелёные** — backend 120, hotelsim 13, dbt 49. (+ system/e2e 4 требуют пересборки живого стека.)
+Ниже — оставшиеся недочёты/пробелы.
 
 Приоритет: P1 (высокий) · P2 (средний) · P3 (низкий). Статус: TODO / IN PROGRESS / DONE.
 
@@ -9,7 +10,7 @@ backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиес�
 |---|---|---|---|---|---|
 | T-01 | Системные E2E-тесты сделать идемпотентными (уникальные даты) | Atai | P1 | ✅ DONE | `f35616a` — было: 409 overbooking при повторном прогоне |
 | T-02 | **Фронтенд-тесты (React)**: их сейчас НЕТ вовсе — добавить Vitest + React Testing Library по ключевым страницам (Login/OTP, Booking, Guest, Admin) | Turat | P1 | TODO | пробел в главе тестирования; нет защиты от регрессий UI |
-| T-03 | Интеграция `origin/latest` (мульти-арендность тиммейта): свести **дублирующий `hotel_id`/rooms** и tenancy с нашей веткой одним общим коммитом | Atai + Dair | P1 | TODO | обе ветки независимо добавили hotel_id; конфликты в room.py/rooms.py/bookings.py/conftest/main/models |
+| T-03 | Интеграция `origin/latest` (мульти-арендность тиммейта): свести **дублирующий `hotel_id`/rooms** и tenancy с нашей веткой одним общим коммитом | Atai + Dair | P1 | ✅ DONE | merge-коммит `4e2dc67` (2 родителя). Решение: `hotels` канонична, `hotel_profile` = 1:1 shared-PK (см. DECISIONS 0006). 182 теста зелёные. Остаток: e2e на живом стеке (rebuild+fresh DB), push |
 | T-04 | Свести `init-db.sql`/bootstrap, чтобы свежий `docker compose up` не падал на users (наш локальный фикс vs «migration backfill» из origin/latest) | Dair + Atai | P2 | PARTIAL | у нас fresh-init чинён локально (`ff91bea`); при merge origin/latest свести подходы |
 | T-05 | Скриншоты в отчёт: разделы 9 (PC/Mobile), 10.5 (Superset dashboard), 11 — заменить `[Insert screenshot]` | Atai (+Turat по UI) | P2 | TODO | стек поднят: localhost:5173 / 8088 |
 | T-06 | Быстрый тест inbound-флоу `hotel_sync.py` (JSONB) — сейчас покрыт только system/e2e (нужен живой PG); добавить уровень integration (PG-фикстура или мок) | Atai + Dair | P2 | TODO | unit/SQLite его не покрывает |
@@ -29,7 +30,7 @@ backend 101, hotelsim 13, system/e2e 4, dbt 49. Ниже — оставшиес�
 - ✅ T-10 → [#53](https://github.com/Ataika/NextStay/issues/53) dbt freshness/snapshots — **CLOSED** (`d5345ef`; large-data = future)
 - 🟡 T-04 → [#47](https://github.com/Ataika/NextStay/issues/47) init-db/bootstrap — PARTIAL (fresh-init done; unify pending #46)
 - ⬜ T-02 → [#45](https://github.com/Ataika/NextStay/issues/45) FE tests — gew1nn (Turat), P1
-- ⬜ T-03 → [#46](https://github.com/Ataika/NextStay/issues/46) reconcile origin/latest — Ataika+ItzDair, P1 (blocked)
+- ✅ T-03 → [#46](https://github.com/Ataika/NextStay/issues/46) reconcile origin/latest — DONE в merge `4e2dc67` (hotels канонична + hotel_profile 1:1 shared-PK); issue можно закрыть после push + e2e
 - ⬜ T-05 → [#48](https://github.com/Ataika/NextStay/issues/48) report screenshots — Ataika, P2 (ручное)
 - ⬜ T-06 → [#49](https://github.com/Ataika/NextStay/issues/49) inbound integration test — Ataika+ItzDair, P2 (покрыто E2E; нужен CI-fixture)
 - ⬜ T-08 → [#51](https://github.com/Ataika/NextStay/issues/51) deprecations — ItzDair, P3 (после #46)
