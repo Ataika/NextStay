@@ -48,11 +48,48 @@ cd frontend
 npm run dev
 ```
 
-### Option C: Docker Compose (Full Stack)
+### Option C: Docker Compose (Full Stack — recommended)
+
+One command (DB + backend + frontend, no manual uvicorn):
+
+```bash
+docker compose up db backend frontend
+```
+
+Or from repo root:
+
+```bash
+npm run dev
+```
+
+Windows PowerShell:
+
+```powershell
+.\scripts\dev.ps1
+```
+
+Detached (background):
+
+```bash
+docker compose up -d db backend frontend
+npm run dev:detached
+```
+
+Full stack including Airflow/Superset/dbt:
 
 ```bash
 docker compose up -d
 ```
+
+### Option D: Hybrid (DB in Docker, backend/frontend on host)
+
+If you prefer local Python/Node but not manual two-terminal startup:
+
+```powershell
+.\scripts\dev-local.ps1
+```
+
+Requires `.venv` with `pip install -r backend/requirements.txt` and `frontend/npm install`.
 
 ### Help
 

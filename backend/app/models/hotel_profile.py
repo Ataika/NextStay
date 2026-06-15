@@ -1,13 +1,18 @@
 from app.db.base import Base
-from sqlalchemy import Column, DateTime, Double, Integer, String, Text
+from sqlalchemy import Column, DateTime, Double, ForeignKey, Integer, String, Text
 from sqlalchemy.sql import func
 
 
 class HotelProfile(Base):
     __tablename__ = "hotel_profile"
 
-    id = Column(Integer, primary_key=True, index=True)
+    # Shared-PK 1:1 extension of the canonical `hotels` entity: hotel_profile.id IS hotels.id.
+    # `hotels` carries identity + sync config; `hotel_profile` carries the descriptive profile.
+    # autoincrement=True keeps standalone creation working (tests/SQLite); the registration flow
+    # sets id explicitly to the matching hotels.id so the 1:1 alignment holds on the live DB.
+    id = Column(Integer, ForeignKey("hotels.id", ondelete="CASCADE"), primary_key=True, autoincrement=True, index=True)
     hotel_name = Column(String(255), nullable=False, default="My Hotel")
+    city = Column(String(100), nullable=True)
     address = Column(Text, nullable=True)
     lat = Column(Double, nullable=True)
     lng = Column(Double, nullable=True)

@@ -86,9 +86,12 @@ export const roomsApi = {
     return response.data;
   },
 
-  getAvailable: async (checkIn: string, checkOut: string, category?: string, capacity?: number) => {
+  getAvailable: async (
+    checkIn: string,
+    checkOut: string,
+    options?: { category?: string; capacity?: number; hotelId?: number },
+  ) => {
     if (USE_MOCK_API) {
-      // Mock implementation - return all available rooms
       const rooms = await mockApi.rooms.getAll();
       return {
         availableRooms: rooms.filter(r => r.status === "Available"),
@@ -97,8 +100,9 @@ export const roomsApi = {
       };
     }
     const params = new URLSearchParams({ checkIn, checkOut });
-    if (category) params.append("category", category);
-    if (capacity) params.append("capacity", capacity.toString());
+    if (options?.category) params.append("category", options.category);
+    if (options?.capacity) params.append("capacity", options.capacity.toString());
+    if (options?.hotelId) params.append("hotelId", options.hotelId.toString());
     const response = await http.get(`/rooms/available?${params.toString()}`);
     return response.data;
   },
@@ -124,6 +128,15 @@ export const roomsApi = {
       return mockApi.rooms.delete(id);
     }
     await http.delete(`/rooms/${id}`);
+  },
+
+  uploadPhoto: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await http.post("/rooms/upload-photo", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data.url as string;
   },
 };
 
@@ -153,11 +166,11 @@ export const tasksApi = {
     return response.data;
   },
 
-  create: async (roomId: number, roomNumber: string, priority: "Low" | "Medium" | "High" = "Medium", notes?: string): Promise<CleaningTask> => {
+  create: async (payload: import("../mocks/tasks").CreateTaskPayload): Promise<CleaningTask> => {
     if (USE_MOCK_API && !shouldUseLiveOwnerApi()) {
-      return mockApi.tasks.create(roomId, roomNumber, priority, notes);
+      return mockApi.tasks.create(payload);
     }
-    const response = await http.post("/tasks", { roomId, roomNumber, priority, notes });
+    const response = await http.post("/tasks", payload);
     return response.data;
   },
 
@@ -166,6 +179,18 @@ export const tasksApi = {
       return mockApi.tasks.assign(taskId, staffId, staffName);
     }
     const response = await http.patch(`/tasks/${taskId}/assign`, { staffId, staffName });
+    return response.data;
+  },
+
+  updateChecklistItem: async (
+    taskId: number,
+    itemId: string,
+    checked: boolean
+  ): Promise<CleaningTask> => {
+    if (USE_MOCK_API && !shouldUseLiveOwnerApi()) {
+      return mockApi.tasks.updateChecklistItem(taskId, itemId, checked);
+    }
+    const response = await http.patch(`/tasks/${taskId}/checklist`, { itemId, checked });
     return response.data;
   },
 
@@ -221,6 +246,19 @@ export const authApi = {
       role: "OWNER" as const,
       user: { id: 1, email: DEV_LOGIN_EMAIL, name: DEV_LOGIN_NAME },
     };
+  },
+
+  checkEmail: async (email: string) => {
+    if (USE_MOCK_API) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const normalized = email.trim().toLowerCase();
+      if (normalized === "staff@nextstay.com" || normalized.endsWith("@nextstay.com") || normalized.includes("@")) {
+        return { exists: true as const };
+      }
+      throw new Error("No account found for this email.");
+    }
+    const response = await http.post("/auth/check-email", { email });
+    return response.data as { exists: boolean };
   },
 
   passwordLogin: async (email: string, password: string) => {
@@ -292,6 +330,81 @@ export const authApi = {
     prefs: { chat_wallpaper?: string | null; preferred_language?: "en" | "it" }
   ): Promise<{ chat_wallpaper: string | null; preferred_language: "en" | "it" }> => {
     const res = await http.patch("/auth/me/preferences", prefs);
+    return res.data;
+  },
+};
+
+export const registerApi = {
+  registerOwner: async (data: {
+    hotel_name: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    password: string;
+    birth_year: number;
+    gender: string;
+  }) => {
+    const res = await http.post("/auth/register/owner", data);
+    return res.data as { token: string; role: string; user: { id: number; email: string; name: string } };
+  },
+
+  verifyInvite: async (code: string) => {
+    const res = await http.post("/auth/register/verify-invite", { code });
+    return res.data as { valid: boolean; email: string; hotel_name: string };
+  },
+
+  registerStaff: async (data: {
+    code: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    password: string;
+    birth_year: number;
+    gender: string;
+  }) => {
+    const res = await http.post("/auth/register/staff", data);
+    return res.data as { token: string; role: string; user: { id: number; email: string; name: string } };
+  },
+};
+
+export interface TeamUser {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  is_active: boolean;
+}
+
+export const usersApi = {
+  list: async (): Promise<TeamUser[]> => {
+    const res = await http.get("/users");
+    return res.data;
+  },
+
+  create: async (data: {
+    email: string;
+    full_name: string;
+    role: string;
+    password: string;
+  }): Promise<TeamUser> => {
+    const res = await http.post("/users", data);
+    return res.data;
+  },
+
+  update: async (
+    id: number,
+    data: { full_name?: string; role?: string; is_active?: boolean },
+  ): Promise<TeamUser> => {
+    const res = await http.patch(`/users/${id}`, data);
+    return res.data;
+  },
+
+  delete: async (id: number): Promise<void> => {
+    await http.delete(`/users/${id}`);
+  },
+
+  invite: async (email: string): Promise<{ message: string }> => {
+    const res = await http.post("/users/invite", { email });
     return res.data;
   },
 };
@@ -613,19 +726,6 @@ export const staffApi = {
     return res.data;
   },
 
-  heartbeat: async (): Promise<void> => {
-    await http.post("/staff/heartbeat");
-  },
-
-  getShiftCode: async (): Promise<{ code: string; expires_in: number }> => {
-    const res = await http.get("/staff/shift-code");
-    return res.data;
-  },
-
-  startShift: async (code: string): Promise<{ started_at: string }> => {
-    const res = await http.post("/staff/shift-start", { code });
-    return res.data;
-  },
 };
 
 // ---------------------------------------------------------------------------
@@ -693,6 +793,7 @@ export interface ChatConversation {
   participants: ChatParticipant[];
   last_message_preview: string | null;
   last_message_at: string | null;
+  unread_count: number;
 }
 
 export interface ChatUserOption {
@@ -745,6 +846,10 @@ export const chatApi = {
   deleteMessage: async (messageId: number): Promise<void> => {
     await http.delete(`/chat/messages/${messageId}`);
   },
+
+  markConversationRead: async (conversationId: number): Promise<void> => {
+    await http.post(`/chat/conversations/${conversationId}/read`);
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -754,6 +859,7 @@ export const chatApi = {
 export interface HotelProfileData {
   id: number;
   hotel_name: string;
+  city: string | null;
   address: string | null;
   lat: number | null;
   lng: number | null;
@@ -775,6 +881,23 @@ export const hotelProfileApi = {
   update: async (data: Partial<Omit<HotelProfileData, "id">>): Promise<HotelProfileData> => {
     const res = await http.patch("/hotel/profile", data);
     return res.data;
+  },
+};
+
+export interface AvailableHotel {
+  id: number;
+  hotelName: string;
+  city: string | null;
+  address: string | null;
+  minPricePerNight: number;
+  availableRoomCount: number;
+}
+
+export const hotelsApi = {
+  getAvailable: async (checkIn: string, checkOut: string): Promise<{ hotels: AvailableHotel[]; checkIn: string; checkOut: string }> => {
+    const params = new URLSearchParams({ checkIn, checkOut });
+    const response = await http.get(`/hotels/available?${params.toString()}`);
+    return response.data;
   },
 };
 

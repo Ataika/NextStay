@@ -1,5 +1,5 @@
 from app.db.base import Base
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.sql import func
 
 
@@ -17,6 +17,10 @@ class User(Base):
     preferred_language = Column(String(10), nullable=False, server_default="'en'", default="en")
     failed_login_attempts = Column(Integer, nullable=False, server_default="0", default=0)
     locked_until = Column(DateTime(timezone=True), nullable=True)
+    birth_year = Column(Integer, nullable=True)
+    gender = Column(String(20), nullable=True)
+    # Tenancy scope = canonical hotels.id (== hotel_profile.id via shared-PK 1:1).
+    hotel_id = Column(Integer, ForeignKey("hotels.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
         DateTime(timezone=True),

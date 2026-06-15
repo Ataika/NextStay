@@ -82,6 +82,30 @@ cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+## Fresh DB: backend crashes on startup (`UndefinedColumn`, `preferred_language`, `failed_login_attempts`)
+
+**Cause:** Older `scripts/init-db.sql` created a legacy `users` table; backend migrations then INSERT rows with columns that did not exist yet.
+
+**Fix in repo (already applied):** auth tables were removed from `init-db.sql`; backend owns schema via `create_all()` + `backend/migrations/`. Migration `00_sync_user_columns.sql` aligns legacy DBs.
+
+**If you still have a broken volume from an old init:**
+
+```bash
+docker compose down
+docker volume rm nextstay_nextstay_data_v2
+docker compose up -d db backend frontend
+```
+
+Or keep data and restart backend only — migrations should add missing columns on startup.
+
+**Recommended dev start (no manual uvicorn):**
+
+```bash
+docker compose up db backend frontend
+# or: npm run dev
+# Windows: .\scripts\dev.ps1
+```
+
 ## Database migration: missing columns (e.g. `bookings.guest_email does not exist`)
 
 Run the SQL migration:

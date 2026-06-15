@@ -1,14 +1,12 @@
-import hashlib
-import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from typing import Annotated
 
-from app.core.limiter import limiter
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
 from app.models.user import User as UserModel
 from app.security.auth import get_current_user, require_roles
-from fastapi import APIRouter, Depends, HTTPException, Request
+from app.security.tenancy import require_hotel_id
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -27,14 +25,6 @@ SHIFT_HOURS: dict[str, float] = {
 VALID_ROLES = ["hostess", "cleaner", "manager", "director"]
 VALID_SHIFT_TYPES = list(SHIFT_HOURS.keys())
 
-_SHIFT_CODE_SECRET = "nextstay-shift-2026"
-
-
-def _get_shift_code(bucket_offset: int = 0) -> str:
-    bucket = int(time.time()) // 120 + bucket_offset
-    digest = hashlib.sha256(f"{_SHIFT_CODE_SECRET}:{bucket}".encode()).hexdigest()
-    return str(int(digest[:8], 16) % 900000 + 100000)  # 100000–999999
-
 
 def get_db():
     db = SessionLocal()
@@ -47,19 +37,6 @@ def get_db():
 # ---------------------------------------------------------------------------
 # Pydantic models
 # ---------------------------------------------------------------------------
-
-
-class ShiftStartRequest(BaseModel):
-    code: str
-
-
-class ShiftCodeResponse(BaseModel):
-    code: str
-    expires_in: int  # seconds until next rotation
-
-
-class ShiftStartResponse(BaseModel):
-    started_at: str  # ISO timestamp
 
 
 class StaffCreate(BaseModel):
@@ -131,12 +108,37 @@ _STATS_SQL = """
 """
 
 
-def _fetch_stats(db: Session, staff_id: int | None = None) -> list:
-    where = "WHERE sm.id = :staff_id" if staff_id is not None else ""
-    params = {"staff_id": staff_id} if staff_id is not None else {}
+def _fetch_stats(
+    db: Session,
+    staff_id: int | None = None,
+    hotel_id: int | None = None,
+) -> list:
+    conditions: list[str] = []
+    params: dict[str, int] = {}
+    if staff_id is not None:
+        conditions.append("sm.id = :staff_id")
+        params["staff_id"] = staff_id
+    if hotel_id is not None:
+        conditions.append("sm.hotel_id = :hotel_id")
+        params["hotel_id"] = hotel_id
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     return list(
         db.execute(text(_STATS_SQL.format(where=where)), params).mappings().all()  # noqa: S608
     )
+
+
+def _assert_staff_in_hotel(db: Session, staff_id: int, hotel_id: int) -> None:
+    row = db.execute(
+        text(
+            """
+            SELECT id FROM staff_members
+            WHERE id = :staff_id AND hotel_id = :hotel_id AND is_active = TRUE
+            """
+        ),
+        {"staff_id": staff_id, "hotel_id": hotel_id},
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Staff member not found")
 
 
 def _to_member(r) -> StaffMember:
@@ -168,18 +170,116 @@ def _staff_id_by_email(db: Session, email: str) -> int | None:
     return row.id if row else None
 
 
+def ensure_staff_profile(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    role: str = "cleaner",
+    hotel_id: int | None = None,
+) -> int:
+    """Create a staff_members row for a user account (e.g. room cleaner on registration)."""
+    existing = _staff_id_by_email(db, email)
+    if existing:
+        if hotel_id is not None:
+            db.execute(
+                text(
+                    """
+                    UPDATE staff_members
+                    SET hotel_id = :hotel_id
+                    WHERE id = :id AND hotel_id IS NULL
+                    """
+                ),
+                {"id": existing, "hotel_id": hotel_id},
+            )
+            db.commit()
+        return existing
+
+    staff_role = role if role in VALID_ROLES else "cleaner"
+    row = db.execute(
+        text(
+            """
+            INSERT INTO staff_members (name, role, email, annual_days_off, hotel_id)
+            VALUES (:name, :role, :email, 20, :hotel_id)
+            RETURNING id
+            """
+        ),
+        {
+            "name": name.strip(),
+            "role": staff_role,
+            "email": email.strip().lower(),
+            "hotel_id": hotel_id,
+        },
+    ).fetchone()
+    db.commit()
+    return row.id
+
+
+def _get_member_by_email(db: Session, email: str) -> StaffMember | None:
+    row = (
+        db.execute(
+            text(
+                """
+                SELECT id, name, role, email, phone, hire_date, is_active, annual_days_off
+                FROM staff_members
+                WHERE LOWER(email) = LOWER(:email) AND is_active = TRUE
+                LIMIT 1
+                """
+            ),
+            {"email": email},
+        )
+        .mappings()
+        .first()
+    )
+    if not row:
+        return None
+
+    try:
+        stats_rows = _fetch_stats(db, row["id"])
+        if stats_rows:
+            return _to_member(stats_rows[0])
+    except Exception:
+        logger.debug("Staff stats query unavailable; returning base profile.", exc_info=True)
+
+    return StaffMember(
+        id=row["id"],
+        name=row["name"],
+        role=row["role"],
+        email=row["email"],
+        phone=row["phone"],
+        hire_date=row["hire_date"].isoformat() if row["hire_date"] else None,
+        is_active=bool(row["is_active"]),
+        annual_days_off=int(row["annual_days_off"]),
+        hours_this_month=0.0,
+        days_off_this_year=0,
+    )
+
+
 @router.get("/staff/me", response_model=StaffMember)
 def get_my_profile(
     db: Annotated[Session, Depends(get_db)],
     user: UserModel = Depends(get_current_user),
 ):
-    rows = _fetch_stats(db)
-    for r in rows:
-        if (r["email"] or "").lower() == user.email.lower():
-            return _to_member(r)
+    member = _get_member_by_email(db, user.email)
+    if member:
+        return member
+
+    if user.role.upper() == "STAFF":
+        hotel_id = require_hotel_id(user, db)
+        ensure_staff_profile(
+            db,
+            name=user.full_name,
+            email=user.email,
+            role="cleaner",
+            hotel_id=hotel_id,
+        )
+        member = _get_member_by_email(db, user.email)
+        if member:
+            return member
+
     raise HTTPException(
         status_code=404,
-        detail="No staff profile linked to your account. Ask your manager to add your email to the staff list.",
+        detail="No staff profile linked to your account.",
     )
 
 
@@ -237,17 +337,19 @@ def get_my_schedule(
 @router.get("/staff", response_model=list[StaffMember])
 def list_staff(
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    return [_to_member(r) for r in _fetch_stats(db)]
+    hotel_id = require_hotel_id(user, db)
+    return [_to_member(r) for r in _fetch_stats(db, hotel_id=hotel_id)]
 
 
 @router.post("/staff", response_model=StaffMember, status_code=201)
 def create_staff_member(
     payload: StaffCreate,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
+    hotel_id = require_hotel_id(user, db)
     if payload.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_ROLES}")
 
@@ -261,8 +363,8 @@ def create_staff_member(
     row = db.execute(
         text(
             """
-            INSERT INTO staff_members (name, role, email, phone, hire_date, annual_days_off)
-            VALUES (:name, :role, :email, :phone, :hire_date, :annual_days_off)
+            INSERT INTO staff_members (name, role, email, phone, hire_date, annual_days_off, hotel_id)
+            VALUES (:name, :role, :email, :phone, :hire_date, :annual_days_off, :hotel_id)
             RETURNING id
             """
         ),
@@ -273,6 +375,7 @@ def create_staff_member(
             "phone": payload.phone,
             "hire_date": hire_date,
             "annual_days_off": payload.annual_days_off,
+            "hotel_id": hotel_id,
         },
     ).fetchone()
     db.commit()
@@ -292,8 +395,9 @@ def create_staff_member(
 def get_schedule(
     week_start: str,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
+    hotel_id = require_hotel_id(user, db)
     try:
         start = date.fromisoformat(week_start)
     except ValueError as err:
@@ -309,11 +413,12 @@ def get_schedule(
             FROM staff_shifts ss
             INNER JOIN staff_members sm ON sm.id = ss.staff_id
             WHERE sm.is_active = TRUE
+              AND sm.hotel_id = :hotel_id
               AND ss.shift_date BETWEEN :start AND :end
             ORDER BY ss.shift_date, ss.staff_id
             """
             ),
-            {"start": start, "end": end},
+            {"start": start, "end": end, "hotel_id": hotel_id},
         )
         .mappings()
         .all()
@@ -341,16 +446,18 @@ def upsert_shift(
     role = user.role.upper()
     if role not in ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"):
         raise HTTPException(status_code=403, detail="Insufficient permissions.")
-    if payload.shift_type != "off" and role not in ("OWNER", "SYS_ADMIN"):
+    if payload.shift_type != "off" and role not in ("OWNER", "MANAGER", "SYS_ADMIN"):
         raise HTTPException(
             status_code=403,
-            detail="Directors and managers may only assign days off, not work shifts.",
+            detail="Only owners and managers may assign work shifts.",
         )
     if payload.shift_type not in VALID_SHIFT_TYPES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid shift_type. Must be one of: {VALID_SHIFT_TYPES}",
         )
+    hotel_id = require_hotel_id(user, db)
+    _assert_staff_in_hotel(db, payload.staff_id, hotel_id)
     try:
         shift_date = date.fromisoformat(payload.shift_date)
     except ValueError as err:
@@ -398,15 +505,26 @@ def delete_shift(
     if role not in ("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER"):
         raise HTTPException(status_code=403, detail="Insufficient permissions.")
 
-    if role not in ("OWNER", "SYS_ADMIN"):
-        row = db.execute(
-            text("SELECT shift_type FROM staff_shifts WHERE id = :id"),
-            {"id": shift_id},
-        ).fetchone()
-        if row and row.shift_type != "off":
+    hotel_id = require_hotel_id(user, db)
+    shift_row = db.execute(
+        text(
+            """
+            SELECT ss.id, ss.shift_type
+            FROM staff_shifts ss
+            INNER JOIN staff_members sm ON sm.id = ss.staff_id
+            WHERE ss.id = :id AND sm.hotel_id = :hotel_id
+            """
+        ),
+        {"id": shift_id, "hotel_id": hotel_id},
+    ).fetchone()
+    if not shift_row:
+        raise HTTPException(status_code=404, detail="Shift not found")
+
+    if role not in ("OWNER", "MANAGER", "SYS_ADMIN"):
+        if shift_row.shift_type != "off":
             raise HTTPException(
                 status_code=403,
-                detail="Directors and managers can only clear days off, not work shifts.",
+                detail="Only owners and managers can clear work shifts.",
             )
 
     affected = db.execute(
@@ -429,11 +547,12 @@ def update_staff_member(
     staff_id: int,
     payload: StaffUpdate,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
     if payload.role is not None and payload.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {VALID_ROLES}")
 
+    hotel_id = require_hotel_id(user, db)
     affected = db.execute(
         text(
             """
@@ -444,11 +563,12 @@ def update_staff_member(
                 phone           = COALESCE(:phone,           phone),
                 is_active       = COALESCE(:is_active,       is_active),
                 annual_days_off = COALESCE(:annual_days_off, annual_days_off)
-            WHERE id = :id
+            WHERE id = :id AND hotel_id = :hotel_id
             """
         ),
         {
             "id": staff_id,
+            "hotel_id": hotel_id,
             "name": payload.name,
             "role": payload.role,
             "email": payload.email,
@@ -468,54 +588,16 @@ def update_staff_member(
     return _to_member(rows[0])
 
 
-@router.get("/staff/shift-code", response_model=ShiftCodeResponse)
-def get_shift_code(
-    user: UserModel = Depends(get_current_user),
-):
-    """Return the current 6-digit rotating shift code (rotates every 2 minutes)."""
-    _ = user
-    code = _get_shift_code()
-    expires_in = 120 - (int(time.time()) % 120)
-    return ShiftCodeResponse(code=code, expires_in=expires_in)
-
-
-@router.post("/staff/shift-start", response_model=ShiftStartResponse)
-@limiter.limit("10/minute")
-def start_shift(
-    request: Request,
-    payload: ShiftStartRequest,
-    user: UserModel = Depends(get_current_user),
-):
-    """Verify the 6-digit shift code and record the shift start time."""
-    _ = user
-    current_code = _get_shift_code(0)
-    prev_code = _get_shift_code(-1)
-    if payload.code.strip() not in (current_code, prev_code):
-        logger.warning("Failed shift-start attempt by user %s.", user.email)
-        raise HTTPException(status_code=401, detail="Invalid shift code. Please try again.")
-    started_at = datetime.now(timezone.utc).isoformat()
-    logger.info("Shift started by user %s.", user.email)
-    return ShiftStartResponse(started_at=started_at)
-
-
-@router.post("/staff/heartbeat", status_code=204)
-def staff_heartbeat(
-    user: UserModel = Depends(get_current_user),
-):
-    """No-op keepalive so the frontend can confirm the session is still valid."""
-    _ = user
-    return None
-
-
 @router.delete("/staff/{staff_id}", status_code=204)
 def delete_staff_member(
     staff_id: int,
     db: Annotated[Session, Depends(get_db)],
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
+    hotel_id = require_hotel_id(user, db)
     affected = db.execute(
-        text("DELETE FROM staff_members WHERE id = :id"),
-        {"id": staff_id},
+        text("DELETE FROM staff_members WHERE id = :id AND hotel_id = :hotel_id"),
+        {"id": staff_id, "hotel_id": hotel_id},
     ).rowcount
     db.commit()
     if affected == 0:

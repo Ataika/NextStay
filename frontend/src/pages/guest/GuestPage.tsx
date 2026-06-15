@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { guestApi, hotelProfileApi, type HotelProfileData } from "../../api/api";
 import LanguageSelector from "../../components/LanguageSelector";
 import { useI18n } from "../../i18n";
@@ -71,13 +71,46 @@ export default function GuestPage() {
   }, [guest, now]);
 
   useEffect(() => {
-    if (token) {
-      loadGuestData(token);
-    } else {
+    if (!token) {
       setLoading(false);
       setGuest(null);
+      return;
     }
-  }, [loadGuestData, token]);
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await guestApi.getByToken(token);
+        if (cancelled) return;
+
+        if (!data) {
+          toast.error(t("guest.invalidToast"));
+          setGuest(null);
+          return;
+        }
+        if (!data.isValid) {
+          toast.error(t("guest.expiredToast"));
+        }
+        setGuest(data);
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(t("guest.loadError"));
+          setGuest(null);
+          console.error(error);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, t]);
 
   useEffect(() => {
     const updateQrSize = () => {
@@ -91,26 +124,6 @@ export default function GuestPage() {
   useEffect(() => {
     hotelProfileApi.get().then(setHotelProfile).catch(() => {});
   }, []);
-
-  const loadGuestData = useCallback(async (guestToken: string) => {
-    try {
-      setLoading(true);
-      const data = await guestApi.getByToken(guestToken);
-      if (!data) {
-        toast.error(t("guest.invalidToast"));
-        return;
-      }
-      if (!data.isValid) {
-        toast.error(t("guest.expiredToast"));
-      }
-      setGuest(data);
-    } catch (error) {
-      toast.error(t("guest.loadError"));
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
 
   const handleCheckout = async () => {
     if (!token || !guest) return;
@@ -350,11 +363,16 @@ ${locale === "it-IT" ? "ID prenotazione" : "Booking ID"}: ${guest.bookingId}`;
 
             {/* QR Code */}
             <div className="flex justify-center mb-6">
-              <div className="bg-white dark:bg-gray-700 p-4 sm:p-6 rounded-lg border-2 border-gray-200 dark:border-gray-600">
-                <QRCodeSVG
+              <div className="bg-white p-4 sm:p-6 rounded-lg border-2 border-gray-200 dark:border-gray-600 shadow-sm">
+                <QRCodeCanvas
                   value={qrValue}
                   size={qrSize}
                   level="H"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                  includeMargin
+                  role="img"
+                  aria-label={t("guest.qrAlt")}
                 />
               </div>
             </div>

@@ -54,6 +54,53 @@ async def send_email(to_email: str, subject: str, body: str, html_body: str | No
         return False
 
 
+def send_hotel_invite_email(to_email: str, code: str, hotel_name: str) -> bool:
+    """Send hotel staff invite code via Brevo transactional API."""
+    register_url = f"{FRONTEND_URL}/register"
+    if not BREVO_API_KEY:
+        logger.error("BREVO_API_KEY is missing. Cannot send invite to %s.", to_email)
+        return False
+    if not BREVO_SENDER_EMAIL:
+        logger.error("BREVO_SENDER_EMAIL is missing. Cannot send invite to %s.", to_email)
+        return False
+
+    payload = {
+        "to": [{"email": to_email}],
+        "sender": {"email": BREVO_SENDER_EMAIL, "name": BREVO_SENDER_NAME},
+        "subject": f"Your invitation to join {hotel_name} on NextStay",
+        "htmlContent": (
+            f"<p>You have been invited to join <b>{hotel_name}</b> on NextStay.</p>"
+            f"<p>Your hotel registration code is <b>{code}</b>. It expires in 7 days.</p>"
+            f'<p>Go to <a href="{register_url}">{register_url}</a>, choose '
+            f"<b>Register with hotel code</b>, and enter this code to complete your account.</p>"
+        ),
+    }
+
+    request = urllib.request.Request(
+        "https://api.brevo.com/v3/smtp/email",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "accept": "application/json",
+            "content-type": "application/json",
+            "api-key": BREVO_API_KEY,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            if 200 <= response.status < 300:
+                return True
+            logger.warning("Brevo non-success status %d for invite %s.", response.status, to_email)
+            return False
+    except urllib.error.HTTPError as err:
+        details = err.read().decode("utf-8", errors="ignore")
+        logger.error("Brevo HTTP error for invite %s: %d %s", to_email, err.code, details)
+        return False
+    except Exception as err:  # noqa: BLE001
+        logger.error("Brevo invite send failed for %s: %s", to_email, err)
+        return False
+
+
 def send_otp_email(to_email: str, otp: str) -> bool:
     """Send OTP email via Brevo transactional API."""
     if not BREVO_API_KEY:

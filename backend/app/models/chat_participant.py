@@ -22,3 +22,4 @@ class ChatParticipant(Base):
     )
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     joined_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    last_read_at = Column(DateTime(timezone=True), nullable=True)

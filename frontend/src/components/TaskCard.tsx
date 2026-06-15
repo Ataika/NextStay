@@ -1,19 +1,23 @@
 import type { CleaningTask } from "../mocks/tasks";
 import { useI18n } from "../i18n";
 import Button from "../ui/Button";
+import { allChecklistItemsChecked, resolveTaskChecklist } from "../utils/taskDisplay";
 
 interface TaskCardProps {
   task: CleaningTask;
   onStart?: (taskId: number) => void;
   onComplete?: (taskId: number) => void;
   onDelete?: (taskId: number) => void;
+  onChecklistToggle?: (taskId: number, itemId: string, checked: boolean) => void;
   currentStaffId?: number;
+  allowStaffActions?: boolean;
 }
 
 const priorityColors = {
   Low: "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600",
   Medium: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700",
   High: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700",
+  Urgent: "bg-red-200 dark:bg-red-900/40 text-red-900 dark:text-red-200 border-red-400 dark:border-red-700",
 };
 
 const statusColors = {
@@ -33,22 +37,30 @@ export default function TaskCard({
   onStart,
   onComplete,
   onDelete,
+  onChecklistToggle,
   currentStaffId = 1,
+  allowStaffActions = true,
 }: TaskCardProps) {
   const { locale, priorityLabel, t } = useI18n();
   const priorityColor = priorityColors[task.priority];
   const statusColor = statusColors[task.status];
   const statusIcon = statusIcons[task.status];
+  const checklist = resolveTaskChecklist(task);
 
   const isAssignedToMe = task.assignedTo === currentStaffId;
-  const canStart = task.status === "Pending" && !task.assignedTo;
-  const canComplete = task.status === "In Progress" && isAssignedToMe;
+  const isUnassigned = !task.assignedTo;
+  const canWorkTask = allowStaffActions && task.status !== "Completed" && (isAssignedToMe || isUnassigned);
+  const canStart = canWorkTask && task.status === "Pending" && isUnassigned && onStart;
+  const allChecked = allChecklistItemsChecked(task);
+  const canComplete =
+    canWorkTask &&
+    task.status !== "Completed" &&
+    allChecked &&
+    onComplete &&
+    (task.status === "In Progress" || (task.status === "Pending" && isAssignedToMe));
 
   return (
-    <div
-      className={`rounded-lg border-2 p-4 mb-3 ${statusColor} transition-all`}
-    >
-      {/* Header */}
+    <div className={`rounded-lg border-2 p-4 mb-3 ${statusColor} transition-all`}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
@@ -63,69 +75,61 @@ export default function TaskCard({
             </p>
           )}
         </div>
-        <span
-          className={`px-2 py-1 text-xs font-semibold rounded border ${priorityColor}`}
-        >
+        <span className={`px-2 py-1 text-xs font-semibold rounded border ${priorityColor}`}>
           {priorityLabel(task.priority)}
         </span>
       </div>
 
-      {/* Notes */}
       {task.notes && (
         <div className="mb-3">
           <p className="text-sm text-gray-700 dark:text-gray-300">{task.notes}</p>
         </div>
       )}
 
-      {/* Checklist */}
       <div className="mb-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={task.status === "Completed"}
-            disabled
-            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-          />
-          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            {t("taskCard.cleaningRoom")}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={task.status === "Completed"}
-            disabled
-            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-          />
-          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            {t("taskCard.changeBedding")}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={task.status === "Completed"}
-            disabled
-            className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
-          />
-          <span className={task.status === "Completed" ? "line-through text-gray-500 dark:text-gray-500" : "text-gray-900 dark:text-gray-200"}>
-            {t("taskCard.refillMiniBar")}
-          </span>
-        </div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+          {t("taskCard.checklist")}
+        </p>
+        {checklist.map((item) => {
+          const interactive = canWorkTask && !!onChecklistToggle;
+          return (
+            <label
+              key={item.id}
+              className={`flex items-center gap-2 text-sm ${
+                interactive ? "cursor-pointer" : "cursor-default"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={item.checked}
+                disabled={!interactive}
+                onChange={(event) => onChecklistToggle?.(task.id, item.id, event.target.checked)}
+                className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+              />
+              <span
+                className={
+                  item.checked
+                    ? "line-through text-gray-500 dark:text-gray-500"
+                    : "text-gray-900 dark:text-gray-200"
+                }
+              >
+                {item.label}
+              </span>
+            </label>
+          );
+        })}
+        {canWorkTask && !allChecked && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">{t("taskCard.completeAllHint")}</p>
+        )}
       </div>
 
-      {/* Actions */}
       <div className="flex flex-wrap gap-2 items-center">
-        {canStart && onStart && (
-          <Button
-            variant="primary"
-            fullWidth
-            onClick={() => onStart(task.id)}
-          >
+        {canStart && (
+          <Button variant="primary" fullWidth onClick={() => onStart(task.id)}>
             {t("taskCard.start")}
           </Button>
         )}
-        {canComplete && onComplete && (
+        {canComplete && (
           <Button
             variant="primary"
             fullWidth
@@ -145,18 +149,13 @@ export default function TaskCard({
             {t("taskCard.assignedElsewhere")}
           </div>
         )}
-        {onDelete && (
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => onDelete(task.id)}
-          >
+        {onDelete && task.status !== "Completed" && (
+          <Button variant="danger" size="sm" onClick={() => onDelete(task.id)}>
             {t("taskCard.delete")}
           </Button>
         )}
       </div>
 
-      {/* Timestamp */}
       <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
         {t("taskCard.created", { value: new Date(task.createdAt).toLocaleString(locale) })}
         {task.completedAt &&

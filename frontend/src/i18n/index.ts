@@ -1,7 +1,12 @@
+import { useCallback, useMemo } from "react";
 import { useSettingsStore, type Language } from "../store/settingsStore";
 import { translations } from "./translations";
 
-type TranslationValue = string | Record<string, TranslationValue>;
+interface TranslationDictionary {
+  [key: string]: string | TranslationDictionary;
+}
+
+type TranslationValue = string | TranslationDictionary;
 type TranslationParams = Record<string, string | number>;
 
 const localeByLanguage: Record<Language, string> = {
@@ -66,14 +71,33 @@ export function useI18n() {
   const language = useSettingsStore((state) => state.language);
   const setLanguage = useSettingsStore((state) => state.setLanguage);
 
+  const t = useCallback(
+    (key: string, params?: TranslationParams) => translate(language, key, params),
+    [language],
+  );
+  const roleLabelFn = useCallback((role: string) => roleLabel(language, role), [language]);
+  const priorityLabelFn = useCallback(
+    (priority: string) => priorityLabel(language, priority),
+    [language],
+  );
+  const taskStatusLabelFn = useCallback(
+    (status: string) => taskStatusLabel(language, status),
+    [language],
+  );
+  const shiftLabelFn = useCallback(
+    (shiftType: string) => shiftLabel(language, shiftType),
+    [language],
+  );
+  const locale = useMemo(() => localeForLanguage(language), [language]);
+
   return {
     language,
     setLanguage,
-    locale: localeForLanguage(language),
-    t: (key: string, params?: TranslationParams) => translate(language, key, params),
-    roleLabel: (role: string) => roleLabel(language, role),
-    priorityLabel: (priority: string) => priorityLabel(language, priority),
-    taskStatusLabel: (status: string) => taskStatusLabel(language, status),
-    shiftLabel: (shiftType: string) => shiftLabel(language, shiftType),
+    locale,
+    t,
+    roleLabel: roleLabelFn,
+    priorityLabel: priorityLabelFn,
+    taskStatusLabel: taskStatusLabelFn,
+    shiftLabel: shiftLabelFn,
   };
 }

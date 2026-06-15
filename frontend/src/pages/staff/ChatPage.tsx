@@ -1,9 +1,8 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
 import { authApi, chatApi, type ChatConversation, type ChatUserOption } from "../../api/api";
 import { useI18n } from "../../i18n";
-import { useAuthStore, type UserRole } from "../../store/authStore";
+import { useAuthStore } from "../../store/authStore";
 import { useChat } from "../../hooks/useChat";
-import Modal from "../../ui/Modal";
 import Button from "../../ui/Button";
 import toast from "react-hot-toast";
 
@@ -24,7 +23,6 @@ const PRESETS: WallpaperPreset[] = [
   { id: "mist", label: "Mist", value: "linear-gradient(135deg, #dbeafe 0%, #f8fafc 100%)" },
 ];
 
-const GROUP_CREATOR_ROLES = new Set<UserRole>(["OWNER", "SYS_ADMIN", "DIRECTOR"]);
 const AVATAR_COLORS = [
   "bg-blue-500",
   "bg-emerald-500",
@@ -129,6 +127,10 @@ function conversationSearchText(conversation: ChatConversation): string {
   ]
     .join(" ")
     .toLowerCase();
+}
+
+function buildGroupTitle(members: ChatUserOption[]): string {
+  return members.map((member) => member.name).join(", ");
 }
 
 interface WallpaperPickerProps {
@@ -266,23 +268,19 @@ export default function ChatPage() {
   const [hoverMessageId, setHoverMessageId] = useState<number | null>(null);
   const lastTypingSentRef = useRef(0);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const deferredSearchQuery = useDeferredValue(searchQuery.trim());
-  const [searchResults, setSearchResults] = useState<ChatUserOption[]>([]);
-  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [listFilter, setListFilter] = useState("");
+  const deferredListFilter = useDeferredValue(listFilter.trim());
 
-  const [groupModalOpen, setGroupModalOpen] = useState(false);
-  const [groupTitle, setGroupTitle] = useState("");
-  const [groupSearch, setGroupSearch] = useState("");
-  const deferredGroupSearch = useDeferredValue(groupSearch.trim());
-  const [groupResults, setGroupResults] = useState<ChatUserOption[]>([]);
-  const [searchingGroupUsers, setSearchingGroupUsers] = useState(false);
-  const [selectedMembers, setSelectedMembers] = useState<ChatUserOption[]>([]);
-  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [recipientQuery, setRecipientQuery] = useState("");
+  const deferredRecipientQuery = useDeferredValue(recipientQuery.trim());
+  const [recipientResults, setRecipientResults] = useState<ChatUserOption[]>([]);
+  const [searchingRecipients, setSearchingRecipients] = useState(false);
+  const [selectedRecipients, setSelectedRecipients] = useState<ChatUserOption[]>([]);
+  const [optionalGroupTitle, setOptionalGroupTitle] = useState("");
+  const [creatingConversation, setCreatingConversation] = useState(false);
+  const recipientInputRef = useRef<HTMLInputElement>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  const canCreateGroups = role ? GROUP_CREATOR_ROLES.has(role) : false;
 
   useEffect(() => {
     authApi.getPreferences()
@@ -295,56 +293,33 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (!deferredSearchQuery) {
-      setSearchingUsers(false);
-      setSearchResults([]);
+    if (!deferredRecipientQuery) {
+      setSearchingRecipients(false);
+      setRecipientResults([]);
       return;
     }
 
     let cancelled = false;
-    setSearchingUsers(true);
+    setSearchingRecipients(true);
 
     void (async () => {
       try {
-        const results = await chatApi.searchUsers(deferredSearchQuery);
-        if (!cancelled) setSearchResults(results);
+        const results = await chatApi.searchUsers(deferredRecipientQuery);
+        if (!cancelled) {
+          const selectedIds = new Set(selectedRecipients.map((recipient) => recipient.id));
+          setRecipientResults(results.filter((user) => !selectedIds.has(user.id)));
+        }
       } catch {
-        if (!cancelled) setSearchResults([]);
+        if (!cancelled) setRecipientResults([]);
       } finally {
-        if (!cancelled) setSearchingUsers(false);
+        if (!cancelled) setSearchingRecipients(false);
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [deferredSearchQuery]);
-
-  useEffect(() => {
-    if (!groupModalOpen || !deferredGroupSearch) {
-      setSearchingGroupUsers(false);
-      setGroupResults([]);
-      return;
-    }
-
-    let cancelled = false;
-    setSearchingGroupUsers(true);
-
-    void (async () => {
-      try {
-        const results = await chatApi.searchUsers(deferredGroupSearch);
-        if (!cancelled) setGroupResults(results);
-      } catch {
-        if (!cancelled) setGroupResults([]);
-      } finally {
-        if (!cancelled) setSearchingGroupUsers(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [deferredGroupSearch, groupModalOpen]);
+  }, [deferredRecipientQuery, selectedRecipients]);
 
   useEffect(() => {
     if (!activeConversation) {
@@ -353,17 +328,17 @@ export default function ChatPage() {
   }, [activeConversation]);
 
   const filteredConversations = useMemo(() => {
-    if (!deferredSearchQuery) return conversations;
-    const query = deferredSearchQuery.toLowerCase();
+    if (!deferredListFilter) return conversations;
+    const query = deferredListFilter.toLowerCase();
     return conversations.filter((conversation) => conversationSearchText(conversation).includes(query));
-  }, [conversations, deferredSearchQuery]);
+  }, [conversations, deferredListFilter]);
 
   const activeSubtitle = activeConversation
     ? conversationSubtitle(
         activeConversation,
         userId,
         roleLabel,
-        t("chat.directMessage"),
+        t("chat.privateChat"),
         (count) => t("chat.members", {
           count,
           label: locale === "it-IT"
@@ -382,14 +357,66 @@ export default function ChatPage() {
     setShowListOnMobile(false);
   };
 
-  const startDirectChat = async (user: ChatUserOption) => {
+  const resetComposer = () => {
+    setRecipientQuery("");
+    setRecipientResults([]);
+    setSelectedRecipients([]);
+    setOptionalGroupTitle("");
+  };
+
+  const addRecipient = (user: ChatUserOption) => {
+    setSelectedRecipients((current) => (
+      current.some((recipient) => recipient.id === user.id)
+        ? current
+        : [...current, user]
+    ));
+    setRecipientQuery("");
+    setRecipientResults([]);
+    recipientInputRef.current?.focus();
+  };
+
+  const removeRecipient = (userId: number) => {
+    setSelectedRecipients((current) => current.filter((recipient) => recipient.id !== userId));
+  };
+
+  const handleRecipientKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Backspace" && !recipientQuery && selectedRecipients.length > 0) {
+      setSelectedRecipients((current) => current.slice(0, -1));
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (recipientResults.length > 0) {
+        addRecipient(recipientResults[0]);
+        return;
+      }
+      if (selectedRecipients.length > 0) {
+        void startSelectedConversation();
+      }
+    }
+  };
+
+  const startSelectedConversation = async () => {
+    if (selectedRecipients.length === 0 || creatingConversation) return;
+
+    setCreatingConversation(true);
     try {
-      await openDirectConversation(user.id);
-      setSearchQuery("");
-      setSearchResults([]);
+      if (selectedRecipients.length === 1) {
+        await openDirectConversation(selectedRecipients[0].id);
+      } else {
+        const title = optionalGroupTitle.trim() || buildGroupTitle(selectedRecipients);
+        await createGroupConversation(title, selectedRecipients.map((recipient) => recipient.id));
+      }
+      resetComposer();
       setShowListOnMobile(false);
     } catch {
-      toast.error(t("chat.openChatFailed"));
+      toast.error(
+        selectedRecipients.length === 1
+          ? t("chat.openChatFailed")
+          : t("chat.createGroupFailed")
+      );
+    } finally {
+      setCreatingConversation(false);
     }
   };
 
@@ -463,47 +490,6 @@ export default function ChatPage() {
     }
   };
 
-  const toggleGroupMember = (user: ChatUserOption) => {
-    setSelectedMembers((current) => (
-      current.some((member) => member.id === user.id)
-        ? current.filter((member) => member.id !== user.id)
-        : [...current, user]
-    ));
-  };
-
-  const resetGroupComposer = () => {
-    setGroupTitle("");
-    setGroupSearch("");
-    setGroupResults([]);
-    setSelectedMembers([]);
-    setGroupModalOpen(false);
-  };
-
-  const handleCreateGroup = async () => {
-    const normalizedTitle = groupTitle.trim();
-    if (!normalizedTitle) {
-      toast.error(t("chat.groupNeedsName"));
-      return;
-    }
-    if (selectedMembers.length === 0) {
-      toast.error(t("chat.groupNeedsMember"));
-      return;
-    }
-
-    setCreatingGroup(true);
-    try {
-      await createGroupConversation(normalizedTitle, selectedMembers.map((member) => member.id));
-      resetGroupComposer();
-      setShowListOnMobile(false);
-    } catch {
-      toast.error(t("chat.createGroupFailed"));
-    } finally {
-      setCreatingGroup(false);
-    }
-  };
-
-  const selectedMemberIds = new Set(selectedMembers.map((member) => member.id));
-
   return (
     <>
       <div className="h-[calc(100vh-8rem)] overflow-hidden rounded-[28px] border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 md:h-[calc(100vh-5.75rem)]">
@@ -514,82 +500,126 @@ export default function ChatPage() {
             }`}
           >
             <div className="border-b border-gray-200 px-4 py-4 dark:border-gray-700">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">
-                    {t("chat.messenger")}
-                  </p>
-                  <h1 className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">{t("chat.staffConversations")}</h1>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {t("chat.onlineNow", { count: online.length })}
-                  </p>
-                </div>
-                {canCreateGroups && (
-                  <button
-                    onClick={() => setGroupModalOpen(true)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white transition hover:bg-blue-700"
-                    title={t("chat.createGroup")}
-                  >
-                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                )}
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">
+                  {t("chat.messenger")}
+                </p>
+                <h1 className="mt-1 text-xl font-semibold text-gray-900 dark:text-white">{t("chat.staffConversations")}</h1>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {t("chat.onlineNow", { count: online.length })}
+                </p>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-                <div className="flex items-center gap-2">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {t("chat.newChat")}
+                </p>
+
+                <div
+                  className="flex min-h-[42px] flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 bg-slate-50 px-2 py-1.5 focus-within:border-blue-500 dark:border-gray-600 dark:bg-gray-700/60"
+                  onClick={() => recipientInputRef.current?.focus()}
+                >
+                  {selectedRecipients.map((recipient) => (
+                    <button
+                      key={recipient.id}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        removeRecipient(recipient.id);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-200"
+                    >
+                      <span>{recipient.name}</span>
+                      <span aria-hidden>×</span>
+                    </button>
+                  ))}
                   <input
+                    ref={recipientInputRef}
                     type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder={t("chat.searchPlaceholder")}
-                    className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
+                    value={recipientQuery}
+                    onChange={(event) => setRecipientQuery(event.target.value)}
+                    onKeyDown={handleRecipientKeyDown}
+                    placeholder={selectedRecipients.length === 0 ? t("chat.recipientPlaceholder") : t("chat.addMoreRecipients")}
+                    className="min-w-[120px] flex-1 bg-transparent px-1 py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
                   />
                 </div>
-              </div>
 
-              {deferredSearchQuery && (
-                <div className="mt-3 rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
-                  <div className="mb-2 flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      {t("chat.staffSearch")}
-                    </p>
-                    {searchingUsers && (
-                      <span className="text-[11px] text-gray-400">{t("chat.searching")}</span>
+                {deferredRecipientQuery && (
+                  <div className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-gray-100 p-1 dark:border-gray-700">
+                    {searchingRecipients && (
+                      <p className="px-2 py-2 text-xs text-gray-400">{t("chat.searching")}</p>
                     )}
-                  </div>
-                  <div className="space-y-2">
-                    {searchResults.length === 0 && !searchingUsers && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{t("chat.noStaffMatch")}</p>
+                    {!searchingRecipients && recipientResults.length === 0 && (
+                      <p className="px-2 py-2 text-sm text-gray-500 dark:text-gray-400">{t("chat.noStaffMatch")}</p>
                     )}
-                    {searchResults.map((user) => (
+                    {recipientResults.map((user) => (
                       <button
                         key={user.id}
-                        onClick={() => void startDirectChat(user)}
-                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
+                        type="button"
+                        onClick={() => addRecipient(user)}
+                        className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-gray-50 dark:hover:bg-gray-700/60"
                       >
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-bold text-white ${avatarColor(user.id)}`}>
+                        <div className={`flex h-9 w-9 items-center justify-center rounded-xl text-xs font-bold text-white ${avatarColor(user.id)}`}>
                           {getInitials(user.name)}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
                           <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[11px] uppercase tracking-wide text-gray-400">{roleLabel(user.role)}</p>
-                          {user.online && (
-                            <p className="text-[11px] font-medium text-emerald-500">{t("chat.online")}</p>
-                          )}
-                        </div>
+                        {user.online && (
+                          <span className="text-[11px] font-medium text-emerald-500">{t("chat.online")}</span>
+                        )}
                       </button>
                     ))}
                   </div>
+                )}
+
+                {selectedRecipients.length >= 2 && (
+                  <input
+                    value={optionalGroupTitle}
+                    onChange={(event) => setOptionalGroupTitle(event.target.value)}
+                    placeholder={t("chat.groupTitleOptional")}
+                    className="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                  />
+                )}
+
+                {selectedRecipients.length > 0 && (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {selectedRecipients.length === 1
+                        ? t("chat.privateChatHint", { name: selectedRecipients[0].name })
+                        : t("chat.groupChatHint", { count: String(selectedRecipients.length) })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void startSelectedConversation()}
+                      disabled={creatingConversation}
+                      className="shrink-0 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {creatingConversation
+                        ? t("chat.openingChat")
+                        : selectedRecipients.length === 1
+                          ? t("chat.openPrivateChat")
+                          : t("chat.createGroupAction")}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-gray-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+                <div className="flex items-center gap-2">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="search"
+                    value={listFilter}
+                    onChange={(event) => setListFilter(event.target.value)}
+                    placeholder={t("chat.filterConversations")}
+                    className="w-full bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400 dark:text-white"
+                  />
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
@@ -610,13 +640,14 @@ export default function ChatPage() {
                 <div className="space-y-2">
                   {filteredConversations.map((conversation) => {
                     const isActive = activeConversation?.id === conversation.id;
+                    const unreadCount = conversation.unread_count ?? 0;
                     const directPartner = conversation.participants.find((participant) => participant.user_id !== userId);
                     const statusLabel = conversation.kind === "group"
                       ? conversationSubtitle(
                           conversation,
                           userId,
                           roleLabel,
-                          t("chat.directMessage"),
+                          t("chat.privateChat"),
                           (count) => t("chat.members", {
                             count,
                             label: locale === "it-IT"
@@ -636,7 +667,9 @@ export default function ChatPage() {
                         className={`w-full rounded-3xl border px-4 py-3 text-left transition ${
                           isActive
                             ? "border-blue-500 bg-blue-50 shadow-sm dark:border-blue-400 dark:bg-blue-900/20"
-                            : "border-transparent bg-white hover:border-gray-200 hover:bg-white dark:bg-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-700/60"
+                            : unreadCount > 0
+                              ? "border-blue-200 bg-blue-50/70 dark:border-blue-800 dark:bg-blue-950/20"
+                              : "border-transparent bg-white hover:border-gray-200 hover:bg-white dark:bg-gray-800 dark:hover:border-gray-700 dark:hover:bg-gray-700/60"
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -648,7 +681,9 @@ export default function ChatPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                                <p className={`truncate text-sm text-gray-900 dark:text-white ${
+                                  unreadCount > 0 ? "font-bold" : "font-semibold"
+                                }`}>
                                   {conversation.title}
                                 </p>
                                 <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -656,19 +691,30 @@ export default function ChatPage() {
                                 </p>
                               </div>
                               <div className="shrink-0 text-right">
-                                <p className="text-[11px] text-gray-400">
-                                  {formatConversationTime(conversation.last_message_at, locale)}
-                                </p>
+                                <div className="flex items-center justify-end gap-2">
+                                  {unreadCount > 0 && (
+                                    <span className="inline-flex min-w-[1.25rem] h-5 px-1.5 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white tabular-nums">
+                                      {unreadCount > 99 ? "99+" : unreadCount}
+                                    </span>
+                                  )}
+                                  <p className="text-[11px] text-gray-400">
+                                    {formatConversationTime(conversation.last_message_at, locale)}
+                                  </p>
+                                </div>
                                 <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
                                   conversation.kind === "group"
                                     ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                                     : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
                                 }`}>
-                                  {conversation.kind === "group" ? t("chat.conversationGroup") : t("chat.conversationDirect")}
+                                  {conversation.kind === "group" ? t("chat.conversationGroup") : t("chat.privateChat")}
                                 </span>
                               </div>
                             </div>
-                            <p className="mt-2 truncate text-sm text-gray-600 dark:text-gray-300">
+                            <p className={`mt-2 truncate text-sm ${
+                              unreadCount > 0
+                                ? "font-medium text-gray-800 dark:text-gray-100"
+                                : "text-gray-600 dark:text-gray-300"
+                            }`}>
                               {conversation.last_message_preview ?? t("chat.noMessagesPreview")}
                             </p>
                           </div>
@@ -763,7 +809,7 @@ export default function ChatPage() {
                       <div>
                         <p className="text-lg font-semibold text-gray-800 dark:text-gray-100">{t("chat.chooseConversation")}</p>
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                          {t("chat.startDirectPrompt")}
+                          {t("chat.startChatPrompt")}
                         </p>
                       </div>
                     </div>
@@ -946,109 +992,6 @@ export default function ChatPage() {
           </section>
         </div>
       </div>
-
-      <Modal
-        isOpen={groupModalOpen}
-        onClose={resetGroupComposer}
-        title={t("chat.createGroupTitle")}
-        footer={(
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button variant="secondary" onClick={resetGroupComposer}>{t("common.cancel")}</Button>
-            <Button onClick={() => void handleCreateGroup()} disabled={creatingGroup}>
-              {creatingGroup ? t("chat.creatingGroup") : t("chat.createGroupAction")}
-            </Button>
-          </div>
-        )}
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("chat.groupName")}
-            </label>
-            <input
-              value={groupTitle}
-              onChange={(event) => setGroupTitle(event.target.value)}
-              placeholder={t("chat.groupNamePlaceholder")}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              {t("chat.addMembers")}
-            </label>
-            <input
-              value={groupSearch}
-              onChange={(event) => setGroupSearch(event.target.value)}
-              placeholder={t("chat.addMembersPlaceholder")}
-              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-            />
-          </div>
-
-          {selectedMembers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {selectedMembers.map((member) => (
-                <button
-                  key={member.id}
-                  onClick={() => toggleGroupMember(member)}
-                  className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                >
-                  <span>{member.name}</span>
-                  <span>×</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="max-h-72 space-y-2 overflow-y-auto rounded-2xl border border-gray-200 p-2 dark:border-gray-700">
-            {searchingGroupUsers && (
-              <p className="px-2 py-4 text-sm text-gray-400">{t("chat.searchingStaff")}</p>
-            )}
-            {!searchingGroupUsers && deferredGroupSearch && groupResults.length === 0 && (
-              <p className="px-2 py-4 text-sm text-gray-500 dark:text-gray-400">{t("chat.noGroupSearchMatch")}</p>
-            )}
-            {!searchingGroupUsers && !deferredGroupSearch && (
-              <p className="px-2 py-4 text-sm text-gray-500 dark:text-gray-400">
-                {t("chat.searchStaffToAdd")}
-              </p>
-            )}
-            {groupResults.map((user) => {
-              const selected = selectedMemberIds.has(user.id);
-              return (
-                <button
-                  key={user.id}
-                  onClick={() => toggleGroupMember(user)}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition ${
-                    selected
-                      ? "bg-blue-50 dark:bg-blue-900/20"
-                      : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  }`}
-                >
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-2xl text-xs font-bold text-white ${avatarColor(user.id)}`}>
-                    {getInitials(user.name)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                    <p className="truncate text-xs text-gray-500 dark:text-gray-400">{user.email}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {user.online && (
-                      <span className="text-[11px] font-medium text-emerald-500">{t("chat.online")}</span>
-                    )}
-                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] ${
-                      selected
-                        ? "border-blue-500 bg-blue-500 text-white"
-                        : "border-gray-300 text-transparent dark:border-gray-600"
-                    }`}>
-                      ✓
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Modal>
     </>
   );
 }

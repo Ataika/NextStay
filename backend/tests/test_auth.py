@@ -3,6 +3,49 @@
 from .conftest import make_owner
 
 # ---------------------------------------------------------------------------
+# Check email
+# ---------------------------------------------------------------------------
+
+
+class TestCheckEmail:
+    def test_check_email_exists(self, client, db):
+        make_owner(db)
+        resp = client.post(
+            "/api/v1/auth/check-email",
+            json={"email": "owner@test.com"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["exists"] is True
+
+    def test_check_email_not_found(self, client):
+        resp = client.post(
+            "/api/v1/auth/check-email",
+            json={"email": "nobody@test.com"},
+        )
+        assert resp.status_code == 404
+
+    def test_check_email_inactive_user(self, client, db):
+        from app.api.v1.auth import hash_password
+        from app.models.user import User
+
+        db.add(
+            User(
+                email="inactive@test.com",
+                full_name="Inactive",
+                role="STAFF",
+                is_active=False,
+                password_hash=hash_password("Password1!"),
+            )
+        )
+        db.commit()
+        resp = client.post(
+            "/api/v1/auth/check-email",
+            json={"email": "inactive@test.com"},
+        )
+        assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
 # Password login
 # ---------------------------------------------------------------------------
 

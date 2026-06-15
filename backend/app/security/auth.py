@@ -75,6 +75,18 @@ def get_current_user(
     return user
 
 
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    db: Session = Depends(get_db),
+) -> UserModel | None:
+    if not credentials:
+        return None
+    try:
+        return get_current_user(credentials, db)
+    except HTTPException:
+        return None
+
+
 def require_roles(*roles: str):
     normalized = {role.upper() for role in roles}
 

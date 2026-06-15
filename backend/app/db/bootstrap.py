@@ -9,10 +9,13 @@ from app.db.session import engine
 LOGGER = logging.getLogger(__name__)
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 MIGRATION_ORDER = [
+    "00_sync_user_columns.sql",
     "add_users_and_auth_sessions.sql",
     "add_email_otps.sql",
     "add_stripe_fields.sql",
     "add_hotel_profile.sql",
+    "add_city_to_hotel_profile.sql",
+    "add_room_holds.sql",
     "add_chat_messages.sql",
     "add_chat_conversations.sql",
     "add_chat_wallpaper_to_users.sql",

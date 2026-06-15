@@ -7,20 +7,21 @@ from app.db.session import SessionLocal
 from app.models.chat_conversation import ChatConversation as ChatConversationModel
 from app.models.chat_message import ChatMessage as ChatMessageModel
 from app.models.chat_participant import ChatParticipant as ChatParticipantModel
+from app.models.hotel_profile import HotelProfile as HotelProfileModel
 from app.models.user import User as UserModel
 from app.security.auth import get_current_user
+from app.security.tenancy import require_hotel_id
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["chat"])
 
 CHAT_HISTORY_LIMIT = 100
-GENERAL_CONVERSATION_KEY = "general"
+HOTEL_CHAT_KEY_PREFIX = "hotel:"
 ALLOWED_ROLES = {"OWNER", "STAFF", "SYS_ADMIN", "DIRECTOR", "MANAGER"}
-GROUP_CREATOR_ROLES = {"OWNER", "SYS_ADMIN", "DIRECTOR"}
 
 
 class ConnectionManager:
@@ -113,27 +114,41 @@ def _ensure_chat_access(user: UserModel) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
 
 
-def _ensure_group_creator(user: UserModel) -> None:
-    if user.role.upper() not in GROUP_CREATOR_ROLES:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions to create groups.")
-
-
 def _direct_key(user_a: int, user_b: int) -> str:
     first, second = sorted((user_a, user_b))
     return f"{first}:{second}"
 
 
+def _general_conversation_key(hotel_id: int) -> str:
+    return f"{HOTEL_CHAT_KEY_PREFIX}{hotel_id}"
+
+
+def _participants_same_hotel(participants: list[UserModel], hotel_id: int) -> bool:
+    for participant in participants:
+        if participant.hotel_id is not None and participant.hotel_id != hotel_id:
+            return False
+    return True
+
+
+def _users_share_hotel(user_a: UserModel, user_b: UserModel) -> bool:
+    if user_a.hotel_id is None or user_b.hotel_id is None:
+        return user_a.hotel_id == user_b.hotel_id
+    return user_a.hotel_id == user_b.hotel_id
+
+
 def _ensure_general_conversation_for_user(db: Session, user: UserModel) -> None:
-    conversation = (
-        db.query(ChatConversationModel).filter(ChatConversationModel.system_key == GENERAL_CONVERSATION_KEY).first()
-    )
+    hotel_id = require_hotel_id(user, db)
+    system_key = _general_conversation_key(hotel_id)
+    conversation = db.query(ChatConversationModel).filter(ChatConversationModel.system_key == system_key).first()
     changed = False
 
     if not conversation:
+        hotel = db.query(HotelProfileModel).filter(HotelProfileModel.id == hotel_id).first()
+        title = f"{hotel.hotel_name} staff" if hotel else "General staff"
         conversation = ChatConversationModel(
             kind="group",
-            title="General staff",
-            system_key=GENERAL_CONVERSATION_KEY,
+            title=title,
+            system_key=system_key,
             created_by_id=user.id,
         )
         db.add(conversation)
@@ -207,6 +222,49 @@ def _last_messages_for_conversations(
     return latest
 
 
+def _unread_counts_for_user(db: Session, user_id: int, conversation_ids: list[int]) -> dict[int, int]:
+    if not conversation_ids:
+        return {}
+
+    memberships = (
+        db.query(ChatParticipantModel)
+        .filter(
+            ChatParticipantModel.user_id == user_id,
+            ChatParticipantModel.conversation_id.in_(conversation_ids),
+        )
+        .all()
+    )
+    read_map = {membership.conversation_id: membership.last_read_at for membership in memberships}
+
+    counts: dict[int, int] = {}
+    for conversation_id in conversation_ids:
+        query = db.query(func.count(ChatMessageModel.id)).filter(
+            ChatMessageModel.conversation_id == conversation_id,
+            ChatMessageModel.sender_id != user_id,
+            ChatMessageModel.deleted_at.is_(None),
+        )
+        last_read_at = read_map.get(conversation_id)
+        if last_read_at is not None:
+            query = query.filter(ChatMessageModel.created_at > last_read_at)
+        counts[conversation_id] = int(query.scalar() or 0)
+    return counts
+
+
+def _mark_conversation_read(db: Session, conversation_id: int, user_id: int) -> None:
+    membership = (
+        db.query(ChatParticipantModel)
+        .filter(
+            ChatParticipantModel.conversation_id == conversation_id,
+            ChatParticipantModel.user_id == user_id,
+        )
+        .first()
+    )
+    if not membership:
+        return
+    membership.last_read_at = datetime.now(timezone.utc)
+    db.commit()
+
+
 class ChatParticipantOut(BaseModel):
     user_id: int
     name: str
@@ -223,6 +281,7 @@ class ChatConversationSummary(BaseModel):
     participants: list[ChatParticipantOut]
     last_message_preview: str | None
     last_message_at: datetime | None
+    unread_count: int = 0
 
 
 class ChatMessageOut(BaseModel):
@@ -265,6 +324,7 @@ def _build_conversation_summary(
     participants: list[UserModel],
     current_user_id: int,
     last_message: tuple[ChatMessageModel, UserModel] | None,
+    unread_count: int = 0,
 ) -> ChatConversationSummary:
     participant_items = [
         ChatParticipantOut(
@@ -298,6 +358,7 @@ def _build_conversation_summary(
         participants=participant_items,
         last_message_preview=preview,
         last_message_at=created_at,
+        unread_count=unread_count,
     )
 
 
@@ -307,6 +368,7 @@ def list_conversations(
     current_user: UserModel = Depends(get_current_user),
 ):
     _ensure_chat_access(current_user)
+    hotel_id = require_hotel_id(current_user, db)
     _ensure_general_conversation_for_user(db, current_user)
 
     conversations = (
@@ -319,16 +381,22 @@ def list_conversations(
     conversation_ids = [conversation.id for conversation in conversations]
     participants_map = _participants_for_conversations(db, conversation_ids)
     last_messages = _last_messages_for_conversations(db, conversation_ids)
+    unread_counts = _unread_counts_for_user(db, current_user.id, conversation_ids)
 
-    summaries = [
-        _build_conversation_summary(
-            conversation=conversation,
-            participants=participants_map.get(conversation.id, []),
-            current_user_id=current_user.id,
-            last_message=last_messages.get(conversation.id),
+    summaries = []
+    for conversation in conversations:
+        participants = participants_map.get(conversation.id, [])
+        if not _participants_same_hotel(participants, hotel_id):
+            continue
+        summaries.append(
+            _build_conversation_summary(
+                conversation=conversation,
+                participants=participants,
+                current_user_id=current_user.id,
+                last_message=last_messages.get(conversation.id),
+                unread_count=unread_counts.get(conversation.id, 0),
+            )
         )
-        for conversation in conversations
-    ]
 
     def sort_key(summary: ChatConversationSummary) -> tuple[datetime, int]:
         created_at = summary.last_message_at or next(
@@ -375,6 +443,19 @@ def get_conversation_messages(
     ]
 
 
+@router.post("/chat/conversations/{conversation_id}/read", status_code=204)
+def mark_conversation_read(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
+    _ensure_chat_access(current_user)
+    conversation = _conversation_for_user(db, conversation_id, current_user.id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    _mark_conversation_read(db, conversation_id, current_user.id)
+
+
 @router.get("/chat/users", response_model=list[ChatUserOption])
 def search_chat_users(
     query: str = Query(default="", max_length=120),
@@ -383,6 +464,7 @@ def search_chat_users(
     current_user: UserModel = Depends(get_current_user),
 ):
     _ensure_chat_access(current_user)
+    hotel_id = require_hotel_id(current_user, db)
 
     users_query = (
         db.query(UserModel)
@@ -390,19 +472,21 @@ def search_chat_users(
             UserModel.is_active.is_(True),
             UserModel.id != current_user.id,
             UserModel.role.in_(tuple(ALLOWED_ROLES)),
+            UserModel.hotel_id == hotel_id,
         )
         .order_by(UserModel.full_name.asc())
     )
 
     cleaned_query = query.strip()
     if cleaned_query:
-        pattern = f"%{cleaned_query}%"
-        users_query = users_query.filter(
-            or_(
-                UserModel.full_name.ilike(pattern),
-                UserModel.email.ilike(pattern),
+        for token in cleaned_query.split():
+            pattern = f"%{token}%"
+            users_query = users_query.filter(
+                or_(
+                    UserModel.full_name.ilike(pattern),
+                    UserModel.email.ilike(pattern),
+                )
             )
-        )
 
     users = users_query.limit(limit).all()
     return [
@@ -439,6 +523,8 @@ def create_or_get_direct_conversation(
     )
     if not target_user:
         raise HTTPException(status_code=404, detail="Staff member not found.")
+    if not _users_share_hotel(current_user, target_user):
+        raise HTTPException(status_code=404, detail="Staff member not found.")
 
     direct_key = _direct_key(current_user.id, target_user.id)
     conversation = db.query(ChatConversationModel).filter(ChatConversationModel.direct_key == direct_key).first()
@@ -469,7 +555,6 @@ def create_group_conversation(
     current_user: UserModel = Depends(get_current_user),
 ):
     _ensure_chat_access(current_user)
-    _ensure_group_creator(current_user)
 
     title = payload.title.strip()
     if not title:
@@ -489,6 +574,8 @@ def create_group_conversation(
         .all()
     )
     if len(members) != len(member_ids):
+        raise HTTPException(status_code=400, detail="One or more selected staff members are unavailable.")
+    if any(not _users_share_hotel(current_user, member) for member in members):
         raise HTTPException(status_code=400, detail="One or more selected staff members are unavailable.")
 
     conversation = ChatConversationModel(
@@ -620,8 +707,11 @@ def get_general_history(
 ):
     _ensure_chat_access(current_user)
     _ensure_general_conversation_for_user(db, current_user)
+    hotel_id = require_hotel_id(current_user, db)
     general = (
-        db.query(ChatConversationModel).filter(ChatConversationModel.system_key == GENERAL_CONVERSATION_KEY).first()
+        db.query(ChatConversationModel)
+        .filter(ChatConversationModel.system_key == _general_conversation_key(hotel_id))
+        .first()
     )
     if not general:
         return []
@@ -629,9 +719,21 @@ def get_general_history(
 
 
 @router.get("/chat/online")
-def get_online_users(current_user: UserModel = Depends(get_current_user)):
+def get_online_users(
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+):
     _ensure_chat_access(current_user)
-    return manager.online_users()
+    hotel_id = require_hotel_id(current_user, db)
+    online = manager.online_users()
+    if not online:
+        return []
+    online_ids = [entry["id"] for entry in online]
+    allowed_ids = {
+        user.id
+        for user in db.query(UserModel).filter(UserModel.id.in_(online_ids), UserModel.hotel_id == hotel_id).all()
+    }
+    return [entry for entry in online if entry["id"] in allowed_ids]
 
 
 @router.websocket("/ws/chat")

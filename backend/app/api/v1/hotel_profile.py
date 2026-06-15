@@ -3,8 +3,9 @@ import re
 from app.db.session import SessionLocal
 from app.models.hotel_profile import HotelProfile as HotelProfileModel
 from app.models.user import User as UserModel
-from app.security.auth import get_current_user
-from fastapi import APIRouter, Depends, HTTPException, status
+from app.security.auth import get_current_user, get_optional_current_user
+from app.security.tenancy import get_hotel_profile_for_user
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
@@ -25,6 +26,7 @@ def get_db():
 class HotelProfileOut(BaseModel):
     id: int
     hotel_name: str
+    city: str | None = None
     address: str | None
     lat: float | None
     lng: float | None
@@ -42,6 +44,7 @@ class HotelProfileOut(BaseModel):
 
 class HotelProfileUpdate(BaseModel):
     hotel_name: str | None = Field(None, min_length=1, max_length=255)
+    city: str | None = Field(None, max_length=100)
     address: str | None = None
     lat: float | None = Field(None, ge=-90, le=90)
     lng: float | None = Field(None, ge=-180, le=180)
@@ -77,8 +80,21 @@ def _get_or_create_profile(db: Session) -> HotelProfileModel:
 
 
 @router.get("/hotel/profile", response_model=HotelProfileOut)
-def get_hotel_profile(db: Session = Depends(get_db)):
-    """Public endpoint — guest page reads this without auth."""
+def get_hotel_profile(
+    hotelId: int | None = Query(default=None, alias="hotelId"),
+    db: Session = Depends(get_db),
+    current_user: UserModel | None = Depends(get_optional_current_user),
+):
+    """Public read by hotelId; authenticated hotel staff without hotelId use their own hotel."""
+    if hotelId is not None:
+        profile = db.query(HotelProfileModel).filter(HotelProfileModel.id == hotelId).first()
+        if not profile:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Hotel not found.")
+        return profile
+
+    if current_user and current_user.hotel_id:
+        return get_hotel_profile_for_user(current_user, db)
+
     return _get_or_create_profile(db)
 
 
@@ -91,7 +107,7 @@ def update_hotel_profile(
     if current_user.role.upper() not in ADMIN_ROLES:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions.")
 
-    profile = _get_or_create_profile(db)
+    profile = get_hotel_profile_for_user(current_user, db)
 
     update_fields = payload.model_dump(exclude_unset=True)
     for field, value in update_fields.items():

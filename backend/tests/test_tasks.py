@@ -73,9 +73,21 @@ class TestTaskCRUD:
         assert resp.status_code == 404
 
     def test_assign_task(self, client, db):
-        make_owner(db)
+        from sqlalchemy import text
+
+        owner = make_owner(db)
         token = login_owner(client)
         room = make_room(db)
+        db.execute(
+            text(
+                """
+                INSERT INTO staff_members (name, role, is_active, annual_days_off, hotel_id)
+                VALUES ('Alice', 'cleaner', 1, 20, :hotel_id)
+                """
+            ),
+            {"hotel_id": owner.hotel_id},
+        )
+        db.commit()
         r = client.post(
             "/api/v1/tasks",
             json={"roomId": room.id, "roomNumber": room.number},
@@ -162,14 +174,54 @@ class TestTaskLifecycle:
         assert len(tasks) == 1
         assert tasks[0]["roomId"] == room1.id
 
+    def test_create_task_with_custom_checklist(self, client, db):
+        make_owner(db)
+        token = login_owner(client)
+        room = make_room(db)
+        resp = client.post(
+            "/api/v1/tasks",
+            json={
+                "roomId": room.id,
+                "roomNumber": room.number,
+                "checklistItems": ["Wash windows", "Replace towels"],
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
+        checklist = resp.json()["checklist"]
+        assert len(checklist) == 2
+        assert checklist[0]["label"] == "Wash windows"
+        assert checklist[0]["checked"] is False
+
+    def test_create_task_uses_default_checklist(self, client, db):
+        make_owner(db)
+        token = login_owner(client)
+        room = make_room(db)
+        resp = client.post(
+            "/api/v1/tasks",
+            json={"roomId": room.id, "roomNumber": room.number},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
+        labels = [item["label"] for item in resp.json()["checklist"]]
+        assert labels == ["Cleaning room", "Change bedding", "Refill mini bar"]
+
     def test_round_robin_assigns_staff_when_available(self, client, db):
         """When a cleaner exists in staff_members, the task is auto-assigned (In Progress)."""
         from sqlalchemy import text
 
-        make_owner(db)
+        owner = make_owner(db)
         token = login_owner(client)
         room = make_room(db)
-        db.execute(text("INSERT INTO staff_members (name, role, is_active) VALUES ('Bob', 'cleaner', 1)"))
+        db.execute(
+            text(
+                """
+                INSERT INTO staff_members (name, role, is_active, annual_days_off, hotel_id)
+                VALUES ('Bob', 'cleaner', 1, 20, :hotel_id)
+                """
+            ),
+            {"hotel_id": owner.hotel_id},
+        )
         db.commit()
         resp = client.post(
             "/api/v1/tasks",

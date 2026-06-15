@@ -1,19 +1,45 @@
 from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 
 from app.core.logging import get_logger
 from app.db.session import SessionLocal
-from app.models.booking import Booking as BookingModel
 from app.models.room import Room as RoomModel
+from app.models.user import User as UserModel
 from app.security.auth import require_roles
-from fastapi import APIRouter, Depends, HTTPException
+from app.security.tenancy import require_hotel_id
+from app.services.room_availability import get_available_rooms_for_stay, parse_booking_dates
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_, text
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 router = APIRouter(tags=["rooms"])
 logger = get_logger(__name__)
 
+ROOM_PHOTOS_DIR = Path(__file__).resolve().parents[3] / "uploads" / "rooms"
+MAX_ROOM_PHOTO_BYTES = 5 * 1024 * 1024
+ALLOWED_ROOM_PHOTO_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+
 VALID_ROOM_STATUSES = {"Available", "Occupied", "Cleaning", "Out of Service"}
+ACCEPTED_ROOM_STATUSES = VALID_ROOM_STATUSES | {"Maintenance"}
+
+
+def normalize_status_for_db(status: str) -> str:
+    if status == "Maintenance":
+        return "Out of Service"
+    return status
+
+
+def normalize_status_for_api(status: str) -> str:
+    if status == "Out of Service":
+        return "Maintenance"
+    return status
 
 
 def get_db():
@@ -32,6 +58,11 @@ class RoomBase(BaseModel):
     capacity: int = Field(..., ge=1)
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    areaSqm: int | None = Field(None, ge=1)
+    bedType: str | None = None
+    viewType: str | None = None
+    floor: int | None = Field(None, ge=0)
 
 
 class RoomCreate(RoomBase):
@@ -46,6 +77,11 @@ class RoomUpdate(BaseModel):
     capacity: int | None = Field(None, ge=1)
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    areaSqm: int | None = Field(None, ge=1)
+    bedType: str | None = None
+    viewType: str | None = None
+    floor: int | None = Field(None, ge=0)
 
 
 class Room(RoomBase):
@@ -68,6 +104,10 @@ class AvailableRoomResponse(BaseModel):
     capacity: int
     description: str | None = None
     amenities: list[str] | None = None
+    photoUrl: str | None = None
+    bedType: str | None = None
+    viewType: str | None = None
+    areaSqm: int | None = None
     totalPrice: float
     nights: int
 
@@ -141,11 +181,16 @@ def serialize_room(room: RoomModel, pricing_map: dict[str, dict] | None = None) 
         id=room.id,
         number=room.number,
         category=room.category,
-        status=room.status,
+        status=normalize_status_for_api(room.status),
         price=room.price,
         capacity=room.capacity,
         description=room.description,
         amenities=room.amenities if room.amenities else [],
+        photoUrl=room.photo_url,
+        areaSqm=room.area_sqm,
+        bedType=room.bed_type,
+        viewType=room.view_type,
+        floor=room.floor,
         dynamicPrice=pricing_info.get("dynamicPrice"),
         priceSource=pricing_info.get("priceSource"),
         pricingStayDate=pricing_info.get("pricingStayDate"),
@@ -154,17 +199,38 @@ def serialize_room(room: RoomModel, pricing_map: dict[str, dict] | None = None) 
     )
 
 
+def _room_payload_to_model_fields(payload: dict) -> dict:
+    field_map = {
+        "photoUrl": "photo_url",
+        "areaSqm": "area_sqm",
+        "bedType": "bed_type",
+        "viewType": "view_type",
+    }
+    model_fields: dict = {}
+    for key, value in payload.items():
+        if key == "status" and value is not None:
+            if value not in ACCEPTED_ROOM_STATUSES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
+                )
+            model_fields["status"] = normalize_status_for_db(value)
+            continue
+        model_fields[field_map.get(key, key)] = value
+    return model_fields
+
+
 @router.get("/rooms/available", response_model=AvailabilityResponse)
 def get_available_rooms(
     checkIn: str,
     checkOut: str,
     category: str | None = None,
     capacity: int | None = None,
+    hotelId: int | None = Query(default=None, alias="hotelId"),
     db: Session = Depends(get_db),
 ):
     try:
-        check_in_date = datetime.fromisoformat(checkIn.replace("Z", "+00:00"))
-        check_out_date = datetime.fromisoformat(checkOut.replace("Z", "+00:00"))
+        check_in_date, check_out_date, _ = parse_booking_dates(checkIn, checkOut)
     except (ValueError, AttributeError) as err:
         raise HTTPException(
             status_code=400,
@@ -178,49 +244,14 @@ def get_available_rooms(
     if check_out_date <= check_in_date:
         raise HTTPException(status_code=400, detail="Check-out date must be after check-in date")
 
-    nights = (check_out_date - check_in_date).days
-
-    query = db.query(RoomModel).filter(RoomModel.status == "Available")
-    if category:
-        query = query.filter(RoomModel.category == category)
-    if capacity:
-        query = query.filter(RoomModel.capacity >= capacity)
-
-    all_rooms = query.all()
-
-    conflicting_bookings = (
-        db.query(BookingModel)
-        .filter(
-            and_(
-                BookingModel.status.in_(["Confirmed", "Upcoming", "Checked-in"]),
-                or_(
-                    and_(BookingModel.check_in >= check_in_date, BookingModel.check_in < check_out_date),
-                    and_(BookingModel.check_out > check_in_date, BookingModel.check_out <= check_out_date),
-                    and_(BookingModel.check_in <= check_in_date, BookingModel.check_out >= check_out_date),
-                ),
-            )
-        )
-        .all()
+    available_rooms, nights = get_available_rooms_for_stay(
+        db,
+        check_in_date,
+        check_out_date,
+        hotel_id=hotelId,
+        category=category,
+        capacity=capacity,
     )
-
-    conflicting_room_ids = {booking.room_id for booking in conflicting_bookings}
-
-    held_rows = db.execute(
-        text(
-            """
-            SELECT DISTINCT room_id FROM room_holds
-            WHERE expires_at > :now
-              AND check_in < :check_out
-              AND check_out > :check_in
-            """
-        ),
-        {"now": datetime.now(), "check_in": check_in_date, "check_out": check_out_date},
-    ).fetchall()
-    held_room_ids = {row[0] for row in held_rows}
-
-    available_rooms = [
-        room for room in all_rooms if room.id not in conflicting_room_ids and room.id not in held_room_ids
-    ]
 
     return AvailabilityResponse(
         availableRooms=[
@@ -232,6 +263,10 @@ def get_available_rooms(
                 capacity=room.capacity,
                 description=room.description,
                 amenities=room.amenities if room.amenities else [],
+                photoUrl=room.photo_url,
+                bedType=room.bed_type,
+                viewType=room.view_type,
+                areaSqm=room.area_sqm,
                 totalPrice=round(room.price * nights, 2),
                 nights=nights,
             )
@@ -245,9 +280,10 @@ def get_available_rooms(
 @router.get("/rooms", response_model=list[Room])
 def get_all_rooms(
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    rooms = db.query(RoomModel).all()
+    hotel_id = require_hotel_id(current_user, db)
+    rooms = db.query(RoomModel).filter(RoomModel.hotel_id == hotel_id).all()
     pricing_map = load_latest_room_pricing(db)
     return [serialize_room(room, pricing_map) for room in rooms]
 
@@ -256,9 +292,10 @@ def get_all_rooms(
 def get_room_by_id(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     pricing_map = load_latest_room_pricing(db)
@@ -269,28 +306,32 @@ def get_room_by_id(
 def create_room(
     room: RoomCreate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
-    if room.status not in VALID_ROOM_STATUSES:
+    hotel_id = require_hotel_id(current_user, db)
+    if room.status not in ACCEPTED_ROOM_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
+            detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
         )
-    existing_room = (
-        db.query(RoomModel).filter(RoomModel.number == room.number, RoomModel.hotel_id == room.hotelId).first()
-    )
+    existing_room = db.query(RoomModel).filter(RoomModel.hotel_id == hotel_id, RoomModel.number == room.number).first()
     if existing_room:
         raise HTTPException(status_code=400, detail="Room with this number already exists for this hotel")
 
     db_room = RoomModel(
+        hotel_id=hotel_id,
         number=room.number,
         category=room.category,
-        status=room.status,
+        status=normalize_status_for_db(room.status),
         price=room.price,
         capacity=room.capacity,
         description=room.description,
         amenities=room.amenities,
-        hotel_id=room.hotelId,
+        photo_url=room.photoUrl,
+        area_sqm=room.areaSqm,
+        bed_type=room.bedType,
+        view_type=room.viewType,
+        floor=room.floor,
     )
     db.add(db_room)
     db.commit()
@@ -304,29 +345,29 @@ def update_room(
     room_id: int,
     room_update: RoomUpdate,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
 ):
-    db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    db_room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
 
-    if room_update.status is not None and room_update.status not in VALID_ROOM_STATUSES:
+    if room_update.status is not None and room_update.status not in ACCEPTED_ROOM_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Must be one of: {sorted(VALID_ROOM_STATUSES)}",
+            detail=f"Invalid status. Must be one of: {sorted(ACCEPTED_ROOM_STATUSES)}",
         )
 
     if room_update.number and room_update.number != db_room.number:
         existing_room = (
-            db.query(RoomModel)
-            .filter(RoomModel.number == room_update.number, RoomModel.hotel_id == db_room.hotel_id)
-            .first()
+            db.query(RoomModel).filter(RoomModel.hotel_id == hotel_id, RoomModel.number == room_update.number).first()
         )
         if existing_room:
             raise HTTPException(status_code=400, detail="Room with this number already exists for this hotel")
 
     update_data = room_update.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
+    model_fields = _room_payload_to_model_fields(update_data)
+    for field, value in model_fields.items():
         setattr(db_room, field, value)
 
     db.commit()
@@ -335,13 +376,44 @@ def update_room(
     return serialize_room(db_room, pricing_map)
 
 
+class RoomPhotoUploadResponse(BaseModel):
+    url: str
+
+
+@router.post("/rooms/upload-photo", response_model=RoomPhotoUploadResponse, status_code=201)
+async def upload_room_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN", "DIRECTOR", "MANAGER")),
+):
+    require_hotel_id(current_user, db)
+    content_type = (file.content_type or "").lower()
+    extension = ALLOWED_ROOM_PHOTO_TYPES.get(content_type)
+    if not extension:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPEG, PNG, WebP, or GIF.")
+
+    payload = await file.read()
+    if not payload:
+        raise HTTPException(status_code=400, detail="Empty file.")
+    if len(payload) > MAX_ROOM_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="Image is too large. Maximum size is 5 MB.")
+
+    ROOM_PHOTOS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}{extension}"
+    destination = ROOM_PHOTOS_DIR / filename
+    destination.write_bytes(payload)
+
+    return RoomPhotoUploadResponse(url=f"/api/v1/uploads/rooms/{filename}")
+
+
 @router.delete("/rooms/{room_id}", status_code=204)
 def delete_room(
     room_id: int,
     db: Session = Depends(get_db),
-    _auth=Depends(require_roles("OWNER", "SYS_ADMIN")),
+    current_user: UserModel = Depends(require_roles("OWNER", "SYS_ADMIN")),
 ):
-    db_room = db.query(RoomModel).filter(RoomModel.id == room_id).first()
+    hotel_id = require_hotel_id(current_user, db)
+    db_room = db.query(RoomModel).filter(RoomModel.id == room_id, RoomModel.hotel_id == hotel_id).first()
     if not db_room:
         raise HTTPException(status_code=404, detail="Room not found")
 

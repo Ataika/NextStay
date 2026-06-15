@@ -66,3 +66,6 @@ scripts/report/screenshots/
 
 # Word temp lock files
 ~$*
+
+# backend file uploads (room photos etc.)
+backend/uploads/

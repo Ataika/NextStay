@@ -37,21 +37,31 @@ http.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    // Handle 401 - unauthorized
+    // Handle 401 - unauthorized (skip redirect on public guest access pages)
     if (error.response?.status === 401) {
-      const { clearAuth } = useAuthStore.getState();
-      clearAuth();
+      const requestUrl = error.config?.url ?? "";
+      const isGuestAccessRequest = requestUrl.includes("/guest/");
+      const isOnGuestPage = window.location.pathname.startsWith("/guest/");
 
-      // Redirect to login page
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
+      if (!isGuestAccessRequest && !isOnGuestPage) {
+        const { clearAuth } = useAuthStore.getState();
+        clearAuth();
+
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+
+        toast.error("Session expired. Please login again.");
       }
 
-      toast.error("Session expired. Please login again.");
       return Promise.reject(error);
     }
 
-    // Handle other errors
+    // Avoid toast spam when the client hits API rate limits
+    if (error.response?.status === 429) {
+      return Promise.reject(error);
+    }
+
     const errorMessage = getErrorMessage(error);
     toast.error(errorMessage);
 

@@ -1,16 +1,19 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { tasksApi, staffApi } from "../../api/api";
 import { useI18n } from "../../i18n";
 import type { CleaningTask } from "../../mocks/tasks";
 import type { StaffMember, ShiftResponse } from "../../api/api";
 import { useAuthStore } from "../../store/authStore";
-import TaskCard from "../../components/TaskCard";
+import StaffCompactTaskItem from "../../components/staff/StaffCompactTaskItem";
+import StaffTasksSidebar from "../../components/staff/StaffTasksSidebar";
+import { STAFF_PATHS, staffTabFromPath, type StaffTab } from "../../utils/staffNav";
 import LoadingSpinner from "../../ui/LoadingSpinner";
 import Card from "../../ui/Card";
 import Modal from "../../ui/Modal";
 import Button from "../../ui/Button";
 import toast from "react-hot-toast";
+import { resolveTaskChecklist } from "../../utils/taskDisplay";
 
 // ---------------------------------------------------------------------------
 // Date helpers
@@ -73,45 +76,6 @@ type ShiftType = keyof typeof SHIFT_CONFIG;
 const MONTH_HOURS = 160;
 
 // ---------------------------------------------------------------------------
-// ShiftTimer — running clock since login, heartbeat every 2 min
-// ---------------------------------------------------------------------------
-
-function ShiftTimer({ loginTime }: { loginTime: string }) {
-  const { t } = useI18n();
-  const [elapsed, setElapsed] = useState(0);
-
-  useEffect(() => {
-    const start = new Date(loginTime).getTime();
-    const tick  = () => setElapsed(Math.floor((Date.now() - start) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [loginTime]);
-
-  // Heartbeat every 2 minutes keeps the session verified
-  useEffect(() => {
-    const id = setInterval(() => { void staffApi.heartbeat().catch(() => {}); }, 120_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-
-  return (
-    <div className="flex items-center gap-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
-      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shrink-0" />
-      <div>
-        <p className="text-[10px] uppercase tracking-wide text-green-600 dark:text-green-500 font-semibold">{t("shifts.active")}</p>
-        <p className="text-sm font-bold text-green-800 dark:text-green-300 tabular-nums leading-none mt-0.5">
-          {String(h).padStart(2, "0")}:{String(m).padStart(2, "0")}:{String(s).padStart(2, "0")}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Progress bar
 // ---------------------------------------------------------------------------
 
@@ -128,19 +92,18 @@ function ProgressBar({ value, max, color = "bg-blue-500" }: { value: number; max
 // Main component
 // ---------------------------------------------------------------------------
 
-type Tab = "tasks" | "schedule" | "calendar" | "hours";
 type StatusFilter   = CleaningTask["status"] | "All";
 type PriorityFilter = CleaningTask["priority"] | "All";
 
 export default function StaffPage() {
-  const navigate    = useNavigate();
   const { locale, priorityLabel, roleLabel: translateRoleLabel, shiftLabel, t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
   const authName    = useAuthStore((s) => s.name);
   const authEmail   = useAuthStore((s) => s.email);
-  const loginTime   = useAuthStore((s) => s.loginTime);
   const setStaffId  = useAuthStore((s) => s.setStaffId);
 
-  const [tab, setTab] = useState<Tab>("tasks");
+  const tab = staffTabFromPath(location.pathname);
 
   // --- Profile ---
   const [profile, setProfile] = useState<StaffMember | null>(null);
@@ -151,9 +114,11 @@ export default function StaffPage() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [statusFilter, setStatusFilter]   = useState<StatusFilter>("All");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
-  const [onlyMyTasks, setOnlyMyTasks]     = useState(false);
+  const [taskListTab, setTaskListTab] = useState<"active" | "completed">("active");
+  const [expandedTaskId, setExpandedTaskId] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget]   = useState<CleaningTask | null>(null);
   const [deleting, setDeleting]           = useState(false);
+  const initialTasksLoadRef = useRef(true);
 
   // --- Schedule (weekly) ---
   const [weekStart, setWeekStart]       = useState(() => getMondayOf(new Date()));
@@ -179,14 +144,19 @@ export default function StaffPage() {
     })();
   }, [setStaffId]);
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(async (options?: { silent?: boolean }) => {
     try {
-      setTasksLoading(true);
+      if (!options?.silent) {
+        setTasksLoading(initialTasksLoadRef.current);
+      }
       setTasks(await tasksApi.getAll());
     } catch {
       toast.error(t("staff.failedLoadTasks"));
     } finally {
-      setTasksLoading(false);
+      if (!options?.silent) {
+        setTasksLoading(false);
+        initialTasksLoadRef.current = false;
+      }
     }
   }, [t]);
 
@@ -225,7 +195,9 @@ export default function StaffPage() {
   }, [calMonth, t]);
 
   useEffect(() => { void loadTasks(); }, [loadTasks]);
-  useEffect(() => { if (tab === "schedule") void loadSchedule(); }, [tab, loadSchedule]);
+  useEffect(() => {
+    if (tab === "overview" || tab === "tasks" || tab === "schedule") void loadSchedule();
+  }, [tab, loadSchedule]);
   useEffect(() => { if (tab === "calendar") void loadCalendar(); }, [tab, loadCalendar]);
 
   // ---------------------------------------------------------------------------
@@ -237,17 +209,41 @@ export default function StaffPage() {
     try {
       await tasksApi.assign(taskId, profile.id, profile.name);
       toast.success(t("staff.taskStarted"));
-      void loadTasks();
+      void loadTasks({ silent: true });
     } catch {
       toast.error(t("staff.failedStartTask"));
     }
   };
 
+  const handleChecklistToggle = async (taskId: number, itemId: string, checked: boolean) => {
+    setTasks((prev) =>
+      prev.map((task) => {
+        if (task.id !== taskId) return task;
+        const checklist = resolveTaskChecklist(task).map((item) =>
+          item.id === itemId ? { ...item, checked } : item
+        );
+        return {
+          ...task,
+          checklist,
+          status: task.status === "Pending" ? "In Progress" : task.status,
+        };
+      })
+    );
+
+    try {
+      const updated = await tasksApi.updateChecklistItem(taskId, itemId, checked);
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? updated : task)));
+    } catch {
+      void loadTasks({ silent: true });
+      toast.error(t("staff.failedUpdateChecklist"));
+    }
+  };
+
   const handleComplete = async (taskId: number) => {
     try {
-      await tasksApi.complete(taskId);
+      const updated = await tasksApi.complete(taskId);
+      setTasks((prev) => prev.map((task) => (task.id === taskId ? updated : task)));
       toast.success(t("staff.taskCompleted"));
-      void loadTasks();
     } catch {
       toast.error(t("staff.failedCompleteTask"));
     }
@@ -272,14 +268,31 @@ export default function StaffPage() {
   // Derived data
   // ---------------------------------------------------------------------------
 
+  const myTasks = useMemo(() => {
+    if (!profile) return tasks;
+    return tasks.filter((task) => task.assignedTo === profile.id);
+  }, [tasks, profile]);
+
+  const overviewTasks = useMemo(() => {
+    return myTasks.filter((task) =>
+      taskListTab === "completed"
+        ? task.status === "Completed"
+        : task.status !== "Completed"
+    );
+  }, [myTasks, taskListTab]);
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      if (statusFilter !== "All" && t.status !== statusFilter) return false;
-      if (priorityFilter !== "All" && t.priority !== priorityFilter) return false;
-      if (onlyMyTasks && profile && t.assignedTo !== profile.id) return false;
+    return myTasks.filter((task) => {
+      const matchesTab =
+        taskListTab === "completed"
+          ? task.status === "Completed"
+          : task.status !== "Completed";
+      if (!matchesTab) return false;
+      if (statusFilter !== "All" && task.status !== statusFilter) return false;
+      if (priorityFilter !== "All" && task.priority !== priorityFilter) return false;
       return true;
     });
-  }, [tasks, statusFilter, priorityFilter, onlyMyTasks, profile]);
+  }, [myTasks, taskListTab, statusFilter, priorityFilter]);
 
   const taskStats = useMemo(() => ({
     pending:    tasks.filter((t) => t.status === "Pending").length,
@@ -324,23 +337,110 @@ export default function StaffPage() {
   // Render
   // ---------------------------------------------------------------------------
 
-  return (
-    <div className="w-full max-w-2xl mx-auto space-y-5 px-4 py-6">
+  const taskListToggle = (
+    <div className="flex gap-1 bg-gray-100 dark:bg-gray-900 rounded-lg p-1">
+      <button
+        type="button"
+        onClick={() => {
+          setTaskListTab("active");
+          if (statusFilter === "Completed") setStatusFilter("All");
+        }}
+        className={`px-3 py-1.5 text-xs rounded-md font-medium ${
+          taskListTab === "active"
+            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+            : "text-gray-500"
+        }`}
+      >
+        {t("staff.myTasks")}
+      </button>
+      <button
+        type="button"
+        onClick={() => setTaskListTab("completed")}
+        className={`px-3 py-1.5 text-xs rounded-md font-medium ${
+          taskListTab === "completed"
+            ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+            : "text-gray-500"
+        }`}
+      >
+        {t("taskStatus.Completed")}
+      </button>
+    </div>
+  );
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-            {profileLoading ? t("staff.loading") : t("staff.hello", { name: displayName.split(" ")[0] })}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            {roleLabel ? `${roleLabel} · ` : ""}{authEmail ?? ""}
-          </p>
+  const renderTaskList = (list: CleaningTask[]) => {
+    if (tasksLoading) {
+      return <LoadingSpinner message={t("staff.loadingTasks")} fullScreen={false} />;
+    }
+    if (list.length === 0) {
+      return (
+        <Card padding="lg">
+          <p className="text-center text-sm text-gray-400">{t("staff.noTasks")}</p>
+        </Card>
+      );
+    }
+    return (
+      <div className="space-y-2">
+        {list.map((task) => (
+          <StaffCompactTaskItem
+            key={task.id}
+            task={task}
+            expanded={expandedTaskId === task.id}
+            onToggleExpand={() =>
+              setExpandedTaskId((current) => (current === task.id ? null : task.id))
+            }
+            currentStaffId={profile?.id ?? -1}
+            onStart={handleStart}
+            onComplete={handleComplete}
+            onChecklistToggle={handleChecklistToggle}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const mobileTabs: StaffTab[] = ["overview", "tasks", "schedule", "calendar", "hours"];
+
+  return (
+    <div className={`w-full mx-auto space-y-5 ${tab === "tasks" ? "max-w-5xl" : "max-w-3xl"}`}>
+        <div className="md:hidden flex gap-1 overflow-x-auto bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          {mobileTabs.map((tabName) => (
+            <Link
+              key={tabName}
+              to={STAFF_PATHS[tabName]}
+              className={`shrink-0 px-3 py-1.5 text-xs rounded-md font-medium transition-colors ${
+                tab === tabName
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500"
+              }`}
+            >
+              {tabName === "overview"
+                ? t("staff.tabOverview")
+                : tabName === "tasks"
+                  ? t("staff.tabTasks")
+                  : tabName === "schedule"
+                    ? t("staff.tabSchedule")
+                    : tabName === "calendar"
+                      ? t("staff.tabCalendar")
+                      : t("staff.tabHours")}
+            </Link>
+          ))}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {loginTime && <ShiftTimer loginTime={loginTime} />}
-          {profile && (
-            <div className="text-right">
+
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              {profileLoading ? t("staff.loading") : t("staff.hello", { name: displayName.split(" ")[0] })}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {tab === "overview"
+                ? t("staff.dashboardSubtitle")
+                : tab === "tasks"
+                  ? t("staff.tabTasks")
+                  : `${roleLabel ? `${roleLabel} · ` : ""}${authEmail ?? ""}`}
+            </p>
+          </div>
+          {profile && (tab === "overview" || tab === "hours") && (
+            <div className="text-right shrink-0">
               <p className="text-xs text-gray-400">{t("staff.thisMonth")}</p>
               <p className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
                 {profile.hours_this_month}h
@@ -348,123 +448,99 @@ export default function StaffPage() {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Shift start prompt */}
-      {!loginTime && (
-        <div className="flex items-center justify-between gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t("staff.shiftNotStarted")}</p>
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t("staff.shiftNotStartedPrompt")}</p>
-          </div>
-          <button
-            onClick={() => navigate("/shift-start")}
-            className="shrink-0 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-lg transition-colors"
-          >
-            {t("staff.startShift")}
-          </button>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-        {(["tasks", "schedule", "calendar", "hours"] as const).map((tabName) => (
-          <button
-            key={tabName}
-            onClick={() => setTab(tabName)}
-            className={`flex-1 py-1.5 text-xs sm:text-sm rounded-md font-medium transition-colors capitalize ${
-              tab === tabName
-                ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-            }`}
-          >
-            {tabName === "tasks"
-              ? t("staff.tabTasks")
-              : tabName === "schedule"
-                ? t("staff.tabSchedule")
-                : tabName === "calendar"
-                  ? t("staff.tabCalendar")
-                  : t("staff.tabHours")}
-          </button>
-        ))}
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* TASKS TAB                                                           */}
-      {/* ------------------------------------------------------------------ */}
-      {tab === "tasks" && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: t("staff.statPending"), value: taskStats.pending, color: "text-gray-900 dark:text-white" },
-              { label: t("staff.statInProgress"), value: taskStats.inProgress, color: "text-blue-700 dark:text-blue-300" },
-              { label: t("staff.statCompleted"), value: taskStats.completed, color: "text-emerald-700 dark:text-emerald-300" },
-            ].map((s) => (
-              <Card key={s.label} padding="sm" className="text-center">
-                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{s.label}</p>
-              </Card>
-            ))}
-          </div>
-
-          <Card padding="md">
-            <div className="space-y-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="All">{t("staff.allStatuses")}</option>
-                <option value="Pending">{t("taskStatus.Pending")}</option>
-                <option value="In Progress">{t("taskStatus.InProgress")}</option>
-                <option value="Completed">{t("taskStatus.Completed")}</option>
-              </select>
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="All">{t("staff.allPriorities")}</option>
-                <option value="High">{priorityLabel("High")}</option>
-                <option value="Medium">{priorityLabel("Medium")}</option>
-                <option value="Low">{priorityLabel("Low")}</option>
-              </select>
-              {profile && (
-                <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={onlyMyTasks}
-                    onChange={(e) => setOnlyMyTasks(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  <span className="text-sm text-gray-900 dark:text-white">{t("staff.onlyMyTasks")}</span>
-                </label>
-              )}
-            </div>
-          </Card>
-
-          {tasksLoading ? (
-            <LoadingSpinner message={t("staff.loadingTasks")} fullScreen={false} />
-          ) : filteredTasks.length === 0 ? (
-            <Card padding="lg">
-              <p className="text-center text-sm text-gray-400">{t("staff.noTasks")}</p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {filteredTasks.map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onStart={handleStart}
-                  onComplete={handleComplete}
-                  onDelete={(id) => setDeleteTarget(filteredTasks.find((t) => t.id === id) ?? null)}
-                  currentStaffId={profile?.id ?? -1}
-                />
+        {tab === "overview" && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: t("staff.statPending"), value: taskStats.pending, color: "text-gray-900 dark:text-white", icon: "🕒" },
+                { label: t("staff.statInProgress"), value: taskStats.inProgress, color: "text-blue-700 dark:text-blue-300", icon: "🔄" },
+                { label: t("staff.statCompleted"), value: taskStats.completed, color: "text-emerald-700 dark:text-emerald-300", icon: "✅" },
+              ].map((s) => (
+                <Card key={s.label} padding="sm" className="flex items-center gap-3">
+                  <span className="text-xl">{s.icon}</span>
+                  <div>
+                    <p className={`text-2xl font-bold leading-none ${s.color}`}>{s.value}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{s.label}</p>
+                  </div>
+                </Card>
               ))}
             </div>
-          )}
-        </div>
-      )}
+
+            <Card padding="sm">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{t("staff.myTasks")}</p>
+                {taskListToggle}
+              </div>
+              {renderTaskList(overviewTasks)}
+            </Card>
+
+            <Card padding="sm">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{t("staff.todayProgress")}</p>
+              <p className="text-xs text-gray-500 mb-2">
+                {t("staff.completedSummary", {
+                  done: String(taskStats.completed),
+                  total: String(tasks.length),
+                })}
+              </p>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="h-2 rounded-full bg-emerald-500 transition-all"
+                  style={{
+                    width: `${tasks.length ? Math.round((taskStats.completed / tasks.length) * 100) : 0}%`,
+                  }}
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {tab === "tasks" && (
+          <div className="grid grid-cols-1 xl:grid-cols-[260px_1fr] gap-4">
+            <div className="space-y-4 order-1 xl:order-none">
+              <StaffTasksSidebar
+                tasks={tasks}
+                shifts={shifts}
+                hoursThisMonth={profile?.hours_this_month ?? 0}
+                onOpenSchedule={() => navigate(STAFF_PATHS.schedule)}
+                onOpenHours={() => navigate(STAFF_PATHS.hours)}
+              />
+            </div>
+
+            <div className="space-y-3 order-2 xl:order-none">
+              <Card padding="sm">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  {taskListToggle}
+                  <div className="flex gap-2 sm:ml-auto w-full sm:w-auto">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                      className="flex-1 sm:flex-none px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="All">{t("staff.allStatuses")}</option>
+                      <option value="Pending">{t("taskStatus.Pending")}</option>
+                      <option value="In Progress">{t("taskStatus.InProgress")}</option>
+                      {taskListTab === "completed" && (
+                        <option value="Completed">{t("taskStatus.Completed")}</option>
+                      )}
+                    </select>
+                    <select
+                      value={priorityFilter}
+                      onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
+                      className="flex-1 sm:flex-none px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    >
+                      <option value="All">{t("staff.allPriorities")}</option>
+                      <option value="High">{priorityLabel("High")}</option>
+                      <option value="Medium">{priorityLabel("Medium")}</option>
+                      <option value="Low">{priorityLabel("Low")}</option>
+                    </select>
+                  </div>
+                </div>
+              </Card>
+              {renderTaskList(filteredTasks)}
+            </div>
+          </div>
+        )}
 
       {/* ------------------------------------------------------------------ */}
       {/* SCHEDULE TAB (weekly)                                               */}
