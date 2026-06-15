@@ -63,3 +63,6 @@ analytics/dbt/logs/
 
 # report screenshots (regenerated from the running stack)
 scripts/report/screenshots/
+
+# Word temp lock files
+~$*
