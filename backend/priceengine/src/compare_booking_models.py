@@ -17,16 +17,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.pipeline import Pipeline
 
-# Use a writable matplotlib config/cache in the system temp dir (container-safe).
-_mpl_cache = Path(tempfile.gettempdir()) / "nextstay_mplconfig"
-_mpl_cache.mkdir(parents=True, exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(_mpl_cache))
-
-import matplotlib  # noqa: E402
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-
 # Allow running this file as a script from project root.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -119,7 +109,23 @@ def save_model_artifact(
         json.dump(metadata, handle, indent=2, default=str)
 
 
+def _import_plt():
+    """Lazily import matplotlib so the module is importable without it (only plotting needs it)."""
+    # Use a writable matplotlib config/cache in the system temp dir (container-safe).
+    _mpl_cache = Path(tempfile.gettempdir()) / "nextstay_mplconfig"
+    _mpl_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(_mpl_cache))
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    return plt
+
+
 def create_metrics_plot(test_metrics_df: pd.DataFrame, output_path: Path) -> None:
+    plt = _import_plt()
     order = test_metrics_df.sort_values("log_loss")["model_name"].tolist()
     plot_df = test_metrics_df.set_index("model_name").loc[order].reset_index()
 
@@ -150,6 +156,7 @@ def create_roc_plot(
     predictions: dict[str, np.ndarray],
     output_path: Path,
 ) -> None:
+    plt = _import_plt()
     fig, ax = plt.subplots(figsize=(7, 6))
     for model_name, probs in predictions.items():
         fpr, tpr, _ = roc_curve(y_true, probs)
@@ -173,6 +180,7 @@ def create_calibration_plot(
     predictions: dict[str, np.ndarray],
     output_path: Path,
 ) -> None:
+    plt = _import_plt()
     fig, ax = plt.subplots(figsize=(7, 6))
     for model_name, probs in predictions.items():
         frac_pos, mean_pred = calibration_curve(y_true, probs, n_bins=10, strategy="quantile")

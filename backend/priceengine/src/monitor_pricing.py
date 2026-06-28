@@ -4,10 +4,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -79,6 +75,11 @@ def create_plots(
     rule_usage_df: pd.DataFrame,
     outputs_dir: Path,
 ) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.bar(by_hotel_df["hotel_id"].astype(str), by_hotel_df["total_expected_revenue"], color="#2a9d8f")
     ax.set_title("Expected Revenue by Hotel")

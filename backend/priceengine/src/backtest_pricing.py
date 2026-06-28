@@ -4,10 +4,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -76,6 +72,11 @@ def create_plots(
     row_results_df: pd.DataFrame,
     outputs_dir: Path,
 ) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     # Revenue uplift by hotel.
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.bar(
