@@ -10,6 +10,8 @@ LOGGER = logging.getLogger(__name__)
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "migrations"
 MIGRATION_ORDER = [
     "00_sync_user_columns.sql",
+    "add_staff_tables.sql",
+    "add_hotel_id_to_staff_members.sql",
     "add_users_and_auth_sessions.sql",
     "add_email_otps.sql",
     "add_stripe_fields.sql",
