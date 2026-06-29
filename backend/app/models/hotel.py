@@ -1,5 +1,5 @@
 from app.db.base import Base
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.sql import func
 
 
@@ -9,6 +9,8 @@ class Hotel(Base):
     id = Column(Integer, primary_key=True, index=True)
     code = Column(String(50), unique=True, nullable=False, index=True)
     name = Column(String(150), nullable=False)
+    # Optional grouping: a hotel may belong to a company (group over hotel_id tenancy).
+    company_id = Column(Integer, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True)
     webhook_url = Column(String(500), nullable=True)
     # Sensitive: never expose in API responses or logs.
     hmac_secret = Column(String(255), nullable=True)

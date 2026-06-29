@@ -5,6 +5,7 @@ from pathlib import Path
 from app.api.v1.auth import router as auth_router
 from app.api.v1.bookings import router as bookings_router
 from app.api.v1.chat import router as chat_router
+from app.api.v1.companies import router as companies_router
 from app.api.v1.guest import router as guest_router
 from app.api.v1.health import router as health_router
 from app.api.v1.holds import router as holds_router
@@ -16,6 +17,7 @@ from app.api.v1.pricing_config import router as pricing_config_router
 from app.api.v1.pricing_lab import router as pricing_lab_router
 from app.api.v1.pricing_pipeline import router as pricing_pipeline_router
 from app.api.v1.register import router as register_router
+from app.api.v1.reports import router as reports_router
 from app.api.v1.rooms import router as rooms_router
 from app.api.v1.staff import router as staff_router
 from app.api.v1.stripe import router as stripe_router
@@ -118,6 +120,8 @@ app.include_router(inventory_setup_router, prefix="/api/v1")
 app.include_router(holds_router, prefix="/api/v1")
 app.include_router(staff_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
+app.include_router(companies_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
 app.include_router(hotel_sync_router, prefix="/api/v1")
 
 register_exception_handlers(app)

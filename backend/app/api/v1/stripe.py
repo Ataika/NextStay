@@ -4,6 +4,7 @@ from app.core.logging import get_logger
 from app.core.utils import count_stay_nights
 from app.db.session import SessionLocal
 from app.models.booking import Booking as BookingModel
+from app.models.payment import Payment as PaymentModel
 from app.models.room import Room as RoomModel
 from app.models.user import User as UserModel
 from app.services.email_service import send_booking_confirmation_to_guest, send_booking_notification_to_owner
@@ -152,10 +153,67 @@ async def stripe_webhook(
     except stripe.error.SignatureVerificationError as err:
         raise HTTPException(status_code=400, detail=f"Invalid signature: {str(err)}") from err
 
+    # Record every incoming event for audit + idempotency. A redelivered event
+    # (same event id) updates the existing audit row instead of duplicating it.
+    payment = record_payment_event(event, db)
+
     if event["type"] == "checkout.session.completed":
-        handle_checkout_session_completed(event["data"]["object"], db, background_tasks)
+        try:
+            handle_checkout_session_completed(event["data"]["object"], db, background_tasks)
+        except Exception as exc:  # noqa: BLE001 — keep the audit row, surface for Stripe retry
+            payment.error_message = str(exc)
+            db.commit()
+            logger.exception("Stripe webhook handler failed for event %s", event.get("id"))
+            raise HTTPException(status_code=500, detail="Webhook handler error") from exc
 
     return {"status": "success"}
+
+
+def _derive_hotel_id(db: Session, booking_id: int | None) -> tuple[int | None, int | None]:
+    """Return (booking_id, hotel_id) — hotel_id derived from the booking's room."""
+    if not booking_id:
+        return None, None
+    booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
+    if not booking:
+        # Booking gone — don't store a dangling FK; the id is still in payload for audit.
+        return None, None
+    room = db.query(RoomModel).filter(RoomModel.id == booking.room_id).first()
+    return booking_id, (room.hotel_id if room else None)
+
+
+def record_payment_event(event: dict, db: Session) -> PaymentModel:
+    """Upsert a Payment audit row keyed by the Stripe event id (idempotent)."""
+    event_id = event["id"]
+    obj = event.get("data", {}).get("object", {}) or {}
+    metadata = obj.get("metadata") or {}
+    raw_booking_id = metadata.get("booking_id")
+    booking_id = int(raw_booking_id) if raw_booking_id else None
+    booking_id, hotel_id = _derive_hotel_id(db, booking_id)
+
+    customer_email = (obj.get("customer_details") or {}).get("email") or obj.get("customer_email")
+    fields = dict(
+        event_type=event.get("type"),
+        booking_id=booking_id,
+        hotel_id=hotel_id,
+        stripe_session_id=obj.get("id") if str(event.get("type", "")).startswith("checkout.session") else None,
+        stripe_payment_intent_id=obj.get("payment_intent"),
+        payment_status=obj.get("payment_status") or obj.get("status"),
+        currency=obj.get("currency"),
+        amount_total_cents=obj.get("amount_total"),
+        customer_email=customer_email,
+        payload=event,
+    )
+
+    payment = db.query(PaymentModel).filter(PaymentModel.stripe_event_id == event_id).first()
+    if payment:
+        for key, value in fields.items():
+            setattr(payment, key, value)
+    else:
+        payment = PaymentModel(stripe_event_id=event_id, **fields)
+        db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
 
 
 def handle_checkout_session_completed(session: dict, db: Session, background_tasks: BackgroundTasks):
@@ -163,7 +221,13 @@ def handle_checkout_session_completed(session: dict, db: Session, background_tas
     booking = db.query(BookingModel).filter(BookingModel.id == booking_id).first()
 
     if not booking:
+        # Permanent condition (booking gone) — nothing to retry; audit row already records the event.
         logger.warning("Stripe webhook: booking %d not found.", booking_id)
+        return
+
+    if booking.status == "Confirmed":
+        # Idempotent: a redelivered event must not re-confirm or re-send emails.
+        logger.info("Booking %d already confirmed; skipping (idempotent).", booking_id)
         return
 
     booking.status = "Confirmed"

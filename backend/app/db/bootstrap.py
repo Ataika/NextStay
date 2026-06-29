@@ -23,6 +23,7 @@ MIGRATION_ORDER = [
     "add_chat_wallpaper_to_users.sql",
     "add_password_hash_to_users.sql",
     "add_preferred_language_to_users.sql",
+    "add_company_to_hotels.sql",
 ]
 
 

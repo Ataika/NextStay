@@ -69,3 +69,7 @@ scripts/report/screenshots/
 
 # backend file uploads (room photos etc.)
 backend/uploads/
+
+# JetBrains IDE
+.idea/
+**/.idea/

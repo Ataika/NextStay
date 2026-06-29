@@ -24,11 +24,13 @@ from app.models import booking as _booking_mod  # noqa: F401
 from app.models import chat_conversation as _cc_mod  # noqa: F401
 from app.models import chat_message as _cm_mod  # noqa: F401
 from app.models import chat_participant as _cp_mod  # noqa: F401
+from app.models import company as _company_mod  # noqa: F401
 from app.models import email_otp as _otp_mod  # noqa: F401
 from app.models import guest_token as _gt_mod  # noqa: F401
 from app.models import hotel as _hotel_mod  # noqa: F401
 from app.models import hotel_invite as _hi_mod  # noqa: F401
 from app.models import hotel_profile as _hp_mod  # noqa: F401
+from app.models import payment as _payment_mod  # noqa: F401
 from app.models import room as _room_mod  # noqa: F401
 from app.models import task as _task_mod  # noqa: F401
 from app.models import user as _user_mod  # noqa: F401  ensure model registered
@@ -60,17 +62,34 @@ from app.api.v1 import (  # noqa: E402
     auth,
     bookings,
     chat,
+    companies,
     hotel_profile,
     hotel_sync,
     register,
+    reports,
     rooms,
     staff,
+    stripe,
     tasks,
     users,
 )
 from app.security import auth as security_auth  # noqa: E402
 
-for module in (auth, bookings, rooms, tasks, hotel_profile, staff, chat, hotel_sync, register, users):
+for module in (
+    auth,
+    bookings,
+    rooms,
+    tasks,
+    hotel_profile,
+    staff,
+    chat,
+    hotel_sync,
+    register,
+    users,
+    stripe,
+    companies,
+    reports,
+):
     app.dependency_overrides[module.get_db] = override_get_db
 
 app.dependency_overrides[security_auth.get_db] = override_get_db
