@@ -1,6 +1,6 @@
 # Hotel Sync — Phase 1: Multi-Hotel DB Foundation — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation:** follow tasks step by step. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ввести реестр отелей (`hotels`) и привязку `rooms.hotel_id`, чтобы синхронизация перестала быть single-hotel — фундамент для варианта A.
 

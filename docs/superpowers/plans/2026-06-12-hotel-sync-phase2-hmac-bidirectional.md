@@ -1,6 +1,6 @@
 # Hotel Sync — Phase 2: HMAC + Bidirectional Sync — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement task-by-task. Steps use checkbox (`- [ ]`) syntax.
+> **Implementation:** follow tasks step by step. Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** Поднять hotel-sync с one-way single-hotel до защищённой двусторонней мульти-отельной синхронизации: HMAC-подпись событий, валидация отеля по реестру, hotel-scoping поиска номеров, и обратный webhook PMS→отель с защитой от эхо-петель.
 

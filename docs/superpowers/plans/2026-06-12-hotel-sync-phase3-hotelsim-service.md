@@ -1,6 +1,6 @@
 # Hotel Sync — Phase 3: Hotel Simulator Service — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **Implementation:** follow tasks step by step. Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** Standalone `hotelsim` service that plays the role of an external hotel's website: a mini booking site + local store, which pushes signed `booking_created`/`booking_cancelled` events to the NextStay PMS and receives PMS→hotel webhooks — closing the bidirectional demo.
 

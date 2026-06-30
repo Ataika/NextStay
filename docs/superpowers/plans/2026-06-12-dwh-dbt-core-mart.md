@@ -1,6 +1,6 @@
 # DWH — dbt CORE + MART — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans. Steps use checkbox (`- [ ]`) syntax.
+> **Implementation:** follow tasks step by step. Steps use checkbox (`- [ ]`) syntax.
 
 **Goal:** Build the dimensional warehouse in dbt — fix the broken staging, add CORE (dims + fact + SCD snapshot) and MART (occupancy, RevPAR, loyalty) layers on top of the real OLTP schema, with dbt tests, runnable and verified locally.
 
